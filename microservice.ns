@@ -1,0 +1,66 @@
+source tb_compat.tcl
+set ns [new Simulator]
+
+# Contents of opt are passed to the emulated environment
+set opt(NSERVERS) 4
+set opt(NCLIENTS) 4
+
+set lanstr ""
+
+
+# Create the server nodes
+for {set i 0} {$i < $opt(NSERVERS)} {incr i} {
+	set servers($i) [$ns node]
+	tb-set-node-os $servers($i) UBUNTU14-64-STD
+}
+
+# Create the client nodes
+for {set i 0} {$i < $opt(NCLIENTS)} {incr i} {
+	set clients($i) [$ns node]
+	tb-set-node-os $clients($i) UBUNTU14-64-STD
+}
+
+# TODO(theano) Link all clients to all servers?
+for {set i 0} {$i < $opt(NCLIENTS)} {incr i} {
+	for {set j 0} {$j < $opt(NSERVERS)} {incr j} {
+		append lanstr "$clients($i) $servers($j) "
+		$ns duplex-link $clients($i) $servers($j) 10Gb 0ms DropTail
+ 	}
+}
+
+# TODO(theano) Create a lan?
+set sys-lan [$ns make-lan "$lanstr" 10Gb 0ms]
+
+
+$ns rtproto Static
+$ns run
+
+
+
+######
+set server [$ns node]
+tb-fix-node $server pc838
+
+set client [$ns node]
+tb-fix-node $client pc837
+
+#set sequencer [$ns node]
+#tb-fix-node $sequencer pc609
+
+set lan0 [$ns make-lan "$server $client" 10Gb 0ms]
+set link0 [$ns duplex-link $client $server 10Gb 0ms DropTail]
+#set link1 [$ns duplex-link $client $sequencer 10Gb 0ms DropTail]
+#set link2 [$ns duplex-link $sequencer $server 10Gb 0ms DropTail]
+#set link1 [$ns duplex-link $client2 $server 10Gb 0ms DropTail]
+
+#tb-set-link-loss $link0 .01
+
+
+tb-set-node-os $server UBUNTU14-64-STD
+tb-set-node-os $client UBUNTU14-64-STD
+#tb-set-node-os $sequencer ubuntu-sequencer
+
+
+#tb-set-node-os $client2 ubuntu-netmap
+
+
