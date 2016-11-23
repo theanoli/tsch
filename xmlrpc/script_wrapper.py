@@ -261,10 +261,6 @@ def do_method(module, method, params):
     if rval != RESPONSE_SUCCESS:
         if response["value"]:
             rval = response["value"]
-            if rval:
-                print "Return value: " + rval
-            else: 
-                print "Success!"
             pass
         pass
     return (rval, response)
