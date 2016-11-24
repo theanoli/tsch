@@ -1,9 +1,9 @@
 #! /bin/bash
 #
-# Modeled after https://github.com/joshpfosi/dup_aware_scheduling
-#
 # Sets up Emulab nodes: 
-# 	- build memcached
+#	- installs dependencies and sets up directory
+# 	- builds memcached
+#	- builds YCSB
 #
 # Usage: build-emulab.sh emulab_user nclients nservers
 #
@@ -18,6 +18,6 @@ EMULAB_USER=$1
 NCLIENTS=$2
 NSERVERS=$3
 
-./build-dependencies.sh $EMULAB_USER $NCLIENTS $NSERVERS
-./build-memcached.sh $EMULAB_USER $NSERVERS
-./build-ycsb.sh $EMULAB_USER $NCLIENTS
+sh ./build-dependencies.sh $EMULAB_USER $NCLIENTS $NSERVERS
+sh ./build-memcached.sh $EMULAB_USER 
+sh ./build-ycsb.sh $EMULAB_USER $NCLIENTS

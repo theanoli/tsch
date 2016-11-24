@@ -4,6 +4,7 @@
 # 	- maven
 # 
 
+cd /usr/local/tsch
 tar -xzf ycsb.tar.gz > /dev/null
 rm -rf ycsb.tar.gz
 

@@ -5,10 +5,10 @@
 #	- libevent
 #
 
-cd /usr/local
+cd /usr/local/tsch
 tar -zxf memcached.tar.gz > /dev/null
 rm memcached.tar.gz
 
-cd memcached
+cd memcached-1.4.33
 ./configure --prefix=/usr/local/memcached > /dev/null
-make && sudo make install > /dev/null
+make > /dev/null && sudo make install > /dev/null

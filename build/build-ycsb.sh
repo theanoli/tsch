@@ -14,13 +14,14 @@ EMULAB_USER=$1
 NCLIENTS=$2
 
 EXPID=sequencer.sequencer.emulab
+SSH="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=100"
 
 for i in `seq 0 $(($NCLIENTS-1))`; 
 do
 	(
-	HOST=$EMULAB_USER@client-$i.$EXPID.net
+	HOST=$EMULAB_USER@clients-$i.$EXPID.net
 	echo "Installing YCSB on $HOST..."
-	scp ycsb.tar.gz $HOST:/usr/local/
+	scp ycsb.tar.gz $HOST:/usr/local/tsch
 	cat setup-ycsb.sh | $SSH $HOST
 	) &
 done 

@@ -14,11 +14,11 @@ fi
 
 EMULAB_USER=$1
 EXPID=sequencer.sequencer.emulab
-SSH="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=100"
 
 HOST=$EMULAB_USER@servers-0.$EXPID.net
+SSH="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=100"
 
 echo "Building memcached on $HOST..."
-scp memcached.tar.gz $HOST:/usr/local/
+scp memcached.tar.gz $HOST:/usr/local/tsch
 cat setup-memcached.sh | $SSH $HOST
 

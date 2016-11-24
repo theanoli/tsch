@@ -1,7 +1,5 @@
 #! /bin/bash
 #
-# Modeled after joshpfosi/dup_aware_scheduling git repo
-#
 # Sets up server & client node dependencies:
 # 	- (what are they?)
 #
@@ -27,7 +25,7 @@ do
 		HOST=$EMULAB_USER@servers-$i.$EXPID.net
 		echo "Setting up $HOST..."
 		cat setup-dependencies.sh | $SSH $HOST
-	) &
+	)
 done
 
 for i in `seq 0 $(($NCLIENTS-1))`
@@ -36,7 +34,7 @@ do
 		HOST=$EMULAB_USER@clients-$i.$EXPID.net
 		echo "Setting up $HOST..."
 		cat setup-dependencies.sh | $SSH $HOST
-	) &
+	)
 done
 
 wait
