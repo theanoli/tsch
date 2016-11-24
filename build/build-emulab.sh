@@ -9,7 +9,7 @@
 #
 
 # Check args
-if [ "$#" -ne 2 ]; then
+if [ "$#" -ne 3 ]; then
 	echo "Usage: $0 emulab_user nclients nservers"
 	exit 1
 fi

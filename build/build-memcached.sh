@@ -13,12 +13,12 @@ if [ "$#" -ne 1 ]; then
 fi
 
 EMULAB_USER=$1
-EXPID=sequencer.sequencer
+EXPID=sequencer.sequencer.emulab
 SSH="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=100"
 
 HOST=$EMULAB_USER@servers-0.$EXPID.net
 
 echo "Building memcached on $HOST..."
-scp memcached $HOST:/usr/local/
+scp memcached.tar.gz $HOST:/usr/local/
 cat setup-memcached.sh | $SSH $HOST
 

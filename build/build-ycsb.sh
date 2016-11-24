@@ -13,7 +13,9 @@ fi
 EMULAB_USER=$1
 NCLIENTS=$2
 
-for i in `seq $NCLIENTS`; 
+EXPID=sequencer.sequencer.emulab
+
+for i in `seq 0 $(($NCLIENTS-1))`; 
 do
 	(
 	HOST=$EMULAB_USER@client-$i.$EXPID.net

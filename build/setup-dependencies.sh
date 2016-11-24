@@ -10,6 +10,6 @@
 echo "Updating apt-get..."
 sudo apt-get update -y > /dev/null
 echo "Installing libevent..."
-sudo apt-get install libevent-dev > /dev/null
+sudo apt-get install -y libevent-dev > /dev/null
 echo "Installing maven..."
 sudo apt-get install -y maven > /dev/null
