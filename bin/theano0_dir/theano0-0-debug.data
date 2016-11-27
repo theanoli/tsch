@@ -1,0 +1,80 @@
+Warning: Permanently added 'clients-0.sequencer.sequencer.emulab.net,155.98.36.67' (RSA) to the list of known hosts.
+[WARN]  Running against a source checkout. In order to get our runtime dependencies we'll have to invoke Maven. Depending on the state of your system, this may take ~30-45 seconds
+[DEBUG]  Running 'mvn -pl com.yahoo.ycsb:memcached-binding -am package -DskipTests dependency:build-classpath -DincludeScope=compile -Dmdep.outputFilterFile=true'
+java -cp /usr/local/tsch/YCSB/memcached/conf:/usr/local/tsch/YCSB/memcached/target/memcached-binding-0.13.0-SNAPSHOT.jar:/users/theano/.m2/repository/log4j/log4j/1.2.17/log4j-1.2.17.jar:/users/theano/.m2/repository/org/apache/htrace/htrace-core4/4.1.0-incubating/htrace-core4-4.1.0-incubating.jar:/usr/local/tsch/YCSB/core/target/core-0.13.0-SNAPSHOT.jar:/users/theano/.m2/repository/org/codehaus/jackson/jackson-core-asl/1.9.4/jackson-core-asl-1.9.4.jar:/users/theano/.m2/repository/org/codehaus/jackson/jackson-mapper-asl/1.9.13/jackson-mapper-asl-1.9.13.jar:/users/theano/.m2/repository/org/hdrhistogram/HdrHistogram/2.1.4/HdrHistogram-2.1.4.jar:/users/theano/.m2/repository/net/spy/spymemcached/2.11.4/spymemcached-2.11.4.jar com.yahoo.ycsb.Client -db com.yahoo.ycsb.db.MemcachedClient -s -P workloads/workloada -p memcached.hosts=servers-0.sequencer.sequencer.emulab.net:9456 -p memcached.connsPerServer=2 -p memcached.numThreads=2 -p fieldlength=50 -p requestdistribution=uniform -p recordcount=1000 -threads 4 -load
+YCSB Client 0.13.0-SNAPSHOT
+Command line: -db com.yahoo.ycsb.db.MemcachedClient -s -P workloads/workloada -p memcached.hosts=servers-0.sequencer.sequencer.emulab.net:9456 -p memcached.connsPerServer=2 -p memcached.numThreads=2 -p fieldlength=50 -p requestdistribution=uniform -p recordcount=1000 -threads 4 -load
+Loading workload...
+log4j:WARN No appenders could be found for logger (org.apache.htrace.core.Tracer).
+log4j:WARN Please initialize the log4j system properly.
+log4j:WARN See http://logging.apache.org/log4j/1.2/faq.html#noconfig for more info.
+Starting test.
+2016-11-27 14:24:50:325 0 sec: 0 operations; est completion in 0 seconds 
+2016-11-27 14:24:50.439 INFO net.spy.memcached.MemcachedConnection:  Added {QA sa=servers-0.sequencer.sequencer.emulab.net/155.98.36.79:9456, #Rops=0, #Wops=0, #iq=0, topRop=null, topWop=null, toWrite=0, interested=0} to connect queue
+2016-11-27 14:24:50.439 INFO net.spy.memcached.MemcachedConnection:  Added {QA sa=servers-0.sequencer.sequencer.emulab.net/155.98.36.79:9456, #Rops=0, #Wops=0, #iq=0, topRop=null, topWop=null, toWrite=0, interested=0} to connect queue
+2016-11-27 14:24:50.439 INFO net.spy.memcached.MemcachedConnection:  Added {QA sa=servers-0.sequencer.sequencer.emulab.net/155.98.36.79:9456, #Rops=0, #Wops=0, #iq=0, topRop=null, topWop=null, toWrite=0, interested=0} to connect queue
+2016-11-27 14:24:50.439 INFO net.spy.memcached.MemcachedConnection:  Added {QA sa=servers-0.sequencer.sequencer.emulab.net/155.98.36.79:9456, #Rops=0, #Wops=0, #iq=0, topRop=null, topWop=null, toWrite=0, interested=0} to connect queue
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+2016-11-27 14:24:50.954 INFO net.spy.memcached.MemcachedConnection:  Shut down memcached client
+2016-11-27 14:24:50.954 INFO net.spy.memcached.MemcachedConnection:  Shut down memcached client
+2016-11-27 14:24:50.954 INFO net.spy.memcached.MemcachedConnection:  Shut down memcached client
+2016-11-27 14:24:50.962 INFO net.spy.memcached.MemcachedConnection:  Shut down memcached client
+2016-11-27 14:24:50:963 0 sec: 1000 operations; 1564.95 current ops/sec; [CLEANUP: Count=4, Max=5087, Min=870, Avg=3044.5, 90=5087, 99=5087, 99.9=5087, 99.99=5087] [INSERT: Count=1000, Max=118015, Min=934, Avg=1772.16, 90=1723, 99=2571, 99.9=114495, 99.99=118015] 
+[WARN]  Running against a source checkout. In order to get our runtime dependencies we'll have to invoke Maven. Depending on the state of your system, this may take ~30-45 seconds
+[DEBUG]  Running 'mvn -pl com.yahoo.ycsb:memcached-binding -am package -DskipTests dependency:build-classpath -DincludeScope=compile -Dmdep.outputFilterFile=true'
+java -cp /usr/local/tsch/YCSB/memcached/conf:/usr/local/tsch/YCSB/memcached/target/memcached-binding-0.13.0-SNAPSHOT.jar:/users/theano/.m2/repository/log4j/log4j/1.2.17/log4j-1.2.17.jar:/users/theano/.m2/repository/org/apache/htrace/htrace-core4/4.1.0-incubating/htrace-core4-4.1.0-incubating.jar:/usr/local/tsch/YCSB/core/target/core-0.13.0-SNAPSHOT.jar:/users/theano/.m2/repository/org/codehaus/jackson/jackson-core-asl/1.9.4/jackson-core-asl-1.9.4.jar:/users/theano/.m2/repository/org/codehaus/jackson/jackson-mapper-asl/1.9.13/jackson-mapper-asl-1.9.13.jar:/users/theano/.m2/repository/org/hdrhistogram/HdrHistogram/2.1.4/HdrHistogram-2.1.4.jar:/users/theano/.m2/repository/net/spy/spymemcached/2.11.4/spymemcached-2.11.4.jar com.yahoo.ycsb.Client -db com.yahoo.ycsb.db.MemcachedClient -s -P workloads/workloada -p memcached.hosts=servers-0.sequencer.sequencer.emulab.net:9456 -p memcached.connsPerServer=2 -p memcached.numThreads=2 -p fieldlength=50 -p requestdistribution=uniform -p recordcount=1000 -threads 4 -t
+YCSB Client 0.13.0-SNAPSHOT
+Command line: -db com.yahoo.ycsb.db.MemcachedClient -s -P workloads/workloada -p memcached.hosts=servers-0.sequencer.sequencer.emulab.net:9456 -p memcached.connsPerServer=2 -p memcached.numThreads=2 -p fieldlength=50 -p requestdistribution=uniform -p recordcount=1000 -threads 4 -t
+Loading workload...
+log4j:WARN No appenders could be found for logger (org.apache.htrace.core.Tracer).
+log4j:WARN Please initialize the log4j system properly.
+log4j:WARN See http://logging.apache.org/log4j/1.2/faq.html#noconfig for more info.
+Starting test.
+2016-11-27 14:25:04:591 0 sec: 0 operations; est completion in 0 seconds 
+2016-11-27 14:25:04.702 INFO net.spy.memcached.MemcachedConnection:  Added {QA sa=servers-0.sequencer.sequencer.emulab.net/155.98.36.79:9456, #Rops=0, #Wops=0, #iq=0, topRop=null, topWop=null, toWrite=0, interested=0} to connect queue
+2016-11-27 14:25:04.702 INFO net.spy.memcached.MemcachedConnection:  Added {QA sa=servers-0.sequencer.sequencer.emulab.net/155.98.36.79:9456, #Rops=0, #Wops=0, #iq=0, topRop=null, topWop=null, toWrite=0, interested=0} to connect queue
+2016-11-27 14:25:04.702 INFO net.spy.memcached.MemcachedConnection:  Added {QA sa=servers-0.sequencer.sequencer.emulab.net/155.98.36.79:9456, #Rops=0, #Wops=0, #iq=0, topRop=null, topWop=null, toWrite=0, interested=0} to connect queue
+2016-11-27 14:25:04.702 INFO net.spy.memcached.MemcachedConnection:  Added {QA sa=servers-0.sequencer.sequencer.emulab.net/155.98.36.79:9456, #Rops=0, #Wops=0, #iq=0, topRop=null, topWop=null, toWrite=0, interested=0} to connect queue
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+2016-11-27 14:25:05.225 INFO net.spy.memcached.MemcachedConnection:  Shut down memcached client
+2016-11-27 14:25:05.225 INFO net.spy.memcached.MemcachedConnection:  Shut down memcached client
+2016-11-27 14:25:05.255 INFO net.spy.memcached.MemcachedConnection:  Shut down memcached client
+2016-11-27 14:25:05.257 INFO net.spy.memcached.MemcachedConnection:  Shut down memcached client
+2016-11-27 14:25:05:258 0 sec: 1000 operations; 1490.31 current ops/sec; [CLEANUP: Count=4, Max=4343, Min=1015, Avg=2637.25, 90=4343, 99=4343, 99.9=4343, 99.99=4343] [READ: Count=523, Max=73535, Min=940, Avg=1868.29, 90=1558, 99=2209, 99.9=73535, 99.99=73535] [UPDATE: Count=477, Max=87103, Min=846, Avg=1815.97, 90=1242, 99=1828, 99.9=87103, 99.99=87103] 
+[OVERALL], RunTime(ms), 671.0
+[OVERALL], Throughput(ops/sec), 1490.312965722802
+[TOTAL_GCS_PS_Scavenge], Count, 0.0
+[TOTAL_GC_TIME_PS_Scavenge], Time(ms), 0.0
+[TOTAL_GC_TIME_%_PS_Scavenge], Time(%), 0.0
+[TOTAL_GCS_PS_MarkSweep], Count, 0.0
+[TOTAL_GC_TIME_PS_MarkSweep], Time(ms), 0.0
+[TOTAL_GC_TIME_%_PS_MarkSweep], Time(%), 0.0
+[TOTAL_GCs], Count, 0.0
+[TOTAL_GC_TIME], Time(ms), 0.0
+[TOTAL_GC_TIME_%], Time(%), 0.0
+[CLEANUP], Operations, 4.0
+[CLEANUP], AverageLatency(us), 2637.25
+[CLEANUP], MinLatency(us), 1015.0
+[CLEANUP], MaxLatency(us), 4343.0
+[CLEANUP], 95thPercentileLatency(us), 4343.0
+[CLEANUP], 99thPercentileLatency(us), 4343.0
+[READ], Operations, 523.0
+[READ], AverageLatency(us), 1868.2906309751434
+[READ], MinLatency(us), 940.0
+[READ], MaxLatency(us), 73535.0
+[READ], 95thPercentileLatency(us), 1685.0
+[READ], 99thPercentileLatency(us), 2209.0
+[READ], Return=OK, 523
+[UPDATE], Operations, 477.0
+[UPDATE], AverageLatency(us), 1815.9706498951782
+[UPDATE], MinLatency(us), 846.0
+[UPDATE], MaxLatency(us), 87103.0
+[UPDATE], 95thPercentileLatency(us), 1287.0
+[UPDATE], 99thPercentileLatency(us), 1828.0
+[UPDATE], Return=OK, 477
