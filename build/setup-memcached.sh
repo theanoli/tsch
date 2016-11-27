@@ -5,10 +5,13 @@
 #	- libevent
 #
 
+export DEBIAN_FRONTEND "noninteractive"
+export LANG "C"
+
 cd /usr/local/tsch
-tar -zxf memcached.tar.gz > /dev/null
+tar -zxf memcached.tar.gz > /dev/null 
 rm memcached.tar.gz
 
-cd memcached-1.4.33
-./configure --prefix=/usr/local/memcached > /dev/null
-make > /dev/null && sudo make install > /dev/null
+cd memcached
+./configure --prefix=/usr/local/memcached > /dev/null 
+make > /dev/null && sudo make install > /dev/null 

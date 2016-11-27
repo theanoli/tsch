@@ -4,6 +4,9 @@
 # 	- maven
 # 
 
+export DEBIAN_FRONTEND "noninteractive"
+export LANG "C"
+
 cd /usr/local/tsch
 tar -xzf ycsb.tar.gz > /dev/null
 rm -rf ycsb.tar.gz
