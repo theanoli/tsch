@@ -11,7 +11,7 @@ set lanstr ""
 # Create the server nodes
 for {set i 0} {$i < $opt(NSERVERS)} {incr i} {
 	set servers($i) [$ns node]
-	tb-set-node-os $servers($i) SRV_UBUNTU14-64-STD
+	tb-set-node-os $servers($i) SERV_UBUNTU14-64-STD
 	append lanstr "$servers($i) "
 }
 
