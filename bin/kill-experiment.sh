@@ -8,19 +8,19 @@ if [ "$#" -ne 3 ]; then
 fi
 
 EMULAB_USER=$1
-NUM_CLIENTS=$2
-NUM_SERVERS=$3
+NCLIENTS=$2
+NSERVERS=$3
 
 EXPID=sequencer.sequencer.emulab.net
 
-echo "Killing clients..."
+echo "Killing $NCLIENTS clients..."
 for i in `seq 0 $(($NCLIENTS-1))`
 do
 	(echo "pkill -f 'bin/ycsb'; pkill -f 'java'" | ssh \
 	$EMULAB_USER@clients-$i.$EXPID &> /dev/null) &
 done
 
-echo "Killing servers..."
+echo "Killing $NSERVERS servers..."
 for i in `seq 0 $(($NSERVERS-1))`
 do
 	(echo "pkill memcached" | ssh $EMULAB_USER@servers-$i.$EXPID &> /dev/null) &

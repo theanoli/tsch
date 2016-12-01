@@ -2,11 +2,11 @@
 #
 # Runs an experiment.
 #
-# Usage: sh experiment.sh <emulab_user> <WORKLOAD> <CONNS_PER_SERVER> <NTHREADS> <OUTPUT>
-# <RECORDSIZE> <CLIENT_THREADS> <NCLIENTS> <NSERVERS> <NOPS>
+# Usage: sh experiment.sh <emulab_user> <workload> <conns_per_server> <nthreads>
+# <recordsize> <client_threads> <nclients> <nservers> <nops> <output>
 
 if [ "$#" -ne 10 ]; then
-	echo "Usage: $0 <emulab_user> <WORKLOAD> <CONNS_PER_SERVER> <NTHREADS> <OUTPUT> <RECORDSIZE> <CLIENT_THREADS> <NCLIENTS> <NSERVERS> <NOPS>"
+	echo "Usage: sh $0 <emulab_user> <workload> <conns_per_server> <nthreads> <recordsize> <client_threads> <nclients> <nservers> <nops> <output>"
 	exit 1
 fi
 
@@ -49,7 +49,7 @@ done
 # Run clients
 # ------------------------------------------------------------------------------
 
-echo $@ | tee -a $OUTPUT_DIR/$OUTPUT.data $OUTPUT_DIR/$OUTPUT-debug.data > /dev/null
+echo $@ >> $OUTPUT_DIR/$OUTPUT.data
 
 for i in `seq 0 $(($NCLIENTS-1))`
 do
@@ -57,9 +57,8 @@ do
 	echo "Running YCSB on client $i: workload=$WORKLOAD"
 	cat run-client.sh | $SSH $EMULAB_USER@clients-$i\.$EXPID bash -s - \
 	$PORT $WORKLOAD $CONNS_PER_SERVER $NTHREADS $RECORDSIZE $CLIENT_THREADS $NSERVERS \
-	$NOPS 2> $OUTPUT_DIR/$OUTPUT-$i-debug.data | tee -a \
-	$OUTPUT_DIR/$OUTPUT-$i-debug.data | grep Throughput | cut -d"," -f3 | \
-	xargs >> $OUTPUT_DIR/$OUTPUT.data
+	$NOPS 2> $OUTPUT_DIR/$OUTPUT-$i-debug.data \
+	>> $OUTPUT_DIR/$OUTPUT.data
  	) &
 	pids[$i]=$!
 done
@@ -79,4 +78,4 @@ for pid in ${pids[*]}; do wait $pid; done;
 # 	# Use CONNS_PER_SERVER to color scatter plot by unaware/aware
 # done
 
-sh kill-experiment.sh $EMULAB_USER $NCLIENTS $NSERVERS
+bash kill-experiment.sh $EMULAB_USER $NCLIENTS $NSERVERS

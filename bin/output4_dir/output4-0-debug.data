@@ -1,0 +1,37 @@
+Warning: Permanently added 'clients-0.sequencer.sequencer.emulab.net,155.98.36.150' (RSA) to the list of known hosts.
+[WARN]  Running against a source checkout. In order to get our runtime dependencies we'll have to invoke Maven. Depending on the state of your system, this may take ~30-45 seconds
+[DEBUG]  Running 'mvn -pl com.yahoo.ycsb:memcached-binding -am package -DskipTests dependency:build-classpath -DincludeScope=compile -Dmdep.outputFilterFile=true'
+java -cp /usr/local/tsch/YCSB/memcached/conf:/usr/local/tsch/YCSB/memcached/target/memcached-binding-0.13.0-SNAPSHOT.jar:/users/theano/.m2/repository/log4j/log4j/1.2.17/log4j-1.2.17.jar:/users/theano/.m2/repository/org/apache/htrace/htrace-core4/4.1.0-incubating/htrace-core4-4.1.0-incubating.jar:/usr/local/tsch/YCSB/core/target/core-0.13.0-SNAPSHOT.jar:/users/theano/.m2/repository/org/codehaus/jackson/jackson-core-asl/1.9.4/jackson-core-asl-1.9.4.jar:/users/theano/.m2/repository/org/codehaus/jackson/jackson-mapper-asl/1.9.13/jackson-mapper-asl-1.9.13.jar:/users/theano/.m2/repository/org/hdrhistogram/HdrHistogram/2.1.4/HdrHistogram-2.1.4.jar:/users/theano/.m2/repository/net/spy/spymemcached/2.11.4/spymemcached-2.11.4.jar com.yahoo.ycsb.Client -db com.yahoo.ycsb.db.MemcachedClient -s -P workloads/workloada -p memcached.hosts=servers-0.sequencer.sequencer.emulab.net:9456 -p memcached.connsPerServer=10 -p memcached.numThreads=2 -p fieldlength=100 -p requestdistribution=uniform -p recordcount=1000 -threads 2 -load
+YCSB Client 0.13.0-SNAPSHOT
+Command line: -db com.yahoo.ycsb.db.MemcachedClient -s -P workloads/workloada -p memcached.hosts=servers-0.sequencer.sequencer.emulab.net:9456 -p memcached.connsPerServer=10 -p memcached.numThreads=2 -p fieldlength=100 -p requestdistribution=uniform -p recordcount=1000 -threads 2 -load
+Loading workload...
+log4j:WARN No appenders could be found for logger (org.apache.htrace.core.Tracer).
+log4j:WARN Please initialize the log4j system properly.
+log4j:WARN See http://logging.apache.org/log4j/1.2/faq.html#noconfig for more info.
+Starting test.
+2016-12-01 11:11:09:711 0 sec: 0 operations; est completion in 0 seconds 
+2016-12-01 11:11:09.815 INFO net.spy.memcached.MemcachedConnection:  Added {QA sa=servers-0.sequencer.sequencer.emulab.net/155.98.36.160:9456, #Rops=0, #Wops=0, #iq=0, topRop=null, topWop=null, toWrite=0, interested=0} to connect queue
+2016-12-01 11:11:09.815 INFO net.spy.memcached.MemcachedConnection:  Added {QA sa=servers-0.sequencer.sequencer.emulab.net/155.98.36.160:9456, #Rops=0, #Wops=0, #iq=0, topRop=null, topWop=null, toWrite=0, interested=0} to connect queue
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+2016-12-01 11:11:10.662 INFO net.spy.memcached.MemcachedConnection:  Shut down memcached client
+2016-12-01 11:11:10.671 INFO net.spy.memcached.MemcachedConnection:  Shut down memcached client
+2016-12-01 11:11:10:671 0 sec: 1000 operations; 1039.5 current ops/sec; [CLEANUP: Count=2, Max=4631, Min=978, Avg=2804, 90=4631, 99=4631, 99.9=4631, 99.99=4631] [INSERT: Count=1000, Max=133119, Min=976, Avg=1505.95, 90=1403, 99=2283, 99.9=133119, 99.99=133119] 
+[WARN]  Running against a source checkout. In order to get our runtime dependencies we'll have to invoke Maven. Depending on the state of your system, this may take ~30-45 seconds
+[DEBUG]  Running 'mvn -pl com.yahoo.ycsb:memcached-binding -am package -DskipTests dependency:build-classpath -DincludeScope=compile -Dmdep.outputFilterFile=true'
+java -cp /usr/local/tsch/YCSB/memcached/conf:/usr/local/tsch/YCSB/memcached/target/memcached-binding-0.13.0-SNAPSHOT.jar:/users/theano/.m2/repository/log4j/log4j/1.2.17/log4j-1.2.17.jar:/users/theano/.m2/repository/org/apache/htrace/htrace-core4/4.1.0-incubating/htrace-core4-4.1.0-incubating.jar:/usr/local/tsch/YCSB/core/target/core-0.13.0-SNAPSHOT.jar:/users/theano/.m2/repository/org/codehaus/jackson/jackson-core-asl/1.9.4/jackson-core-asl-1.9.4.jar:/users/theano/.m2/repository/org/codehaus/jackson/jackson-mapper-asl/1.9.13/jackson-mapper-asl-1.9.13.jar:/users/theano/.m2/repository/org/hdrhistogram/HdrHistogram/2.1.4/HdrHistogram-2.1.4.jar:/users/theano/.m2/repository/net/spy/spymemcached/2.11.4/spymemcached-2.11.4.jar com.yahoo.ycsb.Client -db com.yahoo.ycsb.db.MemcachedClient -s -P workloads/workloada -p memcached.hosts=servers-0.sequencer.sequencer.emulab.net:9456 -p memcached.connsPerServer=10 -p memcached.numThreads=2 -p fieldlength=100 -p requestdistribution=uniform -p recordcount=1000 -threads 2 -t
+YCSB Client 0.13.0-SNAPSHOT
+Command line: -db com.yahoo.ycsb.db.MemcachedClient -s -P workloads/workloada -p memcached.hosts=servers-0.sequencer.sequencer.emulab.net:9456 -p memcached.connsPerServer=10 -p memcached.numThreads=2 -p fieldlength=100 -p requestdistribution=uniform -p recordcount=1000 -threads 2 -t
+Loading workload...
+log4j:WARN No appenders could be found for logger (org.apache.htrace.core.Tracer).
+log4j:WARN Please initialize the log4j system properly.
+log4j:WARN See http://logging.apache.org/log4j/1.2/faq.html#noconfig for more info.
+Starting test.
+2016-12-01 11:11:24:438 0 sec: 0 operations; est completion in 0 seconds 
+2016-12-01 11:11:24.546 INFO net.spy.memcached.MemcachedConnection:  Added {QA sa=servers-0.sequencer.sequencer.emulab.net/155.98.36.160:9456, #Rops=0, #Wops=0, #iq=0, topRop=null, topWop=null, toWrite=0, interested=0} to connect queue
+2016-12-01 11:11:24.546 INFO net.spy.memcached.MemcachedConnection:  Added {QA sa=servers-0.sequencer.sequencer.emulab.net/155.98.36.160:9456, #Rops=0, #Wops=0, #iq=0, topRop=null, topWop=null, toWrite=0, interested=0} to connect queue
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+2016-12-01 11:11:25.261 INFO net.spy.memcached.MemcachedConnection:  Shut down memcached client
+2016-12-01 11:11:25.261 INFO net.spy.memcached.MemcachedConnection:  Shut down memcached client
+2016-12-01 11:11:25:265 0 sec: 1000 operations; 1206.27 current ops/sec; [CLEANUP: Count=2, Max=4447, Min=942, Avg=2694, 90=4447, 99=4447, 99.9=4447, 99.99=4447] [READ: Count=528, Max=56863, Min=878, Avg=1270.25, 90=1378, 99=1703, 99.9=2023, 99.99=56863] [UPDATE: Count=472, Max=102335, Min=859, Avg=1254.86, 90=1148, 99=1618, 99.9=102335, 99.99=102335] 
