@@ -24,7 +24,7 @@ NSERVERS=$8
 NOPS=$9
 OUTPUT=${10}
 
-OUTPUT_DIR=$OUTPUT\_dir/
+OUTPUT_DIR=../results/$OUTPUT\_results/
 
 EXPID=sequencer.sequencer.emulab.net
 
