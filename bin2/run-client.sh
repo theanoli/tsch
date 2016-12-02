@@ -3,8 +3,8 @@
 # Runs Python YCSB script on Emulab
 #
 
-if [ "$#" -ne 7 ]; then 
-	echo "Usage $0 <workload> <conns_per_server> <nthreads> <recordsize> <client_threads> <nservers> <nops>"
+if [ "$#" -ne 8 ]; then 
+	echo "Usage $0 <workload> <conns_per_server> <nthreads> <recordsize> <client_threads> <nservers> <nops> <output_dir>"
 	exit 1
 fi
 
@@ -15,11 +15,16 @@ RECORDSIZE=$4
 CLIENT_THREADS=$5
 NSERVERS=$6
 NOPS=$7
-OUTPUT=$8
+OUTPUT_DIR=$8
 
-OUTPUT_DIR=/proj/sequencer/tsch/results/$OUTPUT\_results/
 EXPID=sequencer.sequencer.emulab.net
 NRECS=100000
+         
+ 
+#---------- Set up the results directory if it doesn't exist ----------#
+echo "Making directory $OUTPUT_DIR..."
+mkdir -p $OUTPUT_DIR
+
 
 cd /proj/sequencer/YCSB
 
@@ -28,7 +33,6 @@ SERVERS=`echo $SERVERS | sed 's/^,//g'`
 SERVERS="memcached.hosts=$SERVERS"
 
 MC_CONNS_PER_SERVER="memcached.connsPerServer=$CONNS_PER_SERVER"
-MC_PORT="memcached.port=$PORT"
 MC_NTHREADS="memcached.numThreads=$NTHREADS"
 MC_FIELDLENGTH="fieldlength=$RECORDSIZE"
 MC_REQDIST="requestdistribution=uniform"
@@ -44,8 +48,8 @@ MC_OPSCOUNT="operationcount=$NOPS"
 	-p "$MC_RECCOUNT" \
 	-p "$MC_OPSCOUNT" \
 	-threads $CLIENT_THREADS \
-	2> $OUTPUT_DIR/$OUTPUT-$i-debug.data \
-	>> $OUTPUT_DIR/$OUTPUT-$i.data
+	2> $OUTPUT_DIR/$i-debug.data \
+	>> $OUTPUT_DIR/$i.data
 
 ./bin/ycsb run memcached -s -P workloads/$WORKLOAD \
 	-p "$SERVERS" \
@@ -56,8 +60,8 @@ MC_OPSCOUNT="operationcount=$NOPS"
 	-p "$MC_RECCOUNT" \
 	-p "$MC_OPSCOUNT" \
 	-threads $CLIENT_THREADS
-	2> $OUTPUT_DIR/$OUTPUT-$i-debug.data \
-	>> $OUTPUT_DIR/$OUTPUT-$i.data
+	2> $OUTPUT_DIR/$i-debug.data \
+	>> $OUTPUT_DIR/$i.data
 
 if [ $? -ne 0 ]
 then

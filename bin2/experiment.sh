@@ -5,25 +5,42 @@
 # Usage: sh experiment.sh <emulab_user> <workload> <conns_per_server> <nthreads>
 # <recordsize> <client_threads> <nclients> <nservers> <nops> <output>
 
-if [ "$#" -ne 10 ]; then
-	echo "Usage: sh $0 <emulab_user> <workload> <conns_per_server> <nthreads> <recordsize> <client_threads> <nclients> <nservers> <nops> <output>"
-	exit 1
-fi
-
 SSH="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=100 -T"
 
-EMULAB_USER=$1
-WORKLOAD=$2
-CONNS_PER_SERVER=$3
-NTHREADS=$4
-RECORDSIZE=$5
-CLIENT_THREADS=$6
-NCLIENTS=$7
-NSERVERS=$8
-NOPS=$9
-OUTPUT=${10}
+# u = user
+# w = workload
+# p = conns per server
+# t = nthreads for memcached
+# z = recordsize
+# n = client threads
+# c = nclients
+# s = nservers
+# o = nops
+# f = output dir/filename
 
-OUTPUT_DIR=/proj/sequencer/tsch/results/$OUTPUT\_results/
+while getopts ":u:w:p:t:z:n:c:s:o:f:" opt; do 
+case $opt in
+	u) EMULAB_USER=$OPTARG;;
+	w) WORKLOAD=$OPTARG;; 
+	p) CONNS_PER_SERVER=$OPTARG;;
+	t) NTHREADS=$OPTARG;;
+	z) RECORDSIZE=$OPTARG;;
+	n) CLIENT_THREADS=$OPTARG;;
+	c) NCLIENTS=$OPTARG;;
+	s) NSERVERS=$OPTARG;;
+	o) NOPS=$OPTARG;;
+	f) OUTPUT=$OPTARG;;
+	:) echo "Option -$OPTARG requires an argument." >&2
+		exit 1;;
+	\?) echo "Invalid option: -$OPTARG" >&2
+		echo "Usage: sh $0 <emulab_user> <workload> <conns_per_server> <nthreads> <recordsize> <client_threads> <nclients> <nservers> <nops> <output>"
+		exit 1;;
+esac
+done
+
+NOW=`date +%s`
+OUTPUT_DIR=/proj/sequencer/tsch/results/$OUTPUT\_$NOW\_results/
+BIN_DIR="/proj/sequencer/tsch/bin2"
 
 EXPID=sequencer.sequencer.emulab.net
 
@@ -35,13 +52,13 @@ if [ $REQ_CONNS -ge $MAX_CONNS ]; then
 	exit 1
 fi
 
-mkdir -p $OUTPUT_DIR
 
 for i in `seq 0 $(($NSERVERS-1))`
 do
 	HOST=$EMULAB_USER@servers-$i\.$EXPID
 	echo "Booting $HOST..."
-	$SSH $HOST 'bash /proj/sequencer/tsch/bin/run-server.sh $CONNS_PER_SERVER $NTHREADS' &
+	# $SSH $HOST "bash \"$BIN_DIR/run-server.sh\""
+	$SSH $HOST "sudo bash \"$BIN_DIR/run-server.sh \"$CONNS_PER_SERVER\" \"$NTHREADS\"" &
 	pids[$i]=$!
 done
 
@@ -53,26 +70,17 @@ for pid in ${pids[*]}; do wait $pid; done;
 # ------------------------------------------------------------------------------
 
 # This will append, rather than overwrite, to save us from ourselves
-echo $@ >> $OUTPUT_DIR/$OUTPUT.data
-
 for i in `seq 0 $(($NCLIENTS-1))`
 do
 	HOST=$EMULAB_USER@clients-$i\.$EXPID
 	(
 	echo "Running YCSB on client $i: workload=$WORKLOAD"
-	echo >> $OUTPUT_DIR/$OUTPUT.data
-	echo "Client $i: workload=$WORKLOAD" >> $OUTPUT_DIR/$OUTPUT.data 
-	$SSH $HOST 'bash /proj/sequencer/tsch/bin/run-client.sh $WORKLOAD $CONNS_PER_SERVER $NTHREADS \
-	$RECORDSIZE $CLIENT_THREADS $NSERVERS \
-	$NOPS $OUTPUT'
+	$SSH $HOST "bash \"$BIN_DIR\"/run-client.sh \"$WORKLOAD\" \"$CONNS_PER_SERVER\" \"$NTHREADS\" \"$RECORDSIZE\" \"$CLIENT_THREADS\" \"$NSERVERS\" \"$NOPS\" \"$OUTPUT_DIR\""
  	) &
 	pids[$i]=$!
 done
 
 for pid in ${pids[*]}; do wait $pid; done;
-
-# Delimit
-echo >> $OUTPUT_DIR/$OUTPUT.data
 
 #
 # Gather stats from each server and echo to $OUTPUT_server.data
