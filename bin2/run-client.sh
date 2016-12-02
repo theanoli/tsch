@@ -21,7 +21,7 @@ EXPID=sequencer.sequencer.emulab.net
 NRECS=100000
          
  
-#---------- Set up the results directory if it doesn't exist ----------#
+# Set up the results directory if it doesn't exist
 echo "Making directory $OUTPUT_DIR..."
 mkdir -p $OUTPUT_DIR
 
@@ -39,6 +39,7 @@ MC_REQDIST="requestdistribution=uniform"
 MC_RECCOUNT="recordcount=$NRECS"
 MC_OPSCOUNT="operationcount=$NOPS"
 
+# Insert data into the database
 ./bin/ycsb load memcached -s -P workloads/$WORKLOAD \
 	-p "$SERVERS" \
  	-p "$MC_CONNS_PER_SERVER" \
@@ -51,6 +52,7 @@ MC_OPSCOUNT="operationcount=$NOPS"
 	2> $OUTPUT_DIR/$i-debug.data \
 	>> $OUTPUT_DIR/$i.data
 
+# Do NOPS inserts and lookups
 ./bin/ycsb run memcached -s -P workloads/$WORKLOAD \
 	-p "$SERVERS" \
 	-p "$MC_CONNS_PER_SERVER" \
