@@ -57,7 +57,7 @@ for i in `seq 0 $(($NSERVERS-1))`
 do
 	HOST=$EMULAB_USER@servers-$i\.$EXPID
 	echo "Booting $HOST..."
-	$SSH $HOST "sh \"$BIN_DIR/run-server.sh\" \"$CONNS_PER_SERVER\" \"$NTHREADS\"" &
+	$SSH $HOST "bash \"$BIN_DIR/run-server.sh\" \"$CONNS_PER_SERVER\" \"$NTHREADS\"" &
 	pids[$i]=$!
 done
 
@@ -72,7 +72,7 @@ do
 	HOST=$EMULAB_USER@clients-$i\.$EXPID
 	(
 	echo "Running YCSB on client $i: workload=$WORKLOAD"
-	$SSH $HOST "sh \"$BIN_DIR\"/run-client.sh \"$WORKLOAD\" \"$CONNS_PER_SERVER\" \"$NTHREADS\" \"$RECORDSIZE\" \"$CLIENT_THREADS\" \"$NSERVERS\" \"$NOPS\" \"$OUTPUT_DIR\""
+	$SSH $HOST "bash \"$BIN_DIR\"/run-client.sh \"$WORKLOAD\" \"$CONNS_PER_SERVER\" \"$NTHREADS\" \"$RECORDSIZE\" \"$CLIENT_THREADS\" \"$NSERVERS\" \"$NOPS\" \"$OUTPUT_DIR\""
  	) &
 	pids[$i]=$!
 done
