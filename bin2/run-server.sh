@@ -12,5 +12,5 @@ CONNS_PER_SERVER=$1
 NTHREADS=$2
 
 # TODO(theano) what about conns per server?
-cd /usr/local/tsch/memcached
+cd /proj/sequencer/memcached
 ./memcached -t $NTHREADS

@@ -23,7 +23,7 @@ NSERVERS=$8
 NOPS=$9
 OUTPUT=${10}
 
-OUTPUT_DIR=../results/$OUTPUT\_results/
+OUTPUT_DIR=/proj/sequencer/tsch/results/$OUTPUT\_results/
 
 EXPID=sequencer.sequencer.emulab.net
 
@@ -41,7 +41,7 @@ for i in `seq 0 $(($NSERVERS-1))`
 do
 	HOST=$EMULAB_USER@servers-$i\.$EXPID
 	echo "Booting $HOST..."
-	cat run-server.sh | $SSH $HOST bash -s - $CONNS_PER_SERVER $NTHREADS &
+	$SSH $HOST 'bash /proj/sequencer/tsch/bin/run-server.sh $CONNS_PER_SERVER $NTHREADS' &
 	pids[$i]=$!
 done
 
@@ -57,14 +57,14 @@ echo $@ >> $OUTPUT_DIR/$OUTPUT.data
 
 for i in `seq 0 $(($NCLIENTS-1))`
 do
+	HOST=$EMULAB_USER@clients-$i\.$EXPID
 	(
 	echo "Running YCSB on client $i: workload=$WORKLOAD"
 	echo >> $OUTPUT_DIR/$OUTPUT.data
 	echo "Client $i: workload=$WORKLOAD" >> $OUTPUT_DIR/$OUTPUT.data 
-	cat run-client.sh | $SSH $EMULAB_USER@clients-$i\.$EXPID bash -s - \
-	$WORKLOAD $CONNS_PER_SERVER $NTHREADS $RECORDSIZE $CLIENT_THREADS $NSERVERS \
-	$NOPS 2> $OUTPUT_DIR/$OUTPUT-$i-debug.data \
-	>> $OUTPUT_DIR/$OUTPUT.data
+	$SSH $HOST 'bash /proj/sequencer/tsch/bin/run-client.sh $WORKLOAD $CONNS_PER_SERVER $NTHREADS \
+	$RECORDSIZE $CLIENT_THREADS $NSERVERS \
+	$NOPS $OUTPUT'
  	) &
 	pids[$i]=$!
 done

@@ -15,11 +15,13 @@ RECORDSIZE=$4
 CLIENT_THREADS=$5
 NSERVERS=$6
 NOPS=$7
+OUTPUT=$8
 
+OUTPUT_DIR=/proj/sequencer/tsch/results/$OUTPUT\_results/
 EXPID=sequencer.sequencer.emulab.net
 NRECS=100000
 
-cd /usr/local/tsch/YCSB
+cd /proj/sequencer/YCSB
 
 for i in `seq 0 $(($NSERVERS - 1))`; do SERVERS="$SERVERS,servers-$i.$EXPID"; done
 SERVERS=`echo $SERVERS | sed 's/^,//g'`
@@ -41,7 +43,9 @@ MC_OPSCOUNT="operationcount=$NOPS"
 	-p "$MC_REQDIST" \
 	-p "$MC_RECCOUNT" \
 	-p "$MC_OPSCOUNT" \
-	-threads $CLIENT_THREADS
+	-threads $CLIENT_THREADS \
+	2> $OUTPUT_DIR/$OUTPUT-$i-debug.data \
+	>> $OUTPUT_DIR/$OUTPUT-$i.data
 
 ./bin/ycsb run memcached -s -P workloads/$WORKLOAD \
 	-p "$SERVERS" \
@@ -52,6 +56,8 @@ MC_OPSCOUNT="operationcount=$NOPS"
 	-p "$MC_RECCOUNT" \
 	-p "$MC_OPSCOUNT" \
 	-threads $CLIENT_THREADS
+	2> $OUTPUT_DIR/$OUTPUT-$i-debug.data \
+	>> $OUTPUT_DIR/$OUTPUT-$i.data
 
 if [ $? -ne 0 ]
 then
