@@ -39,6 +39,16 @@ MC_REQDIST="requestdistribution=uniform"
 MC_RECCOUNT="recordcount=$NRECS"
 MC_OPSCOUNT="operationcount=$NOPS"
 
+(echo "WORKLOAD: $WORKLOAD"
+echo "CONNS_PER_SERVER: $CONNS_PER_SERVER"
+echo "NTHREADS: $NTHREADS"
+echo "RECORDSIZE: $RECORDSIZE"
+echo "CLIENT_THREADS: $CLIENT_THREADS"
+echo "NSERVERS: $NSERVERS"
+echo "NOPS: $NOPS"
+echo "OUTPUT_DIR: $OUTPUT_DIR"
+echo) >> $OUTPUT_DIR/$i.data
+
 # Insert data into the database
 ./bin/ycsb load memcached -s -P workloads/$WORKLOAD \
 	-p "$SERVERS" \

@@ -1,6 +1,7 @@
 #! /bin/bash
 #
-# Runs an experiment.
+# Runs an experiment. Run on the local machine; the remote machines must be
+# up-to-date on changes to run-client.sh and run-server.sh.
 #
 # Usage: sh experiment.sh <emulab_user> <workload> <conns_per_server> <nthreads>
 # <recordsize> <client_threads> <nclients> <nservers> <nops> <output>
@@ -12,13 +13,19 @@ SSH="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAl
 # p = conns per server
 # t = nthreads for memcached
 # z = recordsize
-# n = client threads
+# n = threads per client
 # c = nclients
 # s = nservers
 # o = nops
 # f = output dir/filename
 
-while getopts ":u:w:p:t:z:n:c:s:o:f:" opt; do 
+usage () {
+	echo "Usage: sh $0 -u <emulab_user> -w <workload> -p <conns_per_server> -t <nthreads> -z <recordsize> -n <client_threads> -c <nclients> -s <nservers> -o <nops> -f <output>"
+}
+
+CONNS_PER_SERVER=1024
+
+while getopts ":hu:w:p:t:z:n:c:s:o:f:" opt; do 
 case $opt in
 	u) EMULAB_USER=$OPTARG;;
 	w) WORKLOAD=$OPTARG;; 
@@ -33,14 +40,14 @@ case $opt in
 	:) echo "Option -$OPTARG requires an argument." >&2
 		exit 1;;
 	\?) echo "Invalid option: -$OPTARG" >&2
-		echo "Usage: sh $0 <emulab_user> <workload> <conns_per_server> <nthreads> <recordsize> <client_threads> <nclients> <nservers> <nops> <output>"
-		exit 1;;
+		usage; exit 1;;
+	h) usage; exit;; 
 esac
 done
 
 NOW=`date +%s`
 OUTPUT_DIR=/proj/sequencer/tsch/results/$OUTPUT\_$NOW\_results/
-BIN_DIR="/proj/sequencer/tsch/bin2"
+BIN_DIR="/proj/sequencer/tsch/experiment"
 
 EXPID=sequencer.sequencer.emulab.net
 
@@ -58,7 +65,6 @@ do
 	HOST=$EMULAB_USER@servers-$i\.$EXPID
 	echo "Booting $HOST..."
 	$SSH $HOST "bash \"$BIN_DIR/run-server.sh\" \"$CONNS_PER_SERVER\" \"$NTHREADS\"" &
-	pids[$i]=$!
 done
 
 
