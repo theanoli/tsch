@@ -16,6 +16,7 @@ CLIENT_THREADS=$5
 NSERVERS=$6
 NOPS=$7
 OUTPUT_DIR=$8
+ME=$9
 
 EXPID=sequencer.sequencer.emulab.net
 NRECS=100000
@@ -47,7 +48,7 @@ echo "CLIENT_THREADS: $CLIENT_THREADS"
 echo "NSERVERS: $NSERVERS"
 echo "NOPS: $NOPS"
 echo "OUTPUT_DIR: $OUTPUT_DIR"
-echo) >> $OUTPUT_DIR/$i.data
+echo) >> $OUTPUT_DIR/$ME.data
 
 # Insert data into the database
 ./bin/ycsb load memcached -s -P workloads/$WORKLOAD \
@@ -59,8 +60,8 @@ echo) >> $OUTPUT_DIR/$i.data
 	-p "$MC_RECCOUNT" \
 	-p "$MC_OPSCOUNT" \
 	-threads $CLIENT_THREADS \
-	2> $OUTPUT_DIR/$i-debug.data \
-	>> $OUTPUT_DIR/$i.data
+	2> $OUTPUT_DIR/$ME-debug.data \
+	>> $OUTPUT_DIR/$ME.data
 
 # Do NOPS inserts and lookups
 ./bin/ycsb run memcached -s -P workloads/$WORKLOAD \
@@ -72,8 +73,8 @@ echo) >> $OUTPUT_DIR/$i.data
 	-p "$MC_RECCOUNT" \
 	-p "$MC_OPSCOUNT" \
 	-threads $CLIENT_THREADS
-	2> $OUTPUT_DIR/$i-debug.data \
-	>> $OUTPUT_DIR/$i.data
+	2> $OUTPUT_DIR/$ME-debug.data \
+	>> $OUTPUT_DIR/$ME.data
 
 if [ $? -ne 0 ]
 then

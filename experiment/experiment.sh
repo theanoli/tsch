@@ -20,10 +20,12 @@ SSH="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAl
 # f = output dir/filename
 
 usage () {
-	echo "Usage: sh $0 -u <emulab_user> -w <workload> -p <conns_per_server> -t <nthreads> -z <recordsize> -n <client_threads> -c <nclients> -s <nservers> -o <nops> -f <output>"
+	echo "Usage: sh $0 -u <emulab_user> -w <workload> -t <nthreads> -n <client_threads> -c <nclients> -s <nservers> -o <nops> [-z <recordsize> -p <conns_per_server> -f <output>]"
 }
 
 CONNS_PER_SERVER=1024
+RECORDSIZE=64
+OUTPUT=output
 
 while getopts ":hu:w:p:t:z:n:c:s:o:f:" opt; do 
 case $opt in
@@ -44,6 +46,19 @@ case $opt in
 	h) usage; exit;; 
 esac
 done
+
+echo Args: 
+echo "\tEMULAB_USER: $EMULAB_USER"
+echo "\tWORKLOAD: $WORKLOAD"
+echo "\tCONNS_PER_SERVER: $CONNS_PER_SERVER"
+echo "\tNTHREADS: $NTHREADS"
+echo "\tRECORDSIZE: $RECORDSIZE"
+echo "\tCLIENT_THREADS: $CLIENT_THREADS"
+echo "\tNSERVERS: $NSERVERS"
+echo "\tNCLIENTS: $NCLIENTS"
+echo "\tNOPS: $NOPS"
+echo "\tOUTPUT: $OUTPUT"
+echo
 
 NOW=`date +%s`
 OUTPUT_DIR=/proj/sequencer/tsch/results/$OUTPUT\_$NOW\_results/
@@ -76,10 +91,9 @@ done
 for i in `seq 0 $(($NCLIENTS-1))`
 do
 	HOST=$EMULAB_USER@clients-$i\.$EXPID
-	(
-	echo "Running YCSB on client $i: workload=$WORKLOAD"
-	$SSH $HOST "bash \"$BIN_DIR\"/run-client.sh \"$WORKLOAD\" \"$CONNS_PER_SERVER\" \"$NTHREADS\" \"$RECORDSIZE\" \"$CLIENT_THREADS\" \"$NSERVERS\" \"$NOPS\" \"$OUTPUT_DIR\""
- 	) &
+	( echo "Running YCSB on client $i: workload=$WORKLOAD"
+	$SSH $HOST "bash \"$BIN_DIR\"/run-client.sh \"$WORKLOAD\" \"$CONNS_PER_SERVER\" \"$NTHREADS\" \"$RECORDSIZE\" \"$CLIENT_THREADS\" \"$NSERVERS\" \"$NOPS\" \"$OUTPUT_DIR\" \"$i\""
+ 	> /dev/null ) &
 	pids[$i]=$!
 done
 
