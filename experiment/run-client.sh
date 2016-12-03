@@ -3,8 +3,8 @@
 # Runs Python YCSB script on Emulab
 #
 
-if [ "$#" -ne 8 ]; then 
-	echo "Usage $0 <workload> <conns_per_server> <nthreads> <recordsize> <client_threads> <nservers> <nops> <output_dir>"
+if [ "$#" -ne 9 ]; then 
+	echo "Usage $0 <workload> <conns_per_server> <nthreads> <recordsize> <client_threads> <nservers> <nops> <output_dir> <me>"
 	exit 1
 fi
 
