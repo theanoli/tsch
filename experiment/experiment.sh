@@ -78,7 +78,7 @@ fi
 for i in `seq 0 $(($NSERVERS-1))`
 do
 	HOST=$EMULAB_USER@servers-$i\.$EXPID
-	echo "Booting $HOST..."
+	echo "Loading memcached on $HOST..."
 	$SSH $HOST "bash \"$BIN_DIR/run-server.sh\" \"$CONNS_PER_SERVER\" \"$NTHREADS\"" &
 done
 

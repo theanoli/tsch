@@ -26,7 +26,7 @@ NRECS=100000
 echo "Making directory $OUTPUT_DIR..."
 mkdir -p $OUTPUT_DIR
 
-
+echo "CDing into the YCSB directory..."
 cd /proj/sequencer/YCSB
 
 for i in `seq 0 $(($NSERVERS - 1))`; do SERVERS="$SERVERS,servers-$i.$EXPID"; done
@@ -36,9 +36,9 @@ SERVERS="memcached.hosts=$SERVERS"
 MC_CONNS_PER_SERVER="memcached.connsPerServer=$CONNS_PER_SERVER"
 MC_NTHREADS="memcached.numThreads=$NTHREADS"
 MC_FIELDLENGTH="fieldlength=$RECORDSIZE"
-MC_REQDIST="requestdistribution=uniform"
 MC_RECCOUNT="recordcount=$NRECS"
 MC_OPSCOUNT="operationcount=$NOPS"
+
 
 (echo "WORKLOAD: $WORKLOAD"
 echo "CONNS_PER_SERVER: $CONNS_PER_SERVER"
@@ -51,12 +51,12 @@ echo "OUTPUT_DIR: $OUTPUT_DIR"
 echo) >> $OUTPUT_DIR/$ME.data
 
 # Insert data into the database
+echo "Client $ME is loading YCSB workload..."
 ./bin/ycsb load memcached -s -P workloads/$WORKLOAD \
 	-p "$SERVERS" \
  	-p "$MC_CONNS_PER_SERVER" \
 	-p "$MC_NTHREADS" \
 	-p "$MC_FIELDLENGTH" \
-	-p "$MC_REQDIST" \
 	-p "$MC_RECCOUNT" \
 	-p "$MC_OPSCOUNT" \
 	-threads $CLIENT_THREADS \
@@ -64,12 +64,12 @@ echo) >> $OUTPUT_DIR/$ME.data
 	>> $OUTPUT_DIR/$ME.data
 
 # Do NOPS inserts and lookups
+echo "Client $ME is running YCSB workload..."
 ./bin/ycsb run memcached -s -P workloads/$WORKLOAD \
 	-p "$SERVERS" \
 	-p "$MC_CONNS_PER_SERVER" \
 	-p "$MC_NTHREADS" \
 	-p "$MC_FIELDLENGTH" \
-	-p "$MC_REQDIST" \
 	-p "$MC_RECCOUNT" \
 	-p "$MC_OPSCOUNT" \
 	-threads $CLIENT_THREADS
