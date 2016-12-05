@@ -48,20 +48,20 @@ esac
 done
 
 echo Args: 
-echo "\tEMULAB_USER: $EMULAB_USER"
-echo "\tWORKLOAD: $WORKLOAD"
-echo "\tCONNS_PER_SERVER: $CONNS_PER_SERVER"
-echo "\tNTHREADS: $NTHREADS"
-echo "\tRECORDSIZE: $RECORDSIZE"
-echo "\tCLIENT_THREADS: $CLIENT_THREADS"
-echo "\tNSERVERS: $NSERVERS"
-echo "\tNCLIENTS: $NCLIENTS"
-echo "\tNOPS: $NOPS"
-echo "\tOUTPUT: $OUTPUT"
+echo -e "\tEMULAB_USER: $EMULAB_USER"
+echo -e "\tWORKLOAD: $WORKLOAD"
+echo -e "\tCONNS_PER_SERVER: $CONNS_PER_SERVER"
+echo -e "\tNTHREADS: $NTHREADS"
+echo -e "\tRECORDSIZE: $RECORDSIZE"
+echo -e "\tCLIENT_THREADS: $CLIENT_THREADS"
+echo -e "\tNSERVERS: $NSERVERS"
+echo -e "\tNCLIENTS: $NCLIENTS"
+echo -e "\tNOPS: $NOPS"
+echo -e "\tOUTPUT: $OUTPUT"
 echo
 
 NOW=`date +%s`
-OUTPUT_DIR=/proj/sequencer/tsch/results/$OUTPUT\_$NOW\_results/
+OUTPUT_DIR=/proj/sequencer/tsch/results/$OUTPUT\_$NOW\_results
 BIN_DIR="/proj/sequencer/tsch/experiment"
 
 EXPID=sequencer.sequencer.emulab.net
@@ -98,18 +98,5 @@ do
 done
 
 for pid in ${pids[*]}; do wait $pid; done;
-
-#
-# Gather stats from each server and echo to $OUTPUT_server.data
-#
-
-# echo "Saving STATS from servers to $OUTPUT\_server.data..."
-# for i in `seq 1 $NSERVERS`
-# do
-# 	read cmd_get cmd_set <<< `echo "stats" | nc server-$i.$EXPID $PORT | grep "cmd_get\|set" | cut -d" " -f3`
-# 	cmd_get="${cmd_get/$'\r'/}" ; cmd_set="${cmd_set/$'\r'/}" ; total=`expr $cmd_get + $cmd_set`
-# 	echo "$i $total $CONNS_PER_SERVER" >> $OUTPUT\_server.data
-# 	# Use CONNS_PER_SERVER to color scatter plot by unaware/aware
-# done
 
 bash kill-experiment.sh $EMULAB_USER $NCLIENTS $NSERVERS
