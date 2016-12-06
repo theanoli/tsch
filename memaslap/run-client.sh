@@ -26,7 +26,7 @@ if [ ! -e $OUTPUT_DIR ]; then
 	mkdir $OUTPUT_DIR
 fi
 
-cd /proj/sequencer/libmemcached/clients/memaslap
+cd /proj/sequencer/libmemcached/clients
 
 
 # List the servers
@@ -39,7 +39,17 @@ SERVERS=`echo $SERVERS | sed 's/^,//g'`
 # Construct the command
 cmd="./memaslap"
 
-cmd="$cmd $SERVERS --threads=$CLIENT_THREADS --execute_number=$NOPS --time=$EXP_LEN --cfg_cmd=$CONFIG "
+cmd="$cmd --servers=$SERVERS --threads=$CLIENT_THREADS --cfg_cmd=$CONFIG"
+
+# Specify NOPS?
+if [ "$NOPS" != "" ]; then 
+	cmd="$cmd --execute_number=$NOPS"
+fi
+
+# Specify experiment length?
+if [ "$EXP_LEN" != "" ]; then 
+	cmd="$cmd --time=$EXP_LEN"
+fi
 
 # UDP? 
 if [ "$UDP" = true ]; then 
@@ -53,7 +63,11 @@ fi
 
 
 # Execute the command
-echo "Client $i: Running command \n\t$cmd"
+pwd
+echo -e "Client $i: Running command: \n\t$cmd"
+echo
+
+# $cmd 2> $OUTPUT_DIR/$i\_debug.data >> $OUTPUT_DIR/$i.data
 $cmd
 
 if [ $? -ne 0 ]
