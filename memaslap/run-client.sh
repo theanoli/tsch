@@ -21,7 +21,7 @@ EXPECTED_TPUT=${10}
 
  
 # Set up the results directory if it doesn't exist
-if [ !(-e $OUTPUT_DIR) ]; then
+if [ ! -e $OUTPUT_DIR ]; then
 	echo "Making directory $OUTPUT_DIR..."
 	mkdir $OUTPUT_DIR
 fi
