@@ -8,7 +8,7 @@
 
 SSH="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=100 -T"
 
-# u = user
+# e = user
 # w = workload
 # p = conns per server
 # t = nthreads for memcached
@@ -27,10 +27,10 @@ OUTPUT=output
 EXP_LEN=2m
 UDP=false
 
-while getopts ":hu:l:c:p:t:n:c:s:o:f:" opt; do 
+while getopts ":hue:l:g:p:t:n:c:s:o:f:" opt; do 
 case $opt in
 	e) EMULAB_USER=$OPTARG;;
-	c) CONFIG=$OPTARG;; 
+	g) CONFIG=$OPTARG;; 
 	t) NTHREADS=$OPTARG;; # memcached threads
 	n) CLIENT_THREADS=$OPTARG;;
 	c) NCLIENTS=$OPTARG;;
@@ -86,7 +86,7 @@ done
 for i in `seq 0 $(($NCLIENTS-1))`
 do
 	HOST=$EMULAB_USER@clients-$i\.$EXPID
-	( echo "Running memaslap on client $i: config=$CONFIG"
+	( echo "Running memaslap on client $i with config $CONFIG"
 	$SSH $HOST "bash \"$BIN_DIR\"/run-client.sh \"$CONFIG_DIR/$CONFIG\" \"$NTHREADS\" \"$CLIENT_THREADS\" \"$NSERVERS\" \"$NOPS\" \"$OUTPUT_DIR\" \"$i\" \"$EXP_LEN\" \"$UDP\" \"$EXPECTED_TPUT\""
  	> /dev/null ) &
 	pids[$i]=$!
