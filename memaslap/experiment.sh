@@ -20,7 +20,7 @@ SSH="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAl
 # f = output dir/filename
 
 usage () {
-	echo "Usage: sh $0 -u <emulab_user> -c <config> -t <nthreads> -n <client_threads> -c <nclients> -s <nservers> -o <nops> [-l <exp_len> -f <output> -u]"
+	echo "Usage: sh $0 -u <emulab_user> -c <config> -t <nthreads> -n <client_threads> -c <nclients> -s <nservers> -o <nops> [-l <exp_len> -f <output> -u -p <expected_tput>]"
 }
 
 OUTPUT=output

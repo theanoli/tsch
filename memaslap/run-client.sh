@@ -3,8 +3,8 @@
 # Runs Python YCSB script on Emulab
 #
 
-if [ "$#" -ne 9 ]; then 
-	echo "Usage $0 <config> <nthreads> <client_threads> <nservers> <nops> <output_dir> <me>"
+if [ "$#" -ne 10 ]; then 
+	echo "Usage $0 <config> <nthreads> <client_threads> <nservers> <nops> <output_dir> <me> <udp> <expected_tput>"
 	exit 1
 fi
 
