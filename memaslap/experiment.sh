@@ -37,9 +37,9 @@ case $opt in
 	s) NSERVERS=$OPTARG;;
 	o) NOPS=$OPTARG;;
 	p) EXPECTED_TPUT=$OPTARG;;
-	f) $OUTPUT=$OPTARG;;
-	l) $EXP_LEN=$OPTARG;;
-	u) $UDP=true;;
+	f) OUTPUT=$OPTARG;;
+	l) EXP_LEN=$OPTARG;;
+	u) UDP=true;;
 	:) echo "Option -$OPTARG requires an argument." >&2
 		exit 1;;
 	\?) echo "Invalid option: -$OPTARG" >&2
