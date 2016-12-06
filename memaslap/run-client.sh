@@ -19,35 +19,42 @@ EXP_LEN=$8
 UDP=$9
 EXPECTED_TPUT=${10}
 
-
-EXPID=sequencer.sequencer.emulab.net
-
  
 # Set up the results directory if it doesn't exist
-echo "Making directory $OUTPUT_DIR..."
-mkdir -p $OUTPUT_DIR
+if [ !(-e $OUTPUT_DIR) ]; then
+	echo "Making directory $OUTPUT_DIR..."
+	mkdir $OUTPUT_DIR
+fi
 
-echo "CDing into the YCSB directory..."
 cd /proj/sequencer/libmemcached/clients/memaslap
 
-cmd="./memaslap"
 
 # List the servers
+EXPID=sequencer.sequencer.emulab.net
+
 for i in `seq 0 $(($NSERVERS - 1))`; do SERVERS="$SERVERS,servers-$i.$EXPID:11211"; done
 SERVERS=`echo $SERVERS | sed 's/^,//g'`
 
+
+# Construct the command
+cmd="./memaslap"
+
 cmd="$cmd $SERVERS --threads=$CLIENT_THREADS --execute_number=$NOPS --time=$EXP_LEN --cfg_cmd=$CONFIG "
 
+# UDP? 
 if [ "$UDP" = true ]; then 
 	cmd="$cmd -U"
 fi
 
+# Specify desired throughput?
 if [ "$EXPECTED_TPUT" != "" ]; then 
 	cmd="$cmd --tps=$EXPECTED_TPUT"
 fi
 
-echo $cmd
 
+# Execute the command
+echo "Client $i: Running command \n\t$cmd"
+$cmd
 
 if [ $? -ne 0 ]
 then
