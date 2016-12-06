@@ -20,7 +20,7 @@ SSH="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAl
 # f = output dir/filename
 
 usage () {
-	echo "Usage: sh $0 -u <emulab_user> -c <config> -t <nthreads> -n <client_threads> -c <nclients> -s <nservers> -o <nops> [-l <exp_len> -f <output> -u -p <expected_tput>]"
+	echo "Usage: sh $0 -e <emulab_user> -c <config> -t <nthreads> -n <client_threads> -c <nclients> -s <nservers> -o <nops> [-l <exp_len> -f <output> -u -p <expected_tput>]"
 }
 
 OUTPUT=output
@@ -29,7 +29,7 @@ UDP=false
 
 while getopts ":hu:l:c:p:t:n:c:s:o:f:" opt; do 
 case $opt in
-	u) EMULAB_USER=$OPTARG;;
+	e) EMULAB_USER=$OPTARG;;
 	c) CONFIG=$OPTARG;; 
 	t) NTHREADS=$OPTARG;; # memcached threads
 	n) CLIENT_THREADS=$OPTARG;;
