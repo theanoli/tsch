@@ -3,26 +3,18 @@
 # Runs an experiment. Run on the local machine; the remote machines must be
 # up-to-date on changes to run-client.sh and run-server.sh.
 #
-# Usage: sh experiment.sh <emulab_user> <workload> <conns_per_server> <nthreads>
-# <recordsize> <client_threads> <nclients> <nservers> <nops> <output>
 
 SSH="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=100 -T"
 
-# e = user
-# w = workload
-# p = conns per server
-# t = nthreads for memcached
-# z = recordsize
-# n = threads per client
-# c = nclients
-# s = nservers
-# o = nops
-# f = output dir/filename
 
 usage () {
-	echo "Usage: sh $0 -e <emulab_user> -c <config> -t <nthreads> -n <client_threads> -c <nclients> -s <nservers> -o <nops> [-l <exp_len> -f <output> -u -p <expected_tput>]"
+	echo -e "Usage: sh $0 -e <emulab_user> -c <config> -t <nthreads> -n <client_threads> -c <nclients> -s <nservers> [-o <nops> -l <exp_len*> -f <output> -u -p <expected_tput**>]\n
+	\t* e.g., 1s; nops will override if specified\n
+	\t** e.g., 10k"
 }
 
+
+# Set some defaults
 OUTPUT=output
 EXP_LEN=2m
 UDP=false
