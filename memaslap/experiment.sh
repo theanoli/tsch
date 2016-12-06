@@ -20,25 +20,26 @@ SSH="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAl
 # f = output dir/filename
 
 usage () {
-	echo "Usage: sh $0 -u <emulab_user> -w <workload> -t <nthreads> -n <client_threads> -c <nclients> -s <nservers> -o <nops> [-z <recordsize> -p <conns_per_server> -f <output>]"
+	echo "Usage: sh $0 -u <emulab_user> -c <config> -t <nthreads> -n <client_threads> -c <nclients> -s <nservers> -o <nops> [-l <exp_len> -f <output> -u]"
 }
 
-CONNS_PER_SERVER=1024
-RECORDSIZE=64
 OUTPUT=output
+EXP_LEN=2m
+UDP=false
 
-while getopts ":hu:w:p:t:z:n:c:s:o:f:" opt; do 
+while getopts ":hu:l:c:p:t:n:c:s:o:f:" opt; do 
 case $opt in
 	u) EMULAB_USER=$OPTARG;;
-	w) WORKLOAD=$OPTARG;; 
-	p) CONNS_PER_SERVER=$OPTARG;;
-	t) NTHREADS=$OPTARG;;
-	z) RECORDSIZE=$OPTARG;;
+	c) CONFIG=$OPTARG;; 
+	t) NTHREADS=$OPTARG;; # memcached threads
 	n) CLIENT_THREADS=$OPTARG;;
 	c) NCLIENTS=$OPTARG;;
 	s) NSERVERS=$OPTARG;;
 	o) NOPS=$OPTARG;;
-	f) OUTPUT=$OPTARG;;
+	p) EXPECTED_TPUT=$OPTARG;;
+	f) $OUTPUT=$OPTARG;;
+	l) $EXP_LEN=$OPTARG;;
+	u) $UDP=true;;
 	:) echo "Option -$OPTARG requires an argument." >&2
 		exit 1;;
 	\?) echo "Invalid option: -$OPTARG" >&2
@@ -49,37 +50,31 @@ done
 
 echo Args: 
 echo -e "\tEMULAB_USER: $EMULAB_USER"
-echo -e "\tWORKLOAD: $WORKLOAD"
-echo -e "\tCONNS_PER_SERVER: $CONNS_PER_SERVER"
+echo -e "\tCONFIG: $CONFIG"
 echo -e "\tNTHREADS: $NTHREADS"
-echo -e "\tRECORDSIZE: $RECORDSIZE"
 echo -e "\tCLIENT_THREADS: $CLIENT_THREADS"
 echo -e "\tNSERVERS: $NSERVERS"
 echo -e "\tNCLIENTS: $NCLIENTS"
 echo -e "\tNOPS: $NOPS"
 echo -e "\tOUTPUT: $OUTPUT"
+echo -e "\tEXP_LEN: $EXP_LEN"
+echo -e "\tUDP: $UDP"
+echo -e "\tEXPECTED_TPUT: $EXPECTED_TPUT"
 echo
 
 NOW=`date +%s`
 OUTPUT_DIR=/proj/sequencer/tsch/results/$OUTPUT\_$NOW\_results
-BIN_DIR="/proj/sequencer/tsch/experiment"
+BIN_DIR="/proj/sequencer/tsch/memaslap"
+CONFIG_DIR="$BIN_DIR/configs"
 
 EXPID=sequencer.sequencer.emulab.net
-
-MAX_CONNS=1024
-REQ_CONNS=$(($CLIENT_THREADS * $NCLIENTS))
-
-if [ $REQ_CONNS -ge $MAX_CONNS ]; then
-	echo "Too many client connections ($REQ_CONNS). Memcached only supports $MAX_CONNS."
-	exit 1
-fi
 
 
 for i in `seq 0 $(($NSERVERS-1))`
 do
 	HOST=$EMULAB_USER@servers-$i\.$EXPID
 	echo "Loading memcached on $HOST..."
-	$SSH $HOST "bash \"$BIN_DIR/run-server.sh\" \"$CONNS_PER_SERVER\" \"$NTHREADS\"" &
+	$SSH $HOST "bash \"$BIN_DIR/run-server.sh\" \"$NTHREADS\"" &
 done
 
 
@@ -91,8 +86,8 @@ done
 for i in `seq 0 $(($NCLIENTS-1))`
 do
 	HOST=$EMULAB_USER@clients-$i\.$EXPID
-	( echo "Running YCSB on client $i: workload=$WORKLOAD"
-	$SSH $HOST "bash \"$BIN_DIR\"/run-client.sh \"$WORKLOAD\" \"$CONNS_PER_SERVER\" \"$NTHREADS\" \"$RECORDSIZE\" \"$CLIENT_THREADS\" \"$NSERVERS\" \"$NOPS\" \"$OUTPUT_DIR\" \"$i\""
+	( echo "Running memaslap on client $i: config=$CONFIG"
+	$SSH $HOST "bash \"$BIN_DIR\"/run-client.sh \"$CONFIG_DIR/$CONFIG\" \"$NTHREADS\" \"$CLIENT_THREADS\" \"$NSERVERS\" \"$NOPS\" \"$OUTPUT_DIR\" \"$i\" \"$EXP_LEN\" \"$UDP\" \"$EXPECTED_TPUT\""
  	> /dev/null ) &
 	pids[$i]=$!
 done
