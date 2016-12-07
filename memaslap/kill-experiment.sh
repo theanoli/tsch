@@ -23,10 +23,6 @@ case $opt in
 esac
 done
 
-EMULAB_USER=$1
-NCLIENTS=$2
-NSERVERS=$3
-
 EXPID=sequencer.sequencer.emulab.net
 SSH="ssh -o StrictHostKeyChecking=no"
 

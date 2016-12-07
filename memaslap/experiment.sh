@@ -69,7 +69,7 @@ for i in `seq 0 $(($NSERVERS-1))`
 do
 	HOST=$EMULAB_USER@servers-$i\.$EXPID
 	echo "Loading memcached on $HOST..."
-	$SSH $HOST "bash \"$BIN_DIR/run-server.sh\" \"$NTHREADS\"" &
+	$SSH $HOST "bash \"$BIN_DIR/run-server.sh\" \"$NTHREADS\"" & 
 done
 
 
@@ -77,7 +77,6 @@ done
 # Run clients
 # ------------------------------------------------------------------------------
 
-# This will append, rather than overwrite, to save us from ourselves
 for i in `seq 0 $(($NCLIENTS-1))`
 do
 	HOST=$EMULAB_USER@clients-$i\.$EXPID
