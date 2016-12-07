@@ -1,11 +1,27 @@
 # Kills any running memcached instances
 #
-# Usage ./kill-server <emulab_user> <nclients> <nservers>
 
-if [ "$#" -ne 3 ]; then
-	echo "Usage $0 <emulab-user> <nclients> <nservers>"
+usage () {
+	echo -e "Usage: bash kill-experiment.sh -e <emulab_user> -c <nclients> -s <nservers>"
+}
+
+if [ "$#" -ne 6 ]; then
+	usage
 	exit 1
-fi
+fi 
+
+while getopts ":he:c:s:" opt; do
+case $opt in
+	e) EMULAB_USER=$OPTARG;;
+	s) NSERVERS=$OPTARG;;
+	c) NCLIENTS=$OPTARG;;
+	:) echo "Option -$OPTARG requires an argument." >&2
+		exit 1;;
+	\?) echo "Invalid option: -$OPTARG" >&2
+		usage; exit 1;;
+	h) usage; exit;;
+esac
+done
 
 EMULAB_USER=$1
 NCLIENTS=$2
