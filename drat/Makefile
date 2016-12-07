@@ -1,15 +1,17 @@
 CC=g++
+CFLAGS=-c -Wall
 
 SOURCES=client.c server.c
-EXECUTABLES=client server
+OBJECTS=$(SOURCES:.c=.o)
+EXECUTABLES=$(basename $(SOURCES))
 
-all: $(SOURCES) $(EXECUTABLES)
+all: $(EXECUTABLES)
 
-server.o: server.c
-	$(CC) server.c
+client: client.o
+	$(CC) client.o -o client
 
-client.o: client.c
-	$(CC) client.c
+server: server.o
+	$(CC) server.o -o server
 
 clean:
 	rm *o $(EXECUTABLES)
