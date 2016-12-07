@@ -10,42 +10,56 @@
 #include <arpa/inet.h>
 
 int main(){
-	int welcomeSocket, newSocket;
+	int welcomeSocket, newsockfd;
 	char buffer[64];
-	struct sockaddr_in serverAddr;
-	struct sockaddr_storage serverStorage;
-	socklen_t addr_size;
+	struct sockaddr_in serv_addr;
+	struct sockaddr_storage cli_addr;
+	socklen_t clilen;
 	
+	int pid;
+
 	/*---- Create the socket. The three arguments are: ----*/
 	/* 1) Internet domain 2) Stream socket 3) Default protocol (TCP in this case) */
-	welcomeSocket = socket(PF_INET, SOCK_STREAM, 0);
+	welcomeSocket = socket( PF_INET, SOCK_STREAM, 0 );
 	
 	/*---- Configure settings of the server address struct ----*/
 	/* Address family = Internet */
-	serverAddr.sin_family = AF_INET;
-	/* Set port number, using htons function to use proper byte order */
-	serverAddr.sin_port = htons(7891);
-	/* Set IP address to localhost */
-	serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_port = htons(7891); // htons sets byte order
+	serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 	/* Set all bits of the padding field to 0 */
-	memset(serverAddr.sin_zero, '\0', sizeof serverAddr.sin_zero);  
+	memset( serv_addr.sin_zero, '\0', sizeof serv_addr.sin_zero );
 	
 	/*---- Bind the address struct to the socket ----*/
-	bind(welcomeSocket, (struct sockaddr *) &serverAddr, sizeof(serverAddr));
+	bind( welcomeSocket, (struct sockaddr *) &serv_addr, sizeof(serv_addr) );
 	
-	/*---- Listen on the socket, with 5 max connection requests queued ----*/
-	if(listen(welcomeSocket,5)==0)
-	  printf("Listening\n");
+	/*---- Listen, with 256 max connection requests queued.
+ 	* Note the number of max cxns will be truncated; see listen(2). ----*/
+	if ( listen ( welcomeSocket, 256 ) == 0 )
+		printf( "Listening\n" );
 	else
-	  printf("Error\n");
+		printf( "Error\n" );
 	
 	/*---- Accept call creates a new socket for the incoming connection ----*/
-	addr_size = sizeof serverStorage;
-	newSocket = accept(welcomeSocket, (struct sockaddr *) &serverStorage, &addr_size);
-	
+	clilen = sizeof ( cli_addr );
+
+	while (1) {
+		newsockfd = accept( welcomeSocket, (struct sockaddr *) &cli_addr, &clilen );
+		
+		pid = fork();
+		if ( pid < 0 ) {
+			error ( "Forking error" );
+		} 	
+		if ( pid == 0 ) {
+			// We're in the child; close sockfd
+			close ( welcomeSocket )
+		}
+
 	/*---- Send message to the socket of the incoming connection ----*/
-	strcpy(buffer,"Hello World\n");
-	send(newSocket,buffer,13,0);
-	
+		strcpy ( buffer,"Hello World\n" );
+		send ( newsockfd, buffer, 13, 0 );
+		
+		
+	}
 	return 0;
 }

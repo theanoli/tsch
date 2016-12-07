@@ -23,7 +23,7 @@ int main(){
 	/* Address family = Internet */
 	serverAddr.sin_family = AF_INET;
 	/* Set port number, using htons function to use proper byte order */
-	serverAddr.sin_port = htons(7891);
+	serverAddr.sin_port = htons(8080);
 	/* Set IP address to localhost */
 	serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
 	/* Set all bits of the padding field to 0 */
