@@ -89,4 +89,4 @@ done
 
 for pid in ${pids[*]}; do wait $pid; done;
 
-bash kill-experiment.sh $EMULAB_USER $NCLIENTS $NSERVERS
+bash kill-experiment.sh -e $EMULAB_USER -c $NCLIENTS -s $NSERVERS
