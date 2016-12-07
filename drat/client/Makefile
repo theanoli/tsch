@@ -1,14 +1,14 @@
 CC=gcc
-CFLAGS=-Wall -levent
+CFLAGS=-std=gnu99 -Wall -lrt 
 
-SOURCES=le_server.c
+SOURCES=client.c
 OBJECTS=$(SOURCES:.c=.o)
 EXECUTABLES=$(basename $(SOURCES))
 
 all: $(EXECUTABLES)
 
-le_server: le_server.o
-	$(CC) le_server.o -o le_server $(CFLAGS)
+client: client.o
+	$(CC) $(CFLAGS) client.o -o client  
 
 clean:
 	rm *o $(EXECUTABLES)

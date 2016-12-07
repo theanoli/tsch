@@ -8,6 +8,68 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <arpa/inet.h>
+//#include <types.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <inttypes.h>
+#include <math.h>
+#include <time.h>
+
+#define PSIZE 64
+
+// struct timespec timestamp_ns (void)
+// {
+//     struct timespec spec;
+// 
+//     clock_gettime(CLOCK_REALTIME, &spec);
+//     return spec; 
+// }
+
+char *generate_randstring ( int len ) 
+{
+	char *str; 
+	int i; 
+
+	char *charset = "abcdefghijklmnopqrstuvwxyz"; 
+
+	str = malloc ( 64 * sizeof ( char ) ); 
+	for ( i = 0; i < (PSIZE - 1); i++ ) {
+		str[i] = rand() % (strlen ( charset )); 
+	}
+
+	str[PSIZE - 1] = '\0'; 
+	return str; 
+}
+
+void send_and_receive ( int sockfd ) 
+{
+	int n; 
+	char *buf;
+//	struct timespec start, end; 
+
+	buf = malloc ( 64 * sizeof ( char ) );
+	if ( buf == NULL ) {
+		error ( "Malloc error" );
+	}
+
+//	clock_gettime(CLOCK_REALTIME, &start); 
+
+	n = write ( sockfd, buf, PSIZE ); 
+	if ( n < 0 ) {
+		error ( "Error writing to socket..." );
+	}
+
+	// Eh do we care? 
+	memset ( buf, '\0', 64 ); 
+
+	n = read( sockfd, buf, PSIZE ); 
+	if ( n < 0 ) {
+		error ( "Error reading from socket..." ); 
+	}
+	printf ( "%s\n", buf ); 
+
+//	clock_gettime(CLOCK_REALTIME, &end); 
+}
 
 int main(){
 	int clientSocket;
@@ -34,10 +96,10 @@ int main(){
 	connect(clientSocket, (struct sockaddr *) &serverAddr, addr_size);
 	
 	/*---- Read the message from the server into the buffer ----*/
-	recv(clientSocket, buffer, 1024, 0);
+	send_and_receive( clientSocket ); 	
 	
 	/*---- Print the received message ----*/
-	printf("Data received: %s",buffer);   
+	printf("Data received at %s: %s", timestamp_ns(), buffer);   
 	
 	return 0;
 }
