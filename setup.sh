@@ -44,16 +44,16 @@ if [ $# -eq 4 ]; then
 	fi
 fi
 
-echo "Swapping in..."
-$WRAPPER swapexp -w -e $EXP,$EXP in
-if [ $? -eq 0 ]
-then
-	echo "Experiment is now active!"
-else
-	echo "Failed to swap in the experiment! Exiting..."
-	exit 2
-fi
+echo "Attempting swap-in until we get nodes..."
+ret=1
+try=0
+#while [ ! $ret -eq 0 ]; do 
+for i in `seq 1 5`; do
+	try=$(($try + 1))
+	echo "Swap-in attempt $try"
+	$WRAPPER swapexp -w -e $EXP,$EXP in
+	ret=$?
+done
 
+echo "!!!Swap-in succeeded!!!"
 
-cd ../build
-sh build-emulab.sh $EMULAB_USER $NCLIENTS $NSERVERS

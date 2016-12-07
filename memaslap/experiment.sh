@@ -8,8 +8,8 @@ SSH="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAl
 
 
 usage () {
-	echo -e "Usage: sh $0 -e <emulab_user> -c <config> -t <nthreads> -n <client_threads> -c <nclients> -s <nservers> [-o <nops> -l <exp_len*> -f <output> -u -p <expected_tput**>]\n
-	\t* e.g., 1s; nops will override if specified\n
+	echo -e "Usage: sh $0 -e <emulab_user> -g <config> -t <nthreads> -n <client_threads> -c <nclients> -s <nservers> [-o <nops> -l <exp_len*> -f <output> -u -p <expected_tput**> -m <conc_mult>]
+	\t* e.g., 1s; nops will override if specified
 	\t** e.g., 10k"
 }
 
@@ -18,8 +18,9 @@ usage () {
 OUTPUT=output
 EXP_LEN=2m
 UDP=false
+CONC_MULT=1
 
-while getopts ":hue:l:g:p:t:n:c:s:o:f:" opt; do 
+while getopts ":hue:l:m:g:p:t:n:c:s:o:f:" opt; do 
 case $opt in
 	e) EMULAB_USER=$OPTARG;;
 	g) CONFIG=$OPTARG;; 
@@ -32,6 +33,7 @@ case $opt in
 	f) OUTPUT=$OPTARG;;
 	l) EXP_LEN=$OPTARG;;
 	u) UDP=true;;
+	m) CONC_MULT=$OPTARG;;
 	:) echo "Option -$OPTARG requires an argument." >&2
 		exit 1;;
 	\?) echo "Invalid option: -$OPTARG" >&2
@@ -52,6 +54,7 @@ echo -e "\tOUTPUT: $OUTPUT"
 echo -e "\tEXP_LEN: $EXP_LEN"
 echo -e "\tUDP: $UDP"
 echo -e "\tEXPECTED_TPUT: $EXPECTED_TPUT"
+echo -e "\tCONC_MULT: $CONC_MULT"
 echo
 
 NOW=`date +%s`
@@ -79,7 +82,7 @@ for i in `seq 0 $(($NCLIENTS-1))`
 do
 	HOST=$EMULAB_USER@clients-$i\.$EXPID
 	( echo "Running memaslap on client $i with config $CONFIG"
-	$SSH $HOST "bash \"$BIN_DIR\"/run-client.sh \"$CONFIG_DIR/$CONFIG\" \"$NTHREADS\" \"$CLIENT_THREADS\" \"$NSERVERS\" \"$NOPS\" \"$OUTPUT_DIR\" \"$i\" \"$EXP_LEN\" \"$UDP\" \"$EXPECTED_TPUT\""
+	$SSH $HOST "bash \"$BIN_DIR\"/run-client.sh \"$CONFIG_DIR/$CONFIG\" \"$NTHREADS\" \"$CLIENT_THREADS\" \"$NSERVERS\" \"$NOPS\" \"$OUTPUT_DIR\" \"$i\" \"$EXP_LEN\" \"$UDP\" \"$EXPECTED_TPUT\" \"$CONC_MULT\""
  	> /dev/null ) &
 	pids[$i]=$!
 done
