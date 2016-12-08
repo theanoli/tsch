@@ -20,11 +20,11 @@ void HandleTCPClient( mctx_t mctx, int cli_sock )
 	while (recvMsgSize > 0)      /* zero indicates end of transmission */
 	{
 		/* Echo message back to client */
-		if ( mtcp_write ( mctx, cli_sock, buf, recvMsgSize, 0 ) != recvMsgSize )
+		if ( mtcp_write ( mctx, cli_sock, buf, recvMsgSize ) != recvMsgSize )
 			DieWithError("send() failed");
 		
 		/* See if there is more data to receive */
-		if ( ( recvMsgSize = recv ( mctx, cli_sock, buf, RCVBUFSIZE, 0 )) < 0 )
+		if ( ( recvMsgSize = mtcp_recv ( mctx, cli_sock, buf, RCVBUFSIZE, 0 )) < 0 )
 			DieWithError("recv() failed");
 	}
 	

@@ -3,6 +3,8 @@
 #include <mtcp_api.h>
 
 void *ThreadMain(void *arg);            /* Main program of a thread */
+void *RunServerThread ( void *arg ); 
+mctx_t initializeServerThread ( int core );  
 
 /* Structure of arguments to pass to client thread */
 struct ThreadArgs
@@ -13,30 +15,42 @@ struct ThreadArgs
 
 // Declared out here to make accessible to threads
 unsigned short serv_port;  // server port; gets set via args
+static char *conf_file = NULL; 
 
 int main(int argc, char *argv[])
 {
-	int serv_sock; 		// Socket descriptor for server
-	int cli_sock; 		// Socket descriptor for client
 	int ncores; 
 	int i; 
-	int conn; 
+	int ret;  
 	pthread_t *app_thread;          // Thread IDs from pthread_create()
 	int *core_id; 
-	struct StartupArgs *startupArgs; 
+	struct mtcp_conf mcfg; 
 	
-	if (argc != 3)     
+	if (argc != 4)     
 	{
-	    fprintf(stderr,"Usage:  %s <SERVER PORT> <NUM CONTEXTS>\n", argv[0]);
+	    fprintf(stderr,"Usage:  %s <SERVER PORT> <NUM CONTEXTS> <CONFIG>\n", argv[0]);
 	    exit(1);
 	}
 	
 	serv_port = atoi(argv[1]);	// First arg: local port
 	ncores = atoi(argv[2]); 
+	conf_file = argv[3];
+
+	mtcp_getconf ( &mcfg );
+	mcfg.num_cores = 8;
+	mtcp_setconf ( &mcfg ); 
+
+	ret = mtcp_init ( conf_file );
+	if ( ret ) {
+		DieWithError ( "Failure to initialize mtcp" ); 
+	}
+
+	// TODO
+	// mtcp_register_signal ( SIGINT, SignalHandler ); 
 
 	app_thread = malloc ( ncores * sizeof ( pthread_t )  );
 	core_id = malloc ( ncores * sizeof ( int ) );
-	if ( ( tids == NULL ) || ( core_id == NULL ) ) {
+	if ( ( app_thread == NULL ) || ( core_id == NULL ) ) {
 		DieWithError ( "Error allocating thread array" ); 
 	}
 
@@ -44,22 +58,28 @@ int main(int argc, char *argv[])
 	// clients can connect to.
 	for ( i = 0; i < ncores; i++ ) {
 		core_id[i] = i; 
-		if ( pthread_create ( &app_thread[i], NULL, RunServerThread, (void *)&core_id[i] ) == NULL) {
+		if ( pthread_create ( &app_thread[i], NULL, RunServerThread, (void *)&core_id[i] ) != 0 ) {
 			DieWithError ( "Couldn't create mTCP threads" );
 		}
 	}
 
-	conn = 0; 	
+	for ( ;; ) {
 
+	}
+
+	return 0; 
 	// Will never get here
 }
 
 void *RunServerThread ( void *core_id  ) {
 	struct ThreadArgs *threadArgs; // Pointer to argument structure for thread
+	int listener;
+	int cli_sock; // Socket descriptor for client connection
+	pthread_t tid; 
 	mctx_t mctx; 
 
-	mctx = initializeServerThread( (int) core_id ); 
-	if !mctx {
+	mctx = initializeServerThread( *(int *)core_id ); 
+	if ( !mctx ) {
 		DieWithError ( "Failed to create mtcp context" ); 
 	}	
 
@@ -68,7 +88,7 @@ void *RunServerThread ( void *core_id  ) {
 		DieWithError ( "Failed to create mtcp context" ); 
 	}	
 	
-	cli_sock = AcceptTCPConnection ( listener ); 
+	cli_sock = AcceptTCPConnection ( mctx, listener ); 
 
 	for (;;)
 	{
@@ -92,8 +112,8 @@ void *RunServerThread ( void *core_id  ) {
 
 void *ThreadMain(void *threadArgs)
 {
-	int cli_sock; // Socket descriptor for client connection
 	mctx_t mctx; 
+	int cli_sock; // Socket descriptor for client connection
 	
 	// Guarantees that thread resources are deallocated on return
 	pthread_detach(pthread_self()); 

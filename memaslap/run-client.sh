@@ -3,8 +3,8 @@
 # Runs Python YCSB script on Emulab
 #
 
-if [ "$#" -ne 10 ]; then 
-	echo "Usage $0 <config> <nthreads> <client_threads> <nservers> <nops> <output_dir> <me> <udp> <expected_tput>"
+if [ "$#" -ne 11 ]; then 
+	echo "Usage $0 <config> <nthreads> <client_threads> <nservers> <nops> <output_dir> <me> <udp> <expected_tput> <conc_mult>"
 	exit 1
 fi
 
@@ -18,16 +18,12 @@ ME=$7
 EXP_LEN=$8
 UDP=$9
 EXPECTED_TPUT=${10}
-
+CONC_MULT=${11}
  
-# Set up the results directory if it doesn't exist
-if [ ! -e $OUTPUT_DIR ]; then
-	echo "Making directory $OUTPUT_DIR..."
-	mkdir $OUTPUT_DIR
-fi
 
 cd /proj/sequencer/libmemcached/clients
 
+mkdir -p $OUTPUT_DIR
 
 # List the servers
 EXPID=sequencer.sequencer.emulab.net
@@ -59,6 +55,11 @@ fi
 # Specify desired throughput?
 if [ "$EXPECTED_TPUT" != "" ]; then 
 	cmd="$cmd --tps=$EXPECTED_TPUT"
+fi
+
+# Specify concurrency multiplier?
+if [ "$CONC_MULT" != "" ]; then
+	cmd="$cmd --concurrency=$(($CONC_MULT * $CLIENT_THREADS))"
 fi
 
 

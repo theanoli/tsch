@@ -1,6 +1,7 @@
 #include <sys/socket.h> /* for socket(), bind(), and connect() */
 #include <arpa/inet.h>  /* for sockaddr_in and inet_ntoa() */
 #include <string.h>     /* for memset() */
+#include <mtcp_api.h>
 
 #define MAXPENDING 1024    /* Maximum outstanding connection requests */
 
@@ -14,7 +15,7 @@ int CreateTCPServerSocket ( mctx_t mctx, unsigned short port )
 	
 	/* Create socket for incoming connections */
 	listener = mtcp_socket( mctx, PF_INET, SOCK_STREAM, 0 );
-	if ( ret < 0 ) {
+	if ( listener < 0 ) {
 		DieWithError("socket() failed");
 	}
 

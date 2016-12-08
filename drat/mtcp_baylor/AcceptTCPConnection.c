@@ -15,8 +15,8 @@ int AcceptTCPConnection(mctx_t mctx, int serv_sock)
     clilen = sizeof(cli_addr);
     
     /* Wait for a client to connect */
-    if (cli_sock = mtcp_accept(mctx, serv_sock, (struct sockaddr *) &cli_addr, 
-           &clilen) < 0)
+    if ((cli_sock = mtcp_accept(mctx, serv_sock, (struct sockaddr *) &cli_addr, 
+           &clilen)) < 0)
         DieWithError("mtcp_accept() failed");
     
     /* cli_sock is connected to a client! */
