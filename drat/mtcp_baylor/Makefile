@@ -35,7 +35,7 @@ all: TCPEchoServer-Thread
 
 #	gcc -Wall -o server TCPEchoServer-Thread.c DieWithError.c HandleTCPClient.c CreateTCPServerSocket.c AcceptTCPConnection.c $(LIB_DIR) $(LIBS) $(CFLAGS)
 TCPEchoServer-Thread.o: TCPEchoServer-Thread.c DieWithError.c HandleTCPClient.c CreateTCPServerSocket.c AcceptTCPConnection.c
-	${CC} -c TCPEchoServer-Thread.c -c DieWithError.c HandleTCPClient.c CreateTCPServerSocket.c AcceptTCPConnection.c ${CFLAGS} ${INC}
+	${CC} -c $^ ${CFLAGS} ${INC}
 
 TCPEchoServer-Thread: TCPEchoServer-Thread.o DieWithError.o HandleTCPClient.o CreateTCPServerSocket.o AcceptTCPConnection.o
 	${CC} $^ ${LIBS} -o $@
