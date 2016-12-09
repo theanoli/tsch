@@ -18,6 +18,7 @@
 #include <pthread.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <netdb.h>
 
 #define PSIZE 32
 
@@ -156,9 +157,37 @@ diff ( struct timespec start, struct timespec end )
 	return temp;
 }
 
+int hostname_to_ip(char * hostname , char* ip)
+{
+    struct hostent *he;
+    struct in_addr **addr_list;
+    int i;
+         
+    if ( (he = gethostbyname( hostname ) ) == NULL) 
+    {
+        // get the host info
+        herror("gethostbyname");
+        return 1;
+    }
+ 
+    addr_list = (struct in_addr **) he->h_addr_list;
+     
+    for(i = 0; addr_list[i] != NULL; i++) 
+    {
+        //Return the first one;
+        strcpy(ip , inet_ntoa(*addr_list[i]) );
+        return 0;
+    }
+     
+    return 1;
+}
+ 
 int 
 main ( int argc, char **argv )
 {
+	char *hostname;
+	char ip[100];
+	
 	int portno; 
 	char *fname; 
 	int exp_duration;
@@ -171,17 +200,21 @@ main ( int argc, char **argv )
 	/* 1) Internet domain 2) Stream socket 3) Default protocol (TCP in this case) */
 	clientSocket = socket(PF_INET, SOCK_STREAM, 0);
 
-	if ( argc < 4 ) {
-		perror ( "You need two arguments: <portno> <fname> <exp_duration (s)>" ); 
+	if ( argc < 5 ) {
+		perror ( "You need arguments: <hostname> <portno> <fname> <exp_duration (s)>" ); 
 		return 1; 
 	}
-	portno = atoi ( argv[1] );
-	fname = argv[2]; 
-	exp_duration = atoi ( argv[3] ); 
+	hostname = argv[1];
+	portno = atoi ( argv[2] );
+	fname = argv[3]; 
+	exp_duration = atoi ( argv[4] ); 
 
-	printf ( "Your port number is %d, writefile %s, duration %d\n", 
-				portno, fname, exp_duration ); 
-	
+	printf ( "Your port number is %d, writefile %s, duration %d, host %s\n", 
+				portno, fname, exp_duration, hostname ); 
+
+	hostname_to_ip(hostname, ip);
+	printf ( "%s resolved to %s\n", hostname, ip );
+ 	
 	/*---- Configure settings of the server address struct ----*/
 	/* Address family = Internet */
 	serverAddr.sin_family = AF_INET;
