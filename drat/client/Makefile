@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-std=gnu99 -Wall -lrt 
+CFLAGS=-std=gnu99 -Wall -lrt -pthread 
 
 SOURCES=client.c
 OBJECTS=$(SOURCES:.c=.o)

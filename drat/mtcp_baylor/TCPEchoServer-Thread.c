@@ -86,7 +86,9 @@ void *RunServerThread ( void *core_id  ) {
 	listener = CreateTCPServerSocket ( mctx, serv_port );
 	if ( listener < 0 ) {
 		DieWithError ( "Failed to create mtcp context" ); 
-	}	
+	} else {
+		printf ( "Established listening socket!" ); 
+	}
 	
 	cli_sock = AcceptTCPConnection ( mctx, listener ); 
 

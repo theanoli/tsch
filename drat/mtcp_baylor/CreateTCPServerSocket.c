@@ -19,10 +19,10 @@ int CreateTCPServerSocket ( mctx_t mctx, unsigned short port )
 		DieWithError("socket() failed");
 	}
 
-	ret = mtcp_setsock_nonblock ( mctx, listener ); 
-	if ( ret < 0 ) {
-		DieWithError( "Failed to set nonblocking mode." );
-	}
+	// ret = mtcp_setsock_nonblock ( mctx, listener ); 
+	// if ( ret < 0 ) {
+//		DieWithError( "Failed to set nonblocking mode." );
+//	}
 
 	/* Construct local address structure */
 	memset(&serv_addr, 0, sizeof(serv_addr));   /* Zero out structure */
