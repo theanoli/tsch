@@ -76,8 +76,6 @@ recv_packet ( int sockfd )
 	}
 	strncpy ( str_copy, str, PSIZE );
 
-	printf ( "%s, %d\n", str, n ); 	
-	
 	secs = strtok ( str, "." );
 	ns = strtok ( NULL, "." ); 
 
@@ -102,12 +100,11 @@ recv_packet ( int sockfd )
 	}
 	memset ( rtt, '\0', PSIZE * 2 ); 
 
-	snprintf ( rtt, PSIZE, "%lld.%.9ld", 
+	snprintf ( rtt, PSIZE, "%lld,%.9ld", 
 		(long long) end.tv_sec, end.tv_nsec ); 
-	snprintf ( rtt + strlen ( rtt ), PSIZE, ",%lld.%.9ld\n", 
+	snprintf ( rtt + strlen ( rtt ), PSIZE, ",%lld,%.9ld\n", 
 		(long long) tdiff.tv_sec, tdiff.tv_nsec );
 
-	printf ( "String: %s\n", rtt ); 
 	if ( fprintf ( fd, "%s", rtt ) <= 0 ) {
 		printf ( "Nothing written!\n" );
 	}
