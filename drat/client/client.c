@@ -23,7 +23,7 @@
 
 extern int errno;
 int clientSocket;
-int fd; 
+FILE *fd; 
 
 struct timespec diff ( struct timespec start, struct timespec end ); 
 
@@ -44,6 +44,7 @@ recv_packet ( int sockfd )
 	char *str_copy;
 	char *secs;
 	char *ns; 
+	char *rtt;
 	struct timespec parsed_start, end, tdiff;
 
 	str = malloc ( PSIZE * sizeof ( char ) ); 
@@ -59,6 +60,7 @@ recv_packet ( int sockfd )
 		printf ( "Read less than 1 byte...\n" );
 		if ( n < 0 ) {
 			perror ( "Error reading from socket..." ); 
+			free ( str );
 			return; 
 		}
 		n = read ( sockfd, str, PSIZE ); 
@@ -69,6 +71,7 @@ recv_packet ( int sockfd )
 	str_copy = malloc ( PSIZE * sizeof ( char ) );
 	if ( str_copy == NULL ) {
 		perror ( "Malloc error" );
+		free ( str );
 		return;
 	}
 	strncpy ( str_copy, str, PSIZE );
@@ -80,6 +83,8 @@ recv_packet ( int sockfd )
 
 	if ( ( secs == NULL ) || ( ns == NULL ) ) {
 		perror ( "STRTOK returned NULL prematurely" );
+		free ( str_copy ); 
+		free ( str );
 		return;
 	}
 
@@ -87,9 +92,27 @@ recv_packet ( int sockfd )
 	parsed_start.tv_nsec = atoi ( ns ); 
 
 	tdiff = diff ( parsed_start, end ); 
-	
-	printf ( "%lld,%.9ld\n", (long long) tdiff.tv_sec, tdiff.tv_nsec ); 
 
+	rtt = malloc ( PSIZE * 2 * sizeof ( char ) ); 
+	if ( rtt == NULL ) {
+		free ( str );
+		free ( str_copy );
+		perror ( "Malloc error" ); 
+		return;
+	}
+	memset ( rtt, '\0', PSIZE * 2 ); 
+
+	snprintf ( rtt, PSIZE, "%lld.%.9ld", 
+		(long long) end.tv_sec, end.tv_nsec ); 
+	snprintf ( rtt + strlen ( rtt ), PSIZE, ",%lld.%.9ld\n", 
+		(long long) tdiff.tv_sec, tdiff.tv_nsec );
+
+	printf ( "String: %s\n", rtt ); 
+	if ( fprintf ( fd, "%s", rtt ) <= 0 ) {
+		printf ( "Nothing written!\n" );
+	}
+	
+	free ( rtt );  // current time timestamp + rtt
 	free ( str_copy ); 
 	free ( str );
 }
@@ -115,6 +138,7 @@ send_packet ( int sockfd )
 	n = write ( sockfd, str, PSIZE ); 
 	if ( n < 0 ) {
 		perror ( "Error writing to socket..." );
+		free ( str ); 
 		return; 
 	}
 
@@ -175,8 +199,8 @@ main ( int argc, char **argv )
 	addr_size = sizeof serverAddr;
 	connect(clientSocket, (struct sockaddr *) &serverAddr, addr_size);
 
-	fd = open ( fname, O_APPEND, O_RDWR|O_APPEND ); 
-	if ( fd < 0 ) {
+	fd = fopen ( fname, "a" ); 
+	if ( fd == NULL ) {
 		perror ( "Couldn't create file descriptor" ); 
 		return 1; 	 
 	}
@@ -185,9 +209,8 @@ main ( int argc, char **argv )
 	while ( (time ( 0 ) - start) < exp_duration ) {
 		send_packet ( clientSocket ); 
 		recv_packet ( clientSocket ); 
-		sleep ( 1 ); 
 	}
-	close ( fd ); 	
+	fclose ( fd ); 	
 	return 0;
 }
 
