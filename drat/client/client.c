@@ -16,59 +16,35 @@
 #include <time.h>
 #include <errno.h>
 #include <pthread.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
-#define PSIZE 64
+#define PSIZE 32
 
 extern int errno;
 int clientSocket;
+int fd; 
 
-void *send_packets ( void *threadno );
+struct timespec diff ( struct timespec start, struct timespec end ); 
 
 struct timespec 
 timestamp (void)
 {
     struct timespec spec;
 
-    clock_gettime(CLOCK_REALTIME, &spec);
+    clock_gettime(CLOCK_MONOTONIC, &spec);
     return spec; 
 }
 
-char *
-generate_randstring ( int len ) 
+void
+recv_packet ( int sockfd ) 
 {
-	char *str; 
-	int i; 
-
-	printf ( "Your string is being generated...\n" ); 
-
-	char *charset = "abcdefghijklmnopqrstuvwxyz"; 
-
-	str = malloc ( PSIZE * sizeof ( char ) ); 
-	for ( i = 0; i < (PSIZE - 1); i++ ) {
-		str[i] = charset[rand() % (strlen ( charset ))]; 
-	}
-
-	str[PSIZE - 1] = '\0'; 
-	printf ( "Your string is %s\n", str ); 
-
-	return str; 
-}
-
-void 
-send_and_receive ( int sockfd, int threadno ) 
-{
-	int n; 
+	int n;
 	char *str;
-	struct timespec start, parsed_start, end, diff; 
+	char *str_copy;
 	char *secs;
 	char *ns; 
-
-	secs = malloc ( 11 * sizeof ( char ) );
-	ns = malloc ( 10 * sizeof ( char ) ); 
-	if ( ( secs == NULL ) || ( ns == NULL ) ) {
-		perror ( "Malloc error" ); 
-		return;
-	}
+	struct timespec parsed_start, end, tdiff;
 
 	str = malloc ( PSIZE * sizeof ( char ) ); 
 	if ( str == NULL ) {
@@ -76,8 +52,65 @@ send_and_receive ( int sockfd, int threadno )
 		return;
 	}
 
+	memset ( str, '\0', PSIZE ); 
+
+	n = read ( sockfd, str, PSIZE ); 
+	while ( n <= 0 ) {
+		printf ( "Read less than 1 byte...\n" );
+		if ( n < 0 ) {
+			perror ( "Error reading from socket..." ); 
+			return; 
+		}
+		n = read ( sockfd, str, PSIZE ); 
+	}
+
+	end = timestamp (); 	
+
+	str_copy = malloc ( PSIZE * sizeof ( char ) );
+	if ( str_copy == NULL ) {
+		perror ( "Malloc error" );
+		return;
+	}
+	strncpy ( str_copy, str, PSIZE );
+
+	printf ( "%s, %d\n", str, n ); 	
+	
+	secs = strtok ( str, "." );
+	ns = strtok ( NULL, "." ); 
+
+	if ( ( secs == NULL ) || ( ns == NULL ) ) {
+		perror ( "STRTOK returned NULL prematurely" );
+		return;
+	}
+
+	parsed_start.tv_sec = atoi ( secs ); 
+	parsed_start.tv_nsec = atoi ( ns ); 
+
+	tdiff = diff ( parsed_start, end ); 
+	
+	printf ( "%lld,%.9ld\n", (long long) tdiff.tv_sec, tdiff.tv_nsec ); 
+
+	free ( str_copy ); 
+	free ( str );
+}
+
+void 
+send_packet ( int sockfd ) 
+{
+	int n; 
+	char *str;
+	struct timespec start; 
+
+	str = malloc ( PSIZE * sizeof ( char ) ); 
+	if ( str == NULL ) {
+		perror ( "Malloc error" ); 
+		return;
+	}
+
+	memset ( str, '\0', PSIZE ); 
+
 	start = timestamp (); 
-	snprintf ( str, PSIZE, "%lld.%.9ld", threadno, 
+	snprintf ( str, PSIZE, "%lld.%.9ld", 
 		(long long) start.tv_sec, start.tv_nsec ); 
 	n = write ( sockfd, str, PSIZE ); 
 	if ( n < 0 ) {
@@ -85,32 +118,13 @@ send_and_receive ( int sockfd, int threadno )
 		return; 
 	}
 
-	memset ( str, '\0', PSIZE ); 
-
-	n = read( sockfd, str, PSIZE ); 
-	if ( n < 0 ) {
-		perror ( "Error reading from socket..." ); 
-		return; 
-	}
-
-	end = timestamp (); 	
-	strncpy ( secs, str, 10 ); 
-	strncpy ( ns + 10 * sizeof ( char ), str, 9 );	
-
-	parsed_start->tv_sec = atoi ( secs ); 
-	parsed_start->tv_nsec = atoi ( ns ); 
-
-	diff = diff (  ); 
-
-	printf ( "%s\n", str ); 
-
-	free ( str ); 
+	free ( str );
 }
 
-timespec
-diff ( timespec start, timespec end )
+struct timespec
+diff ( struct timespec start, struct timespec end )
 {
-	timespec temp;
+	struct timespec temp;
 	if ((end.tv_nsec-start.tv_nsec)<0) {
 		temp.tv_sec = end.tv_sec-start.tv_sec-1;
 		temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
@@ -125,25 +139,27 @@ int
 main ( int argc, char **argv )
 {
 	int portno; 
-	int nthreads;
-	int i; 
-	pthread_t *tid;
-	int *threadnum; 
+	char *fname; 
+	int exp_duration;
+
 	struct sockaddr_in serverAddr;
 	socklen_t addr_size;
-	
+	time_t start; 
+
 	/*---- Create the socket. The three arguments are: ----*/
 	/* 1) Internet domain 2) Stream socket 3) Default protocol (TCP in this case) */
 	clientSocket = socket(PF_INET, SOCK_STREAM, 0);
 
-	if ( argc < 3 ) {
-		perror ( "You need two arguments: <portno> <nthreads>" ); 
+	if ( argc < 4 ) {
+		perror ( "You need two arguments: <portno> <fname> <exp_duration (s)>" ); 
 		return 1; 
 	}
 	portno = atoi ( argv[1] );
-	nthreads = atoi ( argv[2] ); 
+	fname = argv[2]; 
+	exp_duration = atoi ( argv[3] ); 
 
-	printf ( "Your port number is %d, %d threads\n", portno, nthreads ); 
+	printf ( "Your port number is %d, writefile %s, duration %d\n", 
+				portno, fname, exp_duration ); 
 	
 	/*---- Configure settings of the server address struct ----*/
 	/* Address family = Internet */
@@ -159,37 +175,19 @@ main ( int argc, char **argv )
 	addr_size = sizeof serverAddr;
 	connect(clientSocket, (struct sockaddr *) &serverAddr, addr_size);
 
-	tid = malloc ( nthreads * sizeof ( int ) ); 
-	threadnum = malloc ( nthreads * sizeof ( int ) ); 
-	if (( tid == NULL ) || ( threadnum == NULL )) {
-		perror ( "Error allocating arrays for thread IDs" );
-		return 1;
+	fd = open ( fname, O_APPEND, O_RDWR|O_APPEND ); 
+	if ( fd < 0 ) {
+		perror ( "Couldn't create file descriptor" ); 
+		return 1; 	 
 	}
 
-	/*---- Spawn nthreads threads and have each flood cxn with packets ----*/
-	for ( i = 0; i < nthreads; i++ ) {
-		threadnum[i] = i; 
-		if ( pthread_create ( &tid[i], NULL, send_packets, &threadnum[i] ) ) {
-			perror ( "Error creating thread" ); 
-			return 1; 
-		} 		
+	start = time ( 0 ); 
+	while ( (time ( 0 ) - start) < exp_duration ) {
+		send_packet ( clientSocket ); 
+		recv_packet ( clientSocket ); 
+		sleep ( 1 ); 
 	}
-
-	while ( 1 ) {
-		// spin forever while the threads run...
-	}
-	// will never get here
+	close ( fd ); 	
 	return 0;
 }
 
-void *
-send_packets ( void *threadno ) 
-{
-	pthread_detach ( pthread_self () ); 
-
-	while ( 1 ) {
-		send_and_receive ( clientSocket, *(int *)threadno ); 
-	}
-
-	return NULL; 
-}
