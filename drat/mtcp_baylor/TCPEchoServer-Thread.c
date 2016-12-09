@@ -87,13 +87,13 @@ void *RunServerThread ( void *core_id  ) {
 	if ( listener < 0 ) {
 		DieWithError ( "Failed to create mtcp context" ); 
 	} else {
-		printf ( "Established listening socket!" ); 
+		printf ( "Established listening socket!\n" ); 
 	}
 	
-	cli_sock = AcceptTCPConnection ( mctx, listener ); 
-
 	for (;;)
 	{
+		cli_sock = AcceptTCPConnection ( mctx, listener ); 
+	
 		/* Create separate memory for client argument */
 		if ((threadArgs = (struct ThreadArgs *) malloc(sizeof(struct ThreadArgs))) 
 		       == NULL)
@@ -124,7 +124,7 @@ void *ThreadMain(void *threadArgs)
 	cli_sock = (( struct ThreadArgs * ) threadArgs )->cli_sock;
 	mctx = (( struct ThreadArgs * ) threadArgs )->mctx; 
 	free(threadArgs);	// Deallocate memory for argument
-
+ 
 	HandleTCPClient ( mctx, cli_sock );
 
 	return (NULL);

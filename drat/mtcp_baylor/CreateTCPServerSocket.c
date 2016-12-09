@@ -2,6 +2,7 @@
 #include <arpa/inet.h>  /* for sockaddr_in and inet_ntoa() */
 #include <string.h>     /* for memset() */
 #include <mtcp_api.h>
+#include <stdio.h>
 
 #define MAXPENDING 1024    /* Maximum outstanding connection requests */
 
@@ -12,6 +13,8 @@ int CreateTCPServerSocket ( mctx_t mctx, unsigned short port )
 	int listener; 
 	int ret; 
 	struct sockaddr_in serv_addr;
+
+	printf ( "Creating listener socket...\n" );
 	
 	/* Create socket for incoming connections */
 	listener = mtcp_socket( mctx, PF_INET, SOCK_STREAM, 0 );
