@@ -57,14 +57,14 @@ recv_packet ( int sockfd )
 	memset ( str, '\0', PSIZE ); 
 
 	n = read ( sockfd, str, PSIZE ); 
-	while ( n <= 0 ) {
-		printf ( "Read less than 1 byte...\n" );
+	while ( n < PSIZE ) {
+		printf ( "Need to read more bytes...\n" );
 		if ( n < 0 ) {
 			perror ( "Error reading from socket..." ); 
 			free ( str );
 			return; 
 		}
-		n = read ( sockfd, str, PSIZE ); 
+		n += read ( sockfd, str, PSIZE ); 
 	}
 
 	end = timestamp (); 	
