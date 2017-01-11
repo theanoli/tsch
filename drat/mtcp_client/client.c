@@ -23,11 +23,19 @@
 
 #define PSIZE 32
 
+struct Threadargs {
+	char *hostname;
+	int portno; 
+	char *fname; 
+	int exp_duration;
+};
+
 extern int errno;
 int clientSocket;
 FILE *fd; 
 
 struct timespec diff ( struct timespec start, struct timespec end ); 
+void *runClientThread ( void *args ); 
 
 struct timespec 
 timestamp (void)
@@ -160,7 +168,7 @@ diff ( struct timespec start, struct timespec end )
 }
 
 mctx_t
-initializeServerThread ( int core ) 
+createServerContext ( int core )
 {
 	mctx_t mctx; 
 
@@ -174,21 +182,22 @@ initializeServerThread ( int core )
 int 
 main ( int argc, char **argv )
 {
-	char *hostname;
-	//char ip[100];
-	
-	int portno; 
-	char *fname; 
-	int exp_duration;
-
-	struct hostent *server;
-	struct sockaddr_in serverAddr;
-	struct sockaddr_in localAddr;
-	time_t start; 
 
 	struct mtcp_conf mcfg;
-	mctx_t mctx; 
 	int ret;
+
+	pthread_t tid;
+	struct Threadargs threadargs; 
+
+	if ( argc < 5 ) {
+		perror ( "You need arguments: <hostname> <portno> <fname> <exp_duration (s)>" ); 
+		return 1; 
+	}
+
+	threadargs.hostname = argv[1];
+	threadargs.portno = atoi ( argv[2] );
+	threadargs.fname = argv[3]; 
+	threadargs.exp_duration = atoi ( argv[4] ); 
 
 	// Setup mtcp stuff
 	mtcp_getconf ( &mcfg );
@@ -201,88 +210,92 @@ main ( int argc, char **argv )
 		return 1;
 	}
 
-	mctx = initializeServerThread( 0 ); 
+	if ( pthread_create ( &tid, NULL, runClientThread, 
+		(void *)&threadargs) ) {
+		perror ( "Failed to create client thread\n" );
+		return 1;
+	}
+
+	pthread_join ( tid, NULL ); 
+
+	fclose ( fd ); 	
+	return 0;
+}
+
+void *
+runClientThread ( void *targs ) 
+{
+	struct hostent *server;
+	struct sockaddr_in serverAddr;
+	time_t start; 
+	int ret;
+
+	struct Threadargs *args;  
+	mctx_t mctx; 	
+
+	args = (struct Threadargs *) targs;
+
+	mctx = createServerContext ( 0 ); 
 	if ( !mctx ) {
 		perror ( "Failed to create mtcp context" ); 
-		return 1;
+		return NULL;
 	}	
-
 
 	/*---- Create the socket. The three arguments are: ----*/
 	/* 1) Internet domain 2) Stream socket 3) Default protocol (TCP in this case) */
 	clientSocket = mtcp_socket( mctx, AF_INET, SOCK_STREAM, 0);
 
-	if ( argc < 5 ) {
-		perror ( "You need arguments: <hostname> <portno> <fname> <exp_duration (s)>" ); 
-		return 1; 
-	}
-	hostname = argv[1];
-	portno = atoi ( argv[2] );
-	fname = argv[3]; 
-	exp_duration = atoi ( argv[4] ); 
-
 	printf ( "Your port number is %d, writefile %s, duration %d, host %s\n", 
-				portno, fname, exp_duration, hostname ); 
+				args->portno, 
+				args->fname, 
+				args->exp_duration, 
+				args->hostname ); 
 
-	server = gethostbyname(hostname);
+	server = gethostbyname(args->hostname);
     	if (server == NULL) {
         	perror ("ERROR, no such host\n");
-        	return 1;
+        	return NULL;
     	}
 
-	//hostname_to_ip(hostname, ip);
-	//printf ( "%s resolved to %s\n", hostname, ip );
- 	
-	/*---- Configure settings of the local address struct ----*/
+	
+
+	/*---- Configure settings of the remote address struct ----*/
 	/* Address family = Internet */
-	localAddr.sin_family = AF_INET;
-	/* Set port number, using htons function to use proper byte order */
-	localAddr.sin_port = htons(portno);
-	/* Set IP address to localhost */
-	localAddr.sin_addr.s_addr = inet_addr("10.0.0.4");
-	// memcpy ( (char *)&serverAddr.sin_addr.s_addr, 
-	//	(char *)server->h_addr, server->h_length );
-	/* Set all bits of the padding field to 0 */
-	memset(localAddr.sin_zero, '\0', sizeof localAddr.sin_zero);  
-	// mtcp_bind ( mctx, clientSocket, (struct sockaddr *)&localAddr, sizeof ( localAddr ) );
-
-
 	serverAddr.sin_family = AF_INET;
 	/* Set port number, using htons function to use proper byte order */
-	serverAddr.sin_port = htons(portno);
+	serverAddr.sin_port = htons(args->portno);
 	/* Set IP address to localhost */
-	//memcpy ( (char *)&serverAddr.sin_addr.s_addr, 
-	//	(char *)server->h_addr, server->h_length );
 	serverAddr.sin_addr.s_addr = inet_addr ( "10.0.0.4" );
 	/* Set all bits of the padding field to 0 */
 	memset(serverAddr.sin_zero, '\0', sizeof serverAddr.sin_zero);  
 	
 	/*---- Connect the socket to the server using the address struct ----*/
+	printf ( "Connecting...\n" ); 
 	ret = mtcp_connect(mctx, clientSocket, (struct sockaddr *) &serverAddr, 
 			(socklen_t)sizeof ( serverAddr ));
-
+	
 	if (ret < 0) {
 		if (errno != EINPROGRESS) {
 			perror("mtcp_connect");
 			mtcp_close(mctx, clientSocket);
-			return -1;
+			return NULL;
 		}
 	}
 
-	fd = fopen ( fname, "a" ); 
+	printf ( "Getting ready to send packets...\n" ); 
+
+	fd = fopen ( args->fname, "a" ); 
 	if ( fd == NULL ) {
 		perror ( "Couldn't create file descriptor" ); 
-		return 1; 	 
+		return NULL; 	 
 	}
 
 	start = time ( 0 ); 
-	while ( (time ( 0 ) - start) < exp_duration ) {
+	while ( (time ( 0 ) - start) < args->exp_duration ) {
 		send_packet ( mctx, clientSocket ); 
 		recv_packet ( mctx, clientSocket ); 
 	}
 
 	mtcp_destroy_context ( mctx );
-	fclose ( fd ); 	
-	return 0;
+	return NULL;
 }
-

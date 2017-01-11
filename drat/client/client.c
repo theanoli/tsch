@@ -57,15 +57,15 @@ recv_packet ( int sockfd )
 	memset ( str, '\0', PSIZE ); 
 
 	n = read ( sockfd, str, PSIZE ); 
-	while ( n < PSIZE ) {
-		printf ( "Need to read more bytes...\n" );
-		if ( n < 0 ) {
-			perror ( "Error reading from socket..." ); 
-			free ( str );
-			return; 
-		}
-		n += read ( sockfd, str, PSIZE ); 
-	}
+ 	while ( n < PSIZE ) {
+ 		printf ( "Need to read more bytes...\n" );
+ 		if ( n < 0 ) {
+ 			perror ( "Error reading from socket..." ); 
+ 			free ( str );
+ 			return; 
+ 		}
+ 		n += read ( sockfd, str, PSIZE ); 
+ 	}
 
 	end = timestamp (); 	
 
@@ -188,6 +188,7 @@ main ( int argc, char **argv )
 	char *hostname;
 	char ip[100];
 	
+	int ret; 
 	int portno; 
 	char *fname; 
 	int exp_duration;
@@ -219,21 +220,27 @@ main ( int argc, char **argv )
 	/* Address family = Internet */
 	serverAddr.sin_family = AF_INET;
 	/* Set port number, using htons function to use proper byte order */
-	serverAddr.sin_port = htons(portno);
+	serverAddr.sin_port = htons( portno );
 	/* Set IP address to localhost */
-	serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	serverAddr.sin_addr.s_addr = inet_addr( ip );
 	/* Set all bits of the padding field to 0 */
-	memset(serverAddr.sin_zero, '\0', sizeof serverAddr.sin_zero);  
+	memset ( serverAddr.sin_zero, '\0', sizeof serverAddr.sin_zero );  
 	
 	/*---- Connect the socket to the server using the address struct ----*/
 	addr_size = sizeof serverAddr;
-	connect(clientSocket, (struct sockaddr *) &serverAddr, addr_size);
+	ret = connect ( clientSocket, (struct sockaddr *) &serverAddr, addr_size );
+	
+	if ( ret < 0 ) {
+		printf ( "Connect failed!\n" );
+	}
 
 	fd = fopen ( fname, "a" ); 
 	if ( fd == NULL ) {
 		perror ( "Couldn't create file descriptor" ); 
 		return 1; 	 
 	}
+
+	printf ( "Connection established; beginning send/receive of packets.\n" );
 
 	start = time ( 0 ); 
 	while ( (time ( 0 ) - start) < exp_duration ) {
