@@ -24,6 +24,7 @@
 
 extern int errno;
 int clientSocket;
+int do_write;
 FILE *fd; 
 
 struct timespec diff ( struct timespec start, struct timespec end ); 
@@ -31,6 +32,7 @@ struct timespec diff ( struct timespec start, struct timespec end );
 struct timespec 
 timestamp (void)
 {
+	// Time since machine started up
     struct timespec spec;
 
     clock_gettime(CLOCK_MONOTONIC, &spec);
@@ -40,7 +42,7 @@ timestamp (void)
 void
 recv_packet ( int sockfd ) 
 {
-	int n;
+	int n, t;
 	char *str;
 	char *str_copy;
 	char *secs;
@@ -56,63 +58,73 @@ recv_packet ( int sockfd )
 
 	memset ( str, '\0', PSIZE ); 
 
-	n = read ( sockfd, str, PSIZE ); 
- 	while ( n < PSIZE ) {
- 		printf ( "Need to read more bytes...\n" );
- 		if ( n < 0 ) {
+	t = 0;  // bytes received so far
+	while ( 1 ) {
+		n = read ( sockfd, str + t, PSIZE ); 
+		
+		if ( n < 0 ) {
  			perror ( "Error reading from socket..." ); 
  			free ( str );
  			return; 
- 		}
- 		n += read ( sockfd, str, PSIZE ); 
- 	}
+		}
 
-	end = timestamp (); 	
-
-	str_copy = malloc ( PSIZE * sizeof ( char ) );
-	if ( str_copy == NULL ) {
-		perror ( "Malloc error" );
-		free ( str );
-		return;
+		t += n;
+		
+		if ( n == 0 || t == PSIZE ) {
+			// no more bytes
+			break;
+		}
+		printf ( "Multiple rounds needed for read\n" ); 
 	}
-	strncpy ( str_copy, str, PSIZE );
 
-	secs = strtok ( str, "." );
-	ns = strtok ( NULL, "." ); 
+	if ( do_write ) {
+		end = timestamp (); 	
 
-	if ( ( secs == NULL ) || ( ns == NULL ) ) {
-		perror ( "STRTOK returned NULL prematurely" );
+		str_copy = malloc ( PSIZE * sizeof ( char ) );
+		if ( str_copy == NULL ) {
+			perror ( "Malloc error" );
+			free ( str );
+			return;
+		}
+		strncpy ( str_copy, str, PSIZE );
+
+		secs = strtok ( str, "." );
+		ns = strtok ( NULL, "." ); 
+
+		if ( ( secs == NULL ) || ( ns == NULL ) ) {
+			perror ( "STRTOK returned NULL prematurely" );
+			free ( str_copy ); 
+			free ( str );
+			return;
+		}
+
+		parsed_start.tv_sec = atoi ( secs ); 
+		parsed_start.tv_nsec = atoi ( ns ); 
+
+		tdiff = diff ( parsed_start, end ); 
+
+		rtt = malloc ( PSIZE * 2 * sizeof ( char ) ); 
+		if ( rtt == NULL ) {
+			free ( str );
+			free ( str_copy );
+			perror ( "Malloc error" ); 
+			return;
+		}
+		memset ( rtt, '\0', PSIZE * 2 ); 
+
+		snprintf ( rtt, PSIZE, "%lld,%.9ld", 
+			(long long) end.tv_sec, end.tv_nsec ); 
+		snprintf ( rtt + strlen ( rtt ), PSIZE, ",%lld,%.9ld\n", 
+			(long long) tdiff.tv_sec, tdiff.tv_nsec );
+
+		if ( fprintf ( fd, "%s", rtt ) <= 0 ) {
+		 	printf ( "Nothing written!\n" );
+		}
+		
+		free ( rtt );  // current time timestamp + rtt
 		free ( str_copy ); 
 		free ( str );
-		return;
 	}
-
-	parsed_start.tv_sec = atoi ( secs ); 
-	parsed_start.tv_nsec = atoi ( ns ); 
-
-	tdiff = diff ( parsed_start, end ); 
-
-	rtt = malloc ( PSIZE * 2 * sizeof ( char ) ); 
-	if ( rtt == NULL ) {
-		free ( str );
-		free ( str_copy );
-		perror ( "Malloc error" ); 
-		return;
-	}
-	memset ( rtt, '\0', PSIZE * 2 ); 
-
-	snprintf ( rtt, PSIZE, "%lld,%.9ld", 
-		(long long) end.tv_sec, end.tv_nsec ); 
-	snprintf ( rtt + strlen ( rtt ), PSIZE, ",%lld,%.9ld\n", 
-		(long long) tdiff.tv_sec, tdiff.tv_nsec );
-
-	if ( fprintf ( fd, "%s", rtt ) <= 0 ) {
-		printf ( "Nothing written!\n" );
-	}
-	
-	free ( rtt );  // current time timestamp + rtt
-	free ( str_copy ); 
-	free ( str );
 }
 
 void 
@@ -189,29 +201,80 @@ main ( int argc, char **argv )
 	char ip[100];
 	
 	int ret; 
+	int sleep;
+	char c;
 	int portno; 
-	char *fname; 
+	char *fname;
 	int exp_duration;
+	char fpath[140] = "../results/";
 
 	struct sockaddr_in serverAddr;
 	socklen_t addr_size;
+
+	int packet_counter; 
 	time_t start; 
+
+	sleep = 0;
+	do_write = 0;
+	fname = NULL; 
+
+	char *usage = "usage: ./client -h hostname -p portno -o outfile -d experiment duration -w, where -w means 'do write'. If -w is not used, do not need an outfile.";
+	opterr = 0; 
+	while (( c = getopt ( argc, argv, "h:p:o:d:s:w" ) ) != -1 )
+		switch ( c ) {
+			case 'h':
+				// hostname
+				hostname = optarg;
+				break;
+			case 'p':
+				// portno
+				portno = atoi ( optarg );
+				break;
+			case 'o':
+				// output file
+				fname = optarg;
+				break;
+			case 'd':
+				// experiment duration
+				exp_duration = atoi ( optarg );
+				break;
+			case 'w':
+				// do write?
+				do_write = 1;
+				break;
+			case 's': 
+				// sleep duration (usec)
+				sleep = atoi ( optarg );
+				break;
+			case '?':
+				fprintf ( stderr, "Unknown option char \
+						`\\x%x'.\n", optopt );
+				fprintf ( stderr, "%s\n", usage );
+				return 1;
+			default:
+				return 1;
+		}
+
+	if ( do_write && ( fname == NULL ) ) {
+		perror ( usage );
+		perror ( "No file name given!" );
+		return 1;
+	} else if ( !do_write && ( fname != NULL ) ) {
+		perror ( usage );
+		perror ( "File name given, but no records will be written" );
+		return 1;
+	} else if ( strlen ( fname ) > 128 ) {
+		perror ( "File name must be less than 128 bytes!" );
+		return 1;
+	}
+
+	printf ( "Your port number is %d, writefile %s, duration %d, host %s\n", 
+				portno, fname, exp_duration, hostname ); 
+
 
 	/*---- Create the socket. The three arguments are: ----*/
 	/* 1) Internet domain 2) Stream socket 3) Default protocol (TCP in this case) */
 	clientSocket = socket(PF_INET, SOCK_STREAM, 0);
-
-	if ( argc < 5 ) {
-		perror ( "You need arguments: <hostname> <portno> <fname> <exp_duration (s)>" ); 
-		return 1; 
-	}
-	hostname = argv[1];
-	portno = atoi ( argv[2] );
-	fname = argv[3]; 
-	exp_duration = atoi ( argv[4] ); 
-
-	printf ( "Your port number is %d, writefile %s, duration %d, host %s\n", 
-				portno, fname, exp_duration, hostname ); 
 
 	hostname_to_ip(hostname, ip);
 	printf ( "%s resolved to %s\n", hostname, ip );
@@ -234,20 +297,35 @@ main ( int argc, char **argv )
 		printf ( "Connect failed!\n" );
 	}
 
-	fd = fopen ( fname, "a" ); 
-	if ( fd == NULL ) {
-		perror ( "Couldn't create file descriptor" ); 
-		return 1; 	 
+	
+	/*---- Open a file for infodump if needed, then run ----*/
+	if ( do_write ) {
+		strcat ( fpath, fname ); 
+		fd = fopen ( fpath, "w" ); 
+		if ( fd == NULL ) {
+			perror ( "Couldn't create file descriptor" ); 
+			return 1; 	 
+		}
+
 	}
 
 	printf ( "Connection established; beginning send/receive of packets.\n" );
 
+	packet_counter = 0;
 	start = time ( 0 ); 
 	while ( (time ( 0 ) - start) < exp_duration ) {
 		send_packet ( clientSocket ); 
 		recv_packet ( clientSocket ); 
+		packet_counter++; 
+		usleep ( sleep );
 	}
-	fclose ( fd ); 	
+
+	if ( do_write ) {
+		fclose ( fd ); 	
+	}
+
+	printf ( "Sent/received %d packets over %ds\n", 
+		packet_counter, exp_duration );
 	return 0;
 }
 
