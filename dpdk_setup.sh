@@ -3,7 +3,7 @@
 # array below). 
 #
 # Must include as argument the interface you want to activate DPDK on. Usage: 
-#	sudo bash dpdk_setup.sh machine_type iface_name  
+#	sudo bash dpdk_setup.sh iface_name  
 #
 # Note the setup.sh program is extremely sensitive to misplaced newlines!
 # If it seems to be working incorrectly, echo $options to see what you're
@@ -13,12 +13,19 @@
 # because of this line:
 dpdk_dir=`echo pwd`
 
-iface=$1
+# Find the DPDK-compatible interface and take it down
+iface=`ifconfig | awk '!/10\.1\.1\..*/ {iface=$1}
+			/10\.1\.1\..*/ {print iface}'`
+
+if [ $iface == "" ]; then
+	echo "Error getting interface name! Exiting..."
+	exit
+fi
 
 # Get the number of NUMA nodes for this machine type
 num_numa_nodes=$( lscpu | awk -F': +' '/NUMA node\(s\)/ { print $2 }' )
 
-tasks=( #"x86_64-native-linuxapp-gcc" 
+tasks=( "x86_64-native-linuxapp-gcc" 
 	"Insert IGB UIO module" 
 	"Setup hugepage mappings for NUMA systems" 
 	"Bind Ethernet device to IGB UIO module" )
@@ -33,7 +40,6 @@ printf q | bash setup.sh > $fname
 
 # Extract the option number from the setup menu text
 for i in "${tasks[@]}"; do
-	echo Working on $i...
 	# Find the correct line and extract the option number
 	optnum=$(awk -v pat="$i" '$0 ~ pat { 
 				gsub(/\[/,""); 
@@ -44,7 +50,6 @@ for i in "${tasks[@]}"; do
 	# "Bind Ethernet device..." is a special case; we need to examine
 	# a sub-menu, too. This is ugly but it works and faster than 
 	# alternative (lshw is really slow!)
-	echo "$optnum"
 	if [ "$i" == "Bind Ethernet device to IGB UIO module" ]; then
 		# Expand the submenu and save to file; printf preserves \n
 		printf "$optnum\nq\nq\nq\n" | bash setup.sh > $pci_fname
@@ -64,6 +69,15 @@ for i in "${tasks[@]}"; do
 
 	options="$options$optnum\n\n"
 done
+
+printf "\n\n++++++++++++++++++++++++++++++++++++++++++++"
+printf "Interface $iface will be configured for DPDK.\n"
+printf "Your setup options will be:\n"
+printf "$options"
+read -n 1 -s -p "Press any key to continue, Ctrl+C to exit..."
+
+echo "Bringing down interface $iface..."
+ifconfig $iface down
 
 printf "$options q\n" | bash setup.sh
 rm $fname

@@ -264,8 +264,8 @@ runClientThread ( void *targs )
 	serverAddr.sin_family = AF_INET;
 	/* Set port number, using htons function to use proper byte order */
 	serverAddr.sin_port = htons(args->portno);
-	/* Set IP address to localhost */
-	serverAddr.sin_addr.s_addr = inet_addr ( "10.0.0.4" );
+	/* Set IP address to hostname */
+	serverAddr.sin_addr.s_addr = inet_addr ( args->hostname );
 	/* Set all bits of the padding field to 0 */
 	memset(serverAddr.sin_zero, '\0', sizeof serverAddr.sin_zero);  
 	
@@ -289,12 +289,14 @@ runClientThread ( void *targs )
 		perror ( "Couldn't create file descriptor" ); 
 		return NULL; 	 
 	}
-
+	
+	printf ( "Starting timer...\n" );
 	start = time ( 0 ); 
 	while ( (time ( 0 ) - start) < args->exp_duration ) {
 		send_packet ( mctx, clientSocket ); 
 		recv_packet ( mctx, clientSocket ); 
 	}
+	printf ( "Done!\n" ); 
 
 	mtcp_destroy_context ( mctx );
 	return NULL;
