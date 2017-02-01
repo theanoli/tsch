@@ -70,11 +70,11 @@ for i in "${tasks[@]}"; do
 	options="$options$optnum\n\n"
 done
 
-printf "\n\n++++++++++++++++++++++++++++++++++++++++++++"
+printf "\n\n++++++++++++++++++++++++++++++++++++++++++++\n"
 printf "Interface $iface will be configured for DPDK.\n"
 printf "Your setup options will be:\n"
 printf "$options"
-read -n 1 -s -p "Press any key to continue, Ctrl+C to exit..."
+read -rsp $'Press any key to continue, Ctrl+C to exit...\n' -n1 key
 
 echo "Bringing down interface $iface..."
 ifconfig $iface down

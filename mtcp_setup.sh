@@ -10,8 +10,8 @@ if [ $# -lt 1 ]; then
 fi
 
 # Clean up old builds
-rm $dpdk/lib
-rm $dpdk/include
+rm -f $dpdk/lib
+rm -f $dpdk/include
 
 cd $dpdk16/tools
 bash /proj/sequencer/tsch/dpdk_setup.sh 

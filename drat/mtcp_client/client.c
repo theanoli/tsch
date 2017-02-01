@@ -182,7 +182,6 @@ createServerContext ( int core )
 int 
 main ( int argc, char **argv )
 {
-
 	struct mtcp_conf mcfg;
 	int ret;
 
@@ -201,7 +200,7 @@ main ( int argc, char **argv )
 
 	// Setup mtcp stuff
 	mtcp_getconf ( &mcfg );
-	mcfg.num_cores = 8;
+	mcfg.num_cores = 1;
 	mtcp_setconf ( &mcfg ); 
 
 	ret = mtcp_init ( "epserver.conf" );
@@ -235,6 +234,7 @@ runClientThread ( void *targs )
 
 	args = (struct Threadargs *) targs;
 
+	// For now use only the first core; later will include -N option to handle more?
 	mctx = createServerContext ( 0 ); 
 	if ( !mctx ) {
 		perror ( "Failed to create mtcp context" ); 
