@@ -17,10 +17,8 @@
 #include <assert.h>
 
 #include <mtcp_api.h>
-#include <mtcp_epoll.h>
 #include "cpu.h"
 #include "rss.h"
-#include "http_parsing.h"
 #include "debug.h"
 
 #define MAX_CPUS 16
@@ -64,13 +62,15 @@ static int done[MAX_CPUS];
 static int num_cores;
 static int core_limit;
 /*----------------------------------------------------------------------------*/
+static int fio = FALSE;
+/*----------------------------------------------------------------------------*/
 static in_addr_t daddr;
 static in_port_t dport;
 static in_addr_t saddr;
-FILE *fd;
 /*----------------------------------------------------------------------------*/
 static int concurrency;
 static int max_fds;
+static int response_size = 0;
 /*----------------------------------------------------------------------------*/
 struct thread_context
 {
@@ -146,7 +146,6 @@ CreateConnection(thread_context_t ctx)
 			mtcp_close(mctx, sockid);
 			return -1;
 		}
-		perror ( "mtcp_connect" );
 	}
 
 	return sockid;
@@ -158,6 +157,7 @@ CloseConnection(thread_context_t ctx, int sockid)
 	mtcp_close(ctx->mctx, sockid);
 	if (CreateConnection(ctx) < 0) {
 		done[ctx->core] = TRUE;
+		break;
 	}
 }
 /*----------------------------------------------------------------------------*/
@@ -298,9 +298,9 @@ RunEchoClient(void *arg)
 	mctx_t mctx;
 	int core = *(int *)arg;
 	struct in_addr daddr_in;
-	int sockfd;
-
-	time_t start;
+	int n;
+	int ep;
+	int i;
 
 	mtcp_core_affinitize(core);
 
@@ -319,21 +319,20 @@ RunEchoClient(void *arg)
 			core, inet_ntoa(daddr_in), ntohs(dport));
 
 	while (!done[core]) {
-		if ( (sockfd = CreateConnection(ctx)) < 0) {
+		if (CreateConnection(ctx) < 0) {
 			done[core] = TRUE;
 			break;
 		}
 		
 		// TODO here put functionality
-		printf ( "Starting timer, sockfd is %d...\n", sockfd );
+		printf ( "Starting timer...\n" );
 		start = time ( 0 ); 
-		while ( (time ( 0 ) - start) < 30 ) {
-			if ( done[core] == TRUE ) {
+		while ( (time ( 0 ) - start) < args->exp_duration ) {
+			if ( done[core] = TRUE ) {
 				break;
 			}
-			send_packet ( mctx, sockfd ); 
-			recv_packet ( mctx, sockfd ); 
-			sleep ( 1 );
+			send_packet ( mctx, clientSocket ); 
+			recv_packet ( mctx, clientSocket ); 
 		}
 		done[core] = TRUE;
 		printf ( "Done!\n" ); 
@@ -367,23 +366,15 @@ main(int argc, char **argv)
 	int ret;
 	int i;
 
-	char *hostname;
-	int portno;
-	
-	// This stuff doesn't do anything right now...
-	// char *fname;
-	// int exp_duration;
-	
-	// TODO do getopts
-	if ( argc < 3 ) {
-		perror ( "You need arguments: <hostname> <portno>" ); 
+	if ( argc < 5 ) {
+		perror ( "You need arguments: <hostname> <portno> <fname> <exp_duration (s)>" ); 
 		return 1; 
 	}
 
 	hostname = argv[1];
 	portno = atoi ( argv[2] );
-	// fname = argv[3]; 
-	// exp_duration = atoi ( argv[4] ); 
+	fname = argv[3]; 
+	exp_duration = atoi ( argv[4] ); 
 
 	daddr = inet_addr(hostname);
 	dport = htons(portno);
@@ -429,6 +420,7 @@ main(int argc, char **argv)
 	max_fds = concurrency * 3;
 
 	TRACE_CONFIG("Application configuration:\n");
+	TRACE_CONFIG("URL: %s\n", url);
 	TRACE_CONFIG("# of cores: %d\n", core_limit);
 	TRACE_CONFIG("Concurrency: %d\n", total_concurrency);
 
