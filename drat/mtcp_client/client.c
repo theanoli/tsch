@@ -119,6 +119,7 @@ static inline int
 CreateConnection(thread_context_t ctx)
 {
 	mctx_t mctx = ctx->mctx;
+	struct mtcp_epoll_event ev;
 	struct sockaddr_in addr;
 	int sockid;
 	int ret;
@@ -149,12 +150,17 @@ CreateConnection(thread_context_t ctx)
 		perror ( "mtcp_connect" );
 	}
 
+	ev.events = MTCP_EPOLLOUT;
+	ev.data.sockid = sockid;
+	mtcp_epoll_ctl(mctx, ctx->ep, MTCP_EPOLL_CTL_ADD, sockid, &ev);
+
 	return sockid;
 }
 /*----------------------------------------------------------------------------*/
 static inline void 
 CloseConnection(thread_context_t ctx, int sockid)
 {
+	mtcp_epoll_ctl(ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_DEL, sockid, NULL);
 	mtcp_close(ctx->mctx, sockid);
 	if (CreateConnection(ctx) < 0) {
 		done[ctx->core] = TRUE;
@@ -171,9 +177,10 @@ timestamp (void)
 }
 /*----------------------------------------------------------------------------*/
 void
-recv_packet ( mctx_t mctx, int sockfd ) 
+recv_packet ( thread_context_t ctx, int sockid ) 
 {
-	int n;
+	mctx_t mctx = ctx->mctx;
+	int rd;
 	char *str;
 	char *str_copy;
 	char *secs;
@@ -189,15 +196,31 @@ recv_packet ( mctx_t mctx, int sockfd )
 
 	memset ( str, '\0', PSIZE ); 
 
-	n = mtcp_read ( mctx, sockfd, str, PSIZE ); 
-	while ( n <= 0 ) {
-		printf ( "Read less than 1 byte...\n" );
-		if ( n < 0 ) {
-			perror ( "Error reading from socket..." ); 
-			free ( str );
-			return; 
+	rd = 1;
+	while (rd > 0) {
+		rd = mtcp_read ( mctx, sockid, str, PSIZE ); 
+		if (rd <= 0)
+			break;
+
+		TRACE_APP("Socket %d: mtcp_read ret: %d\n",
+				sockid, rd);
+	}	
+
+	if (rd > 0) {
+		TRACE_APP("Socket %d Done\n", sockid ); 
+
+	} else if (rd == 0) {
+		/* connection closed by remote host */
+		TRACE_DBG("Socket %d connection closed with server.\n", sockid);
+
+		CloseConnection(ctx, sockid);
+
+	} else if (rd < 0) {
+		if (errno != EAGAIN) {
+			TRACE_DBG("Socket %d: mtcp_read() error %s\n", 
+					sockid, strerror(errno));
+			CloseConnection(ctx, sockid);
 		}
-		n = mtcp_read ( mctx, sockfd, str, PSIZE ); 
 	}
 
 	end = timestamp (); 	
@@ -239,9 +262,10 @@ recv_packet ( mctx_t mctx, int sockfd )
 	snprintf ( rtt + strlen ( rtt ), PSIZE, ",%lld,%.9ld\n", 
 		(long long) tdiff.tv_sec, tdiff.tv_nsec );
 
-	if ( fprintf ( fd, "%s", rtt ) <= 0 ) {
-		printf ( "Nothing written!\n" );
-	}
+	// TODO 
+	//if ( fprintf ( fd, "%s", rtt ) <= 0 ) {
+	//	printf ( "Nothing written!\n" );
+	//}
 	
 	free ( rtt );  // current time timestamp + rtt
 	free ( str_copy ); 
@@ -249,11 +273,13 @@ recv_packet ( mctx_t mctx, int sockfd )
 }
 /*----------------------------------------------------------------------------*/
 void 
-send_packet ( mctx_t mctx, int sockfd ) 
+send_packet ( thread_context_t ctx, int sockid ) 
 {
+	mctx_t mctx = ctx->mctx;
 	int n; 
 	char *str;
-	struct timespec start; 
+	struct mtcp_epoll_event ev;
+	struct timespec start;
 
 	printf ( "Writing\n" );
 	str = malloc ( PSIZE * sizeof ( char ) ); 
@@ -267,12 +293,16 @@ send_packet ( mctx_t mctx, int sockfd )
 	start = timestamp (); 
 	snprintf ( str, PSIZE, "%lld.%.9ld", 
 		(long long) start.tv_sec, start.tv_nsec ); 
-	n = mtcp_write ( mctx, sockfd, str, PSIZE ); 
+	n = mtcp_write ( mctx, sockid, str, PSIZE ); 
 	if ( n < 0 ) {
 		perror ( "Error writing to socket..." );
 		free ( str ); 
 		return; 
 	}
+	TRACE_APP("Socket %d sent.\n", sockid);
+	ev.events = MTCP_EPOLLIN;
+	ev.data.sockid = sockid;
+	mtcp_epoll_ctl ( ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD, sockid, &ev );
 
 	free ( str );
 }
@@ -298,9 +328,11 @@ RunEchoClient(void *arg)
 	mctx_t mctx;
 	int core = *(int *)arg;
 	struct in_addr daddr_in;
-	int sockfd;
-
-	time_t start;
+	int i;
+	int maxevents;
+	int ep;
+	struct mtcp_epoll_event *events;
+	int nevents;
 
 	mtcp_core_affinitize(core);
 
@@ -318,26 +350,63 @@ RunEchoClient(void *arg)
 	fprintf(stderr, "Thread %d connecting to %s:%u\n", 
 			core, inet_ntoa(daddr_in), ntohs(dport));
 
+	/* Initialization */
+	maxevents = max_fds * 3;
+	ep = mtcp_epoll_create(mctx, maxevents);
+	if (ep < 0) {
+		TRACE_ERROR("Failed to create epoll struct!n");
+		exit(EXIT_FAILURE);
+	}
+	events = (struct mtcp_epoll_event *)
+			calloc(maxevents, sizeof(struct mtcp_epoll_event));
+	if (!events) {
+		TRACE_ERROR("Failed to allocate events!\n");
+		exit(EXIT_FAILURE);
+	}
+	ctx->ep = ep;
+
 	while (!done[core]) {
-		if ( (sockfd = CreateConnection(ctx)) < 0) {
+		if (CreateConnection(ctx) < 0) {
 			done[core] = TRUE;
 			break;
 		}
-		
-		// TODO here put functionality
-		printf ( "Starting timer, sockfd is %d...\n", sockfd );
-		start = time ( 0 ); 
-		while ( (time ( 0 ) - start) < 30 ) {
-			if ( done[core] == TRUE ) {
-				break;
+
+		nevents = mtcp_epoll_wait(mctx, ep, events, maxevents, -1);
+	
+		if (nevents < 0) {
+			if (errno != EINTR) {
+				TRACE_ERROR("mtcp_epoll_wait failed! ret: %d\n", nevents);
 			}
-			send_packet ( mctx, sockfd ); 
-			recv_packet ( mctx, sockfd ); 
-			sleep ( 1 );
+			done[core] = TRUE;
+			break;
+		}	
+
+		for (i = 0; i < nevents; i++) {
+
+			if (events[i].events & MTCP_EPOLLERR) {
+				int err;
+				socklen_t len = sizeof(err);
+
+				TRACE_APP("[CPU %d] Error on socket %d\n", 
+						core, events[i].data.sockid);
+				if (mtcp_getsockopt(mctx, events[i].data.sockid, 
+							SOL_SOCKET, SO_ERROR, (void *)&err, &len) == 0) {
+				}
+				CloseConnection(ctx, events[i].data.sockid);
+
+			} else if (events[i].events & MTCP_EPOLLIN) {
+				recv_packet ( ctx, events[i].data.sockid ); 
+
+			} else if (events[i].events == MTCP_EPOLLOUT) {
+				send_packet ( ctx, events[i].data.sockid ); 
+
+			} else {
+				TRACE_ERROR("Socket %d: event: %s\n", 
+						events[i].data.sockid, EventToString(events[i].events));
+				assert(0);
+			}
 		}
-		done[core] = TRUE;
-		printf ( "Done!\n" ); 
-		break;
+
 	}
 
 	TRACE_INFO("Thread %d waiting for mtcp to be destroyed.\n", core);
@@ -370,6 +439,9 @@ main(int argc, char **argv)
 	char *hostname;
 	int portno;
 	
+	// to time experiments
+	time_t start;
+
 	// This stuff doesn't do anything right now...
 	// char *fname;
 	// int exp_duration;
@@ -394,7 +466,7 @@ main(int argc, char **argv)
 	concurrency = 100;
 
 	// TODO argparse; make these actual args later
-	core_limit = 1;
+	core_limit = 2;
 	total_concurrency = 100;
 
 	mtcp_getconf ( &mcfg );
@@ -454,6 +526,13 @@ main(int argc, char **argv)
 			TRACE_ERROR("Failed to create thread.\n");
 			exit(-1);
 		}
+	}
+	
+	start = time ( 0 ); 
+	while ( (time ( 0 ) - start) < 30 ) {
+	}
+	for ( i = 0; i < core_limit; i++ ) {
+		done[i] = TRUE;
 	}
 
 	for (i = 0; i < core_limit; i++) {

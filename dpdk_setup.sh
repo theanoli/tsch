@@ -25,10 +25,15 @@ fi
 # Get the number of NUMA nodes for this machine type
 num_numa_nodes=$( lscpu | awk -F': +' '/NUMA node\(s\)/ { print $2 }' )
 
-tasks=( "x86_64-native-linuxapp-gcc" 
-	"Insert IGB UIO module" 
-	"Setup hugepage mappings for NUMA systems" 
-	"Bind Ethernet device to IGB UIO module" )
+taskset1=( "x86_64-native-linuxapp-gcc" 
+		"Insert IGB UIO module" 
+		"Setup hugepage mappings for NUMA systems" )
+
+# "Bind Ethernet device..." is a special case; we need to examine
+# a sub-menu, too, but the sub-menu only becomes available after inserting
+# the IGB UIO module. This is ugly but it works and faster than 
+# alternative (lshw is really slow!)
+taskset2=( "Bind Ethernet device to IGB UIO module" )
 
 # Files in which to dump options menu of the DPDK setup script (fname)
 # and the PCI information (pci_fname)
@@ -39,25 +44,14 @@ pci_fname=another_random_file.txt
 printf q | bash setup.sh > $fname
 
 # Extract the option number from the setup menu text
-for i in "${tasks[@]}"; do
+for i in "${taskset1[@]}"; do
 	# Find the correct line and extract the option number
 	optnum=$(awk -v pat="$i" '$0 ~ pat { 
 				gsub(/\[/,""); 
 				gsub(/\]/,""); 
 				print $1 
 			}' $fname )	
-	
-	# "Bind Ethernet device..." is a special case; we need to examine
-	# a sub-menu, too. This is ugly but it works and faster than 
-	# alternative (lshw is really slow!)
-	if [ "$i" == "Bind Ethernet device to IGB UIO module" ]; then
-		# Expand the submenu and save to file; printf preserves \n
-		printf "$optnum\nq\nq\nq\n" | bash setup.sh > $pci_fname
 
-		optnum="$optnum\n$(awk -v pat="$iface" '$0 ~ pat { print $1 }' $pci_fname | 
-				awk -F':' '{ print $2":"$3 }')"
-	fi
-	
 	# Add an input for every NUMA node
 	if [ "$i" == "Setup hugepage mappings for NUMA systems" ]; then
 		for i in `seq 1 $num_numa_nodes`; do
@@ -70,10 +64,41 @@ for i in "${tasks[@]}"; do
 	options="$options$optnum\n\n"
 done
 
+printf "$options q\n" | bash setup.sh
+
+options=""
+optnum=""
+for i in "${taskset2[@]}"; do	
+	# Find the correct line and extract the option number
+	optnum=$(awk -v pat="$i" '$0 ~ pat { 
+				gsub(/\[/,""); 
+				gsub(/\]/,""); 
+				print $1 
+			}' $fname )	
+
+	if [ "$i" == "Bind Ethernet device to IGB UIO module" ]; then
+		# Expand the submenu and save to file; printf preserves \n
+		printf "$optnum\nq\nq\nq\n" | bash setup.sh > $pci_fname
+
+		pcinum=$(awk -v pat="$iface" '$0 ~ pat { print $1 }' $pci_fname | 
+				awk -F':' '{ print $2":"$3 }')
+		optnum="$optnum\n$pcinum"
+	fi
+	
+	options="$options$optnum\n\n"
+done
+
 printf "\n\n++++++++++++++++++++++++++++++++++++++++++++\n"
+if [ $pcinum == "" ]; then
+	printf "Couldn't find the PCI number! exiting...\n"
+	rm $fname
+	rm $pci_fname
+	exit
+fi
+
 printf "Interface $iface will be configured for DPDK.\n"
-printf "Your setup options will be:\n"
-printf "$options"
+printf "PCI number: $picnum"
+printf $options
 read -rsp $'Press any key to continue, Ctrl+C to exit...\n' -n1 key
 
 echo "Bringing down interface $iface..."
