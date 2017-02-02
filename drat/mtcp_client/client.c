@@ -147,7 +147,6 @@ CreateConnection(thread_context_t ctx)
 			mtcp_close(mctx, sockid);
 			return -1;
 		}
-		perror ( "mtcp_connect" );
 	}
 
 	ev.events = MTCP_EPOLLOUT;
@@ -281,7 +280,6 @@ send_packet ( thread_context_t ctx, int sockid )
 	struct mtcp_epoll_event ev;
 	struct timespec start;
 
-	printf ( "Writing\n" );
 	str = malloc ( PSIZE * sizeof ( char ) ); 
 	if ( str == NULL ) {
 		perror ( "Malloc error" ); 
@@ -466,7 +464,7 @@ main(int argc, char **argv)
 	concurrency = 100;
 
 	// TODO argparse; make these actual args later
-	core_limit = 2;
+	core_limit = 1;
 	total_concurrency = 100;
 
 	mtcp_getconf ( &mcfg );
