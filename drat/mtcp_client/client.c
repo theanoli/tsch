@@ -487,6 +487,7 @@ main(int argc, char **argv)
 			break;
 		case 's':
 			hostname = optarg;
+			break;
 		case 'c':
 			total_concurrency = atoi ( optarg );
 			break;
