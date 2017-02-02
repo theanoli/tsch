@@ -425,6 +425,15 @@ SignalHandler(int signum)
 	}
 }
 /*----------------------------------------------------------------------------*/
+static void
+printHelp(const char *prog_name)
+{
+	TRACE_CONFIG("%s -s host_ip -o result_file [-c concurrency]"
+		     "[-N num_cores] [-h]\n",
+		     prog_name);
+	exit(EXIT_SUCCESS);
+}
+/*----------------------------------------------------------------------------*/
 int 
 main(int argc, char **argv)
 {
@@ -432,7 +441,7 @@ main(int argc, char **argv)
 	int cores[MAX_CPUS];
 	int total_concurrency = 0;
 	int ret;
-	int i;
+	int i, o;
 
 	char *hostname;
 	int portno;
@@ -440,56 +449,65 @@ main(int argc, char **argv)
 	// to time experiments
 	time_t start;
 
+	portno = 8000;
+	hostname = NULL;
 	// This stuff doesn't do anything right now...
 	// char *fname;
 	// int exp_duration;
 	
 	// TODO do getopts
-	if ( argc < 3 ) {
-		perror ( "You need arguments: <hostname> <portno>" ); 
+	if ( argc < 2 ) {
+		perror ( "You need arguments: \n" );
+		printHelp(argv[0]);
 		return 1; 
 	}
-
-	hostname = argv[1];
-	portno = atoi ( argv[2] );
-	// fname = argv[3]; 
-	// exp_duration = atoi ( argv[4] ); 
-
-	daddr = inet_addr(hostname);
-	dport = htons(portno);
-	saddr = INADDR_ANY;
 
 	num_cores = GetNumCPUs();
 	core_limit = num_cores;
 	concurrency = 100;
 
 	// TODO argparse; make these actual args later
-	core_limit = 1;
-	total_concurrency = 100;
+	while (-1 != (o = getopt(argc, argv, "N:s:o:c:h"))) {
+		switch (o) {
+		case 'N':
+			core_limit = atoi(optarg);
+			if (core_limit > num_cores) {
+				TRACE_CONFIG("CPU limit should be smaller than the "
+					     "number of CPUs: %d\n", num_cores);
+				return FALSE;
+			}
+			/** 
+			 * it is important that core limit is set 
+			 * before mtcp_init() is called. You can
+			 * not set core_limit after mtcp_init()
+			 */
+			mtcp_getconf(&mcfg);
+			mcfg.num_cores = core_limit;
+			mtcp_setconf(&mcfg);
+			break;
+		case 's':
+			hostname = optarg;
+		case 'c':
+			total_concurrency = atoi ( optarg );
+			break;
+		case 'o':
+			// Output (results) file
+			// conf_file = optarg;
+			break;
+		case 'h':
+			printHelp(argv[0]);
+			break;
+		}
+	}
 
-	mtcp_getconf ( &mcfg );
-	mcfg.num_cores = core_limit;
-	mtcp_setconf ( &mcfg );
-	
-	// for (i = 3; i < argc - 1; i++) {
-	// 	if (strcmp(argv[i], "-N") == 0) {
-	// 		core_limit = atoi(argv[i + 1]);
-	// 		if (core_limit > num_cores) {
-	// 			TRACE_CONFIG("CPU limit should be smaller than the "
-	// 					"number of CPUS: %d\n", num_cores);
-	// 			return FALSE;
-	// 		}
-	// 		/** 
-	// 		 * it is important that core limit is set 
-	// 		 * before mtcp_init() is called. You can
-	// 		 * not set core_limit after mtcp_init()
-	// 		 */
-	// 		mtcp_getconf(&mcfg);
-	// 		mcfg.num_cores = core_limit;
-	// 		mtcp_setconf(&mcfg);
-	// 	} else if (strcmp(argv[i], "-c") == 0) {
-	// 		total_concurrency = atoi(argv[i + 1]);
+	if ( hostname == NULL ) {
+		printf ( "Usage:\n" );
+		printHelp ( argv[0] );
+	}
 
+	daddr = inet_addr(hostname);
+	dport = htons(portno);
+	saddr = INADDR_ANY;
 
 	/* per-core concurrency = total_concurrency / # cores */
 	if (total_concurrency > 0)
@@ -528,12 +546,14 @@ main(int argc, char **argv)
 	
 	start = time ( 0 ); 
 	while ( (time ( 0 ) - start) < 30 ) {
+		for ( i = 0; i < core_limit; i++ ) {
+			if ( done[i] == TRUE ) {
+				break;
+			}
+		}
 	}
 	for ( i = 0; i < core_limit; i++ ) {
 		done[i] = TRUE;
-	}
-
-	for (i = 0; i < core_limit; i++) {
 		pthread_join(app_thread[i], NULL);
 		TRACE_INFO("Thread %d joined.\n", i);
 	}

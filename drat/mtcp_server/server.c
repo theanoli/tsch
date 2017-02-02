@@ -335,7 +335,7 @@ static void
 printHelp(const char *prog_name)
 {
 	TRACE_CONFIG("%s -f <mtcp_conf_file> "
-		     "[-N num_cores] [-c <per-process core_id>] [-h]\n",
+		     "[-N num_cores] [-h]\n",
 		     prog_name);
 	exit(EXIT_SUCCESS);
 }
@@ -358,7 +358,7 @@ main(int argc, char **argv)
 		return FALSE;
 	}
 
-	while (-1 != (o = getopt(argc, argv, "N:f:c:h"))) {
+	while (-1 != (o = getopt(argc, argv, "N:f:h"))) {
 		switch (o) {
 		case 'N':
 			core_limit = atoi(optarg);
@@ -378,13 +378,6 @@ main(int argc, char **argv)
 			break;
 		case 'f':
 			conf_file = optarg;
-			break;
-		case 'c':
-			process_cpu = atoi(optarg);
-			if (process_cpu > core_limit) {
-				TRACE_CONFIG("Starting CPU is way off limits!\n");
-				return FALSE;
-			}
 			break;
 		case 'h':
 			printHelp(argv[0]);
