@@ -80,30 +80,22 @@ HandleReadEvent(struct thread_context *ctx, int sockid)
 	// 
 	// Returns number of bytes read
 	struct mtcp_epoll_event ev;
-	char buf[PSIZE];
+	char buf[PSIZE] = {0};
 	int rd;
-	int sent, len;
-	int i;
+	int sent;
 
-	i = 0;
-
-	// Keep reading until receive buffer is consumed
-	while ( ( rd = mtcp_read(ctx->mctx, sockid, buf, PSIZE) ) > 0 ) {
-		len = strlen ( buf );
-		sent = mtcp_write(ctx->mctx, sockid, buf, len);
-
-		printf ( "Buf: %s\n", buf );	
-		assert(sent == len);
-
-		i++;
+	rd = mtcp_read (ctx->mctx, sockid, buf, PSIZE);
+	sent = -1;
+	while (sent < 1) {
+		sent = mtcp_write (ctx->mctx, sockid, buf, len);	
 	}
 
-	if ( rd < 0 ) {
-		return rd;
+	if (sent != PSIZE) {
+		printf ( "Buf: %s, %d, %d\n", buf, rd, sent );
 	}
 
 	// Reset the event
-	ev.events = MTCP_EPOLLIN | MTCP_EPOLLOUT;
+	ev.events = MTCP_EPOLLIN;
 	ev.data.sockid = sockid;
 	mtcp_epoll_ctl(ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD, 
 			sockid, &ev);
@@ -297,11 +289,10 @@ RunServerThread(void *arg)
 			} else if (events[i].events & MTCP_EPOLLIN) {
 				ret = HandleReadEvent(ctx, events[i].data.sockid);
 
-				// if (ret == 0) {
+				if (ret == 0) {
 					/* connection closed by remote host */
-				//	CloseConnection(ctx, events[i].data.sockid);
-				// } else 
-				if (ret < 0) {
+					CloseConnection(ctx, events[i].data.sockid);
+				} else if (ret < 0) {
 					/* if not EAGAIN, it's an error */
 					if (errno != EAGAIN) {
 						CloseConnection(ctx, events[i].data.sockid);

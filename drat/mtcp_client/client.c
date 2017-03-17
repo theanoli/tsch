@@ -33,8 +33,6 @@
 #define IP_RANGE 1
 #define MAX_IP_STR_LEN 16
 
-#define BUF_SIZE (8*1024)
-
 #define CALC_MD5SUM FALSE
 
 #define TIMEVAL_TO_MSEC(t)		((t.tv_sec * 1000) + (t.tv_usec / 1000))
@@ -58,7 +56,6 @@
 
 /*----------------------------------------------------------------------------*/
 static pthread_t app_thread[MAX_CPUS];
-static mctx_t g_mctx[MAX_CPUS];
 static int done[MAX_CPUS];
 static char *conf_file = NULL;
 /*----------------------------------------------------------------------------*/
@@ -82,8 +79,6 @@ struct thread_context
 };
 typedef struct thread_context* thread_context_t;
 /*----------------------------------------------------------------------------*/
-static struct thread_context *g_ctx[MAX_CPUS];
-/*----------------------------------------------------------------------------*/
 struct timespec diff ( struct timespec start, struct timespec end ); 
 /*----------------------------------------------------------------------------*/
 thread_context_t 
@@ -104,7 +99,6 @@ CreateContext(int core)
 		TRACE_ERROR("Failed to create mtcp context.\n");
 		return NULL;
 	}
-	g_mctx[core] = ctx->mctx;
 
 	return ctx;
 }
@@ -176,50 +170,75 @@ timestamp (void)
     return spec; 
 }
 /*----------------------------------------------------------------------------*/
+void 
+send_packet ( thread_context_t ctx, int sockid ) 
+{
+	mctx_t mctx = ctx->mctx;
+	int n; 
+	// struct mtcp_epoll_event ev;
+	struct timespec start;
+
+	char str[PSIZE] = {0};
+
+	start = timestamp (); 
+	snprintf ( str, PSIZE, "%lld.%.9ld", 
+		(long long) start.tv_sec, start.tv_nsec ); 
+	n = mtcp_write ( mctx, sockid, str, PSIZE ); 
+	if ( n < 0 ) {
+		perror ( "Error writing to socket..." );
+		return; 
+	}
+
+	// ev.events = MTCP_EPOLLIN | MTCP_EPOLLOUT;
+	// ev.data.sockid = sockid;
+	// mtcp_epoll_ctl ( ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD, sockid, &ev );
+}
+/*----------------------------------------------------------------------------*/
 void
 recv_packet ( thread_context_t ctx, int sockid ) 
 {
 	mctx_t mctx = ctx->mctx;
-	int rd;
-	char *str;
-	char *secs;
-	char *ns; 
-	char *rtt;
-	struct timespec parsed_start, end, tdiff;
 	struct mtcp_epoll_event ev;
 
-	str = malloc ( PSIZE * sizeof ( char ) ); 
-	rtt = malloc ( PSIZE * 2 * sizeof ( char ) ); 
-	if ( ( str == NULL ) ||
-		( rtt == NULL ) ) {
-		perror ( "Malloc error" ); 
-		return;
-	}
+	int rd;
+	char *saveptr;
 
-	memset ( str, '\0', PSIZE ); 
+	char *secs;
+	char *ns; 
+	struct timespec parsed_start, end, tdiff;
+
+	char str[PSIZE] = {0};
+	char rtt[PSIZE * 2] = {0};
 
 	rd = mtcp_read ( mctx, sockid, str, PSIZE );
 	if ( rd < 0 ) {
 		if ( errno != EAGAIN ) {
 			CloseConnection ( ctx, sockid );
+			return;
 		} else {
+			ev.events = MTCP_EPOLLOUT;
+			ev.data.sockid = sockid;
+			mtcp_epoll_ctl ( ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD,
+					sockid, &ev );
 			return;
 		}
 	} else if ( rd == 0 ) {
 		CloseConnection ( ctx, sockid );
+		return;
 	}
 
+	printf ("Got: %s\n", str);
+
 	end = timestamp (); 	
-
-	secs = strtok ( str, "." );
-	ns = strtok ( NULL, "." ); 
-
-	printf ( "%s: %s, %s\n", str, secs, ns );
+	
+	secs = strtok_r ( str, ".", &saveptr );
+	ns = strtok_r ( NULL, ".", &saveptr ); 
 
 	if ( ( secs == NULL ) || ( ns == NULL ) ) {
+		printf ("Setting perror; %s, %s, %d bytes\n",
+				secs, ns, rd);
 		perror ( "STRTOK returned NULL prematurely" );
-		free ( str );
-		free ( rtt );
+		exit (-1);
 		return;
 	}
 
@@ -228,53 +247,14 @@ recv_packet ( thread_context_t ctx, int sockid )
 
 	tdiff = diff ( parsed_start, end ); 
 
-	memset ( rtt, '\0', PSIZE * 2 ); 
-
 	snprintf ( rtt, PSIZE, "%lld,%.9ld", 
 		(long long) end.tv_sec, end.tv_nsec ); 
 	snprintf ( rtt + strlen ( rtt ), PSIZE, ",%lld,%.9ld\n", 
 		(long long) tdiff.tv_sec, tdiff.tv_nsec );
 
-	ev.events = MTCP_EPOLLOUT | MTCP_EPOLLIN;
+	ev.events = MTCP_EPOLLOUT;
 	ev.data.sockid = sockid;
 	mtcp_epoll_ctl ( ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD, sockid, &ev );
-
-	free ( str );
-	free ( rtt );
-}
-/*----------------------------------------------------------------------------*/
-void 
-send_packet ( thread_context_t ctx, int sockid ) 
-{
-	mctx_t mctx = ctx->mctx;
-	int n; 
-	char *str;
-	struct mtcp_epoll_event ev;
-	struct timespec start;
-
-	str = malloc ( PSIZE * sizeof ( char ) ); 
-	if ( str == NULL ) {
-		perror ( "Malloc error" ); 
-		return;
-	}
-
-	memset ( str, '\0', PSIZE ); 
-
-	start = timestamp (); 
-	snprintf ( str, PSIZE, "%lld.%.9ld", 
-		(long long) start.tv_sec, start.tv_nsec ); 
-	n = mtcp_write ( mctx, sockid, str, PSIZE ); 
-	if ( n < 0 ) {
-		perror ( "Error writing to socket..." );
-		free ( str ); 
-		return; 
-	}
-
-	ev.events = MTCP_EPOLLIN | MTCP_EPOLLOUT;
-	ev.data.sockid = sockid;
-	mtcp_epoll_ctl ( ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD, sockid, &ev );
-
-	free ( str );
 }
 /*----------------------------------------------------------------------------*/
 struct timespec
@@ -311,7 +291,6 @@ RunEchoClient(void *arg)
 		return NULL;
 	}
 	mctx = ctx->mctx;
-	g_ctx[core] = ctx;
 	srand(time(NULL));
 
 	mtcp_init_rss(mctx, saddr, IP_RANGE, daddr, dport);
@@ -365,7 +344,6 @@ RunEchoClient(void *arg)
 				CloseConnection(ctx, events[i].data.sockid);
 
 			} else if (events[i].events & MTCP_EPOLLOUT) {
-				usleep ( 10 );
 				send_packet ( ctx, events[i].data.sockid ); 
 				recv_packet ( ctx, events[i].data.sockid ); 
 
@@ -519,13 +497,14 @@ main(int argc, char **argv)
 	}
 	
 	start = time ( 0 ); 
-	while ( (time ( 0 ) - start) < 30 ) {
+	while ( (time ( 0 ) - start) < 15 ) {
 		for ( i = 0; i < core_limit; i++ ) {
 			if ( done[i] == TRUE ) {
 				break;
 			}
 		}
 	}
+	TRACE_INFO ("Done looping--entering shutdown phase\n");
 	for ( i = 0; i < core_limit; i++ ) {
 		done[i] = TRUE;
 		pthread_join(app_thread[i], NULL);
