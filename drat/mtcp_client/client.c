@@ -60,6 +60,7 @@
 static pthread_t app_thread[MAX_CPUS];
 static mctx_t g_mctx[MAX_CPUS];
 static int done[MAX_CPUS];
+static char *conf_file = NULL;
 /*----------------------------------------------------------------------------*/
 static int num_cores;
 static int core_limit;
@@ -181,64 +182,44 @@ recv_packet ( thread_context_t ctx, int sockid )
 	mctx_t mctx = ctx->mctx;
 	int rd;
 	char *str;
-	char *str_copy;
 	char *secs;
 	char *ns; 
 	char *rtt;
 	struct timespec parsed_start, end, tdiff;
+	struct mtcp_epoll_event ev;
 
 	str = malloc ( PSIZE * sizeof ( char ) ); 
-	if ( str == NULL ) {
+	rtt = malloc ( PSIZE * 2 * sizeof ( char ) ); 
+	if ( ( str == NULL ) ||
+		( rtt == NULL ) ) {
 		perror ( "Malloc error" ); 
 		return;
 	}
 
 	memset ( str, '\0', PSIZE ); 
 
-	rd = 1;
-	while (rd > 0) {
-		rd = mtcp_read ( mctx, sockid, str, PSIZE ); 
-		if (rd <= 0)
-			break;
-
-		TRACE_APP("Socket %d: mtcp_read ret: %d\n",
-				sockid, rd);
-	}	
-
-	if (rd > 0) {
-		TRACE_APP("Socket %d Done\n", sockid ); 
-
-	} else if (rd == 0) {
-		/* connection closed by remote host */
-		TRACE_DBG("Socket %d connection closed with server.\n", sockid);
-
-		CloseConnection(ctx, sockid);
-
-	} else if (rd < 0) {
-		if (errno != EAGAIN) {
-			TRACE_DBG("Socket %d: mtcp_read() error %s\n", 
-					sockid, strerror(errno));
-			CloseConnection(ctx, sockid);
+	rd = mtcp_read ( mctx, sockid, str, PSIZE );
+	if ( rd < 0 ) {
+		if ( errno != EAGAIN ) {
+			CloseConnection ( ctx, sockid );
+		} else {
+			return;
 		}
+	} else if ( rd == 0 ) {
+		CloseConnection ( ctx, sockid );
 	}
 
 	end = timestamp (); 	
 
-	str_copy = malloc ( PSIZE * sizeof ( char ) );
-	if ( str_copy == NULL ) {
-		perror ( "Malloc error" );
-		free ( str );
-		return;
-	}
-	strncpy ( str_copy, str, PSIZE );
-
 	secs = strtok ( str, "." );
 	ns = strtok ( NULL, "." ); 
 
+	printf ( "%s: %s, %s\n", str, secs, ns );
+
 	if ( ( secs == NULL ) || ( ns == NULL ) ) {
 		perror ( "STRTOK returned NULL prematurely" );
-		free ( str_copy ); 
 		free ( str );
+		free ( rtt );
 		return;
 	}
 
@@ -247,13 +228,6 @@ recv_packet ( thread_context_t ctx, int sockid )
 
 	tdiff = diff ( parsed_start, end ); 
 
-	rtt = malloc ( PSIZE * 2 * sizeof ( char ) ); 
-	if ( rtt == NULL ) {
-		free ( str );
-		free ( str_copy );
-		perror ( "Malloc error" ); 
-		return;
-	}
 	memset ( rtt, '\0', PSIZE * 2 ); 
 
 	snprintf ( rtt, PSIZE, "%lld,%.9ld", 
@@ -261,14 +235,12 @@ recv_packet ( thread_context_t ctx, int sockid )
 	snprintf ( rtt + strlen ( rtt ), PSIZE, ",%lld,%.9ld\n", 
 		(long long) tdiff.tv_sec, tdiff.tv_nsec );
 
-	// TODO 
-	//if ( fprintf ( fd, "%s", rtt ) <= 0 ) {
-	//	printf ( "Nothing written!\n" );
-	//}
-	
-	free ( rtt );  // current time timestamp + rtt
-	free ( str_copy ); 
+	ev.events = MTCP_EPOLLOUT | MTCP_EPOLLIN;
+	ev.data.sockid = sockid;
+	mtcp_epoll_ctl ( ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD, sockid, &ev );
+
 	free ( str );
+	free ( rtt );
 }
 /*----------------------------------------------------------------------------*/
 void 
@@ -297,8 +269,8 @@ send_packet ( thread_context_t ctx, int sockid )
 		free ( str ); 
 		return; 
 	}
-	TRACE_APP("Socket %d sent.\n", sockid);
-	ev.events = MTCP_EPOLLIN;
+
+	ev.events = MTCP_EPOLLIN | MTCP_EPOLLOUT;
 	ev.data.sockid = sockid;
 	mtcp_epoll_ctl ( ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD, sockid, &ev );
 
@@ -392,15 +364,16 @@ RunEchoClient(void *arg)
 				}
 				CloseConnection(ctx, events[i].data.sockid);
 
-			} else if (events[i].events & MTCP_EPOLLIN) {
+			} else if (events[i].events & MTCP_EPOLLOUT) {
+				usleep ( 10 );
+				send_packet ( ctx, events[i].data.sockid ); 
 				recv_packet ( ctx, events[i].data.sockid ); 
 
-			} else if (events[i].events == MTCP_EPOLLOUT) {
-				send_packet ( ctx, events[i].data.sockid ); 
-
+			} else if ( events[i].events & MTCP_EPOLLIN ) {
+				assert ( 1 );
 			} else {
 				TRACE_ERROR("Socket %d: event: %s\n", 
-						events[i].data.sockid, EventToString(events[i].events));
+					events[i].data.sockid, EventToString(events[i].events));
 				assert(0);
 			}
 		}
@@ -452,8 +425,6 @@ main(int argc, char **argv)
 	portno = 8000;
 	hostname = NULL;
 	// This stuff doesn't do anything right now...
-	// char *fname;
-	// int exp_duration;
 	
 	// TODO do getopts
 	if ( argc < 2 ) {
@@ -488,12 +459,14 @@ main(int argc, char **argv)
 		case 's':
 			hostname = optarg;
 			break;
+		case 'f': 
+			conf_file = optarg;
+			break;
 		case 'c':
 			total_concurrency = atoi ( optarg );
 			break;
 		case 'o':
 			// Output (results) file
-			// conf_file = optarg;
 			break;
 		case 'h':
 			printHelp(argv[0]);

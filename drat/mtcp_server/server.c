@@ -22,7 +22,7 @@
 #include "http_parsing.h"
 #include "debug.h"
 
-#define RCVBUFSIZE 32
+#define PSIZE 32
 
 #define MAX_FLOW_NUM  (10000)
 
@@ -64,6 +64,7 @@ static char *conf_file = NULL;
 void 
 CloseConnection(struct thread_context *ctx, int sockid )
 {
+	// Delete the FD from this epoll instance
 	mtcp_epoll_ctl(ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_DEL, sockid, NULL);
 	mtcp_close(ctx->mctx, sockid);
 }
@@ -71,26 +72,43 @@ CloseConnection(struct thread_context *ctx, int sockid )
 static int 
 HandleReadEvent(struct thread_context *ctx, int sockid)
 {
+	// Handles incoming packets: echoes contents of packet back to
+	// sender.
+	// 
+	// We get here if epoll_wait reported that data became available
+	// on this connection.
+	// 
+	// Returns number of bytes read
 	struct mtcp_epoll_event ev;
-	char buf[RCVBUFSIZE];
+	char buf[PSIZE];
 	int rd;
 	int sent, len;
+	int i;
 
-	/* HTTP request handling */
-	rd = mtcp_read(ctx->mctx, sockid, buf, RCVBUFSIZE);
-	if (rd <= 0) {
+	i = 0;
+
+	// Keep reading until receive buffer is consumed
+	while ( ( rd = mtcp_read(ctx->mctx, sockid, buf, PSIZE) ) > 0 ) {
+		len = strlen ( buf );
+		sent = mtcp_write(ctx->mctx, sockid, buf, len);
+
+		printf ( "Buf: %s\n", buf );	
+		assert(sent == len);
+
+		i++;
+	}
+
+	if ( rd < 0 ) {
 		return rd;
 	}
 
-	len = strlen ( buf );
-	sent = mtcp_write(ctx->mctx, sockid, buf, len);
-	TRACE_APP("Socket %d Sent packet: try: %d, sent: %d\n", 
-			sockid, len, sent);
-	assert(sent == len);
-
+	// Reset the event
 	ev.events = MTCP_EPOLLIN | MTCP_EPOLLOUT;
 	ev.data.sockid = sockid;
-	mtcp_epoll_ctl(ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD, sockid, &ev);
+	mtcp_epoll_ctl(ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD, 
+			sockid, &ev);
+
+	// printf ( "Read %d packets\n", i );
 
 	return rd;
 }
@@ -182,7 +200,7 @@ CreateListeningSocket(struct thread_context *ctx)
 		return -1;
 	}
 
-	/* bind to port 80 */
+	/* bind to port 800 */
 	saddr.sin_family = AF_INET;
 	saddr.sin_addr.s_addr = INADDR_ANY;
 	saddr.sin_port = htons(8000);
@@ -279,10 +297,11 @@ RunServerThread(void *arg)
 			} else if (events[i].events & MTCP_EPOLLIN) {
 				ret = HandleReadEvent(ctx, events[i].data.sockid);
 
-				if (ret == 0) {
+				// if (ret == 0) {
 					/* connection closed by remote host */
-					CloseConnection(ctx, events[i].data.sockid);
-				} else if (ret < 0) {
+				//	CloseConnection(ctx, events[i].data.sockid);
+				// } else 
+				if (ret < 0) {
 					/* if not EAGAIN, it's an error */
 					if (errno != EAGAIN) {
 						CloseConnection(ctx, events[i].data.sockid);
