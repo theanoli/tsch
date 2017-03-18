@@ -175,7 +175,6 @@ send_packet ( thread_context_t ctx, int sockid )
 {
 	mctx_t mctx = ctx->mctx;
 	int n; 
-	// struct mtcp_epoll_event ev;
 	struct timespec start;
 
 	char str[PSIZE] = {0};
@@ -188,10 +187,6 @@ send_packet ( thread_context_t ctx, int sockid )
 		perror ( "Error writing to socket..." );
 		return; 
 	}
-
-	// ev.events = MTCP_EPOLLIN | MTCP_EPOLLOUT;
-	// ev.data.sockid = sockid;
-	// mtcp_epoll_ctl ( ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD, sockid, &ev );
 }
 /*----------------------------------------------------------------------------*/
 void
@@ -227,18 +222,13 @@ recv_packet ( thread_context_t ctx, int sockid )
 		return;
 	}
 
-	printf ("Got: %s\n", str);
-
 	end = timestamp (); 	
 	
 	secs = strtok_r ( str, ".", &saveptr );
 	ns = strtok_r ( NULL, ".", &saveptr ); 
 
+	// A packet got chopped up; RTT is invalid
 	if ( ( secs == NULL ) || ( ns == NULL ) ) {
-		printf ("Setting perror; %s, %s, %d bytes\n",
-				secs, ns, rd);
-		perror ( "STRTOK returned NULL prematurely" );
-		exit (-1);
 		return;
 	}
 

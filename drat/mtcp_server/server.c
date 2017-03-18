@@ -81,17 +81,18 @@ HandleReadEvent(struct thread_context *ctx, int sockid)
 	// Returns number of bytes read
 	struct mtcp_epoll_event ev;
 	char buf[PSIZE] = {0};
-	int rd;
-	int sent;
+	int ret;
 
-	rd = mtcp_read (ctx->mctx, sockid, buf, PSIZE);
-	sent = -1;
-	while (sent < 1) {
-		sent = mtcp_write (ctx->mctx, sockid, buf, len);	
-	}
-
-	if (sent != PSIZE) {
-		printf ( "Buf: %s, %d, %d\n", buf, rd, sent );
+	// Keep reading until receive buffer is consumed or we can't send
+	// anymore
+	ret = mtcp_read (ctx->mctx, sockid, buf, PSIZE);
+	if ((ret < 0) && (ret != -EAGAIN)) {
+		return ret;
+	}	
+	
+	ret = mtcp_write (ctx->mctx, sockid, buf, PSIZE);	
+	if ((ret < 0) && (ret != -EAGAIN)) {
+		return ret;
 	}
 
 	// Reset the event
@@ -100,9 +101,7 @@ HandleReadEvent(struct thread_context *ctx, int sockid)
 	mtcp_epoll_ctl(ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD, 
 			sockid, &ev);
 
-	// printf ( "Read %d packets\n", i );
-
-	return rd;
+	return ret;
 }
 /*----------------------------------------------------------------------------*/
 int 
