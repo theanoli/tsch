@@ -30,8 +30,8 @@
 #define MAX_FILE_LEN 128
 #define HTTP_HEADER_LEN 1024
 
-#define IP_RANGE 1
-#define MAX_IP_STR_LEN 16
+#define NRTTBUFS 2
+#define RTTBUFSIZE 0x1000000
 
 #define CALC_MD5SUM FALSE
 
@@ -69,7 +69,7 @@ FILE *fd;
 /*----------------------------------------------------------------------------*/
 struct rtt_buffer {
 	int count;
-	char buf[0x1000000];  // ~10 MB at a time
+	char buf[RTTBUFSIZE];  // ~10 MB at a time
 };
 typedef struct rtt_buffer* rtt_buffer_t;
 /*----------------------------------------------------------------------------*/
@@ -412,8 +412,8 @@ main(int argc, char **argv)
 	time_t start;
 
 	// To collect measurements
-	
-	data_bufs
+	rtt_buffer rtt_buffers[NRTTBUFS];
+	int curbuf;
 
 	portno = 8000;
 	hostname = NULL;
@@ -429,9 +429,10 @@ main(int argc, char **argv)
 	core_limit = num_cores;
 	concurrency = 100;
 	sleeptime = 0;
+	latency = FALSE;
 
 	// TODO argparse; make these actual args later
-	while (-1 != (o = getopt(argc, argv, "N:s:o:c:t:h"))) {
+	while (-1 != (o = getopt(argc, argv, "N:s:o:c:t:lh"))) {
 		switch (o) {
 		case 'N':
 			core_limit = atoi(optarg);
@@ -464,6 +465,9 @@ main(int argc, char **argv)
 		case 't':
 			sleeptime = atoi (optarg);
 			break;
+		case 'l':
+			latency = TRUE;
+			break;
 		case 'h':
 			printHelp(argv[0]);
 			break;
@@ -473,6 +477,18 @@ main(int argc, char **argv)
 	if (hostname == NULL) {
 		printf ("Usage:\n");
 		printHelp (argv[0]);
+	}
+
+	if (latency) {
+		// Set up buffers to collect RTT measurements
+		curbuf = 0;
+		for (i = 0; i < NBUFS; i++) {
+			rtt_buffers[i] = calloc (sizeof (struct rtt_buffer), 1); 
+			if (rtt_buffers[i] == NULL) {
+				TRACE_ERROR ("Error allocating buffer\n");
+				exit(1);
+			}
+		}
 	}
 
 	daddr = inet_addr (hostname);
