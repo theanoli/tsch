@@ -67,6 +67,12 @@ static in_port_t dport;
 static in_addr_t saddr;
 FILE *fd;
 /*----------------------------------------------------------------------------*/
+struct rtt_buffer {
+	int count;
+	char buf[0x1000000];  // ~10 MB at a time
+};
+typedef struct rtt_buffer* rtt_buffer_t;
+/*----------------------------------------------------------------------------*/
 static int concurrency;
 static int max_fds;
 /*----------------------------------------------------------------------------*/
@@ -171,7 +177,7 @@ timestamp (void)
 }
 /*----------------------------------------------------------------------------*/
 void 
-send_packet ( thread_context_t ctx, int sockid ) 
+SendPacket ( thread_context_t ctx, int sockid ) 
 {
 	mctx_t mctx = ctx->mctx;
 	int n; 
@@ -190,7 +196,7 @@ send_packet ( thread_context_t ctx, int sockid )
 }
 /*----------------------------------------------------------------------------*/
 void
-recv_packet ( thread_context_t ctx, int sockid ) 
+ReceivePacket ( thread_context_t ctx, int sockid ) 
 {
 	mctx_t mctx = ctx->mctx;
 	struct mtcp_epoll_event ev;
@@ -200,7 +206,7 @@ recv_packet ( thread_context_t ctx, int sockid )
 
 	char *secs;
 	char *ns; 
-	struct timespec parsed_start, end, tdiff;
+	struct timespec sendtime, recvtime;
 
 	char str[PSIZE] = {0};
 	char rtt[PSIZE * 2] = {0};
@@ -222,25 +228,29 @@ recv_packet ( thread_context_t ctx, int sockid )
 		return;
 	}
 
+	// Capture receive time
 	end = timestamp (); 	
 	
+	// Parse seconds/nanoseconds from received packet
 	secs = strtok_r ( str, ".", &saveptr );
 	ns = strtok_r ( NULL, ".", &saveptr ); 
 
-	// A packet got chopped up; RTT is invalid
-	if ( ( secs == NULL ) || ( ns == NULL ) ) {
+	// The received packet got chopped up; RTT is invalid
+	if ((secs == NULL) || (ns == NULL) ) {
+		ev.events = MTCP_EPOLLOUT;
+		ev.data.sockid = sockid;
+		mtcp_epoll_ctl ( ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD,
+					sockid, &ev );
 		return;
+	} else {
+		sendtime.tv_sec = atoi ( secs ); 
+		sendtime.tv_nsec = atoi ( ns ); 
 	}
 
-	parsed_start.tv_sec = atoi ( secs ); 
-	parsed_start.tv_nsec = atoi ( ns ); 
-
-	tdiff = diff ( parsed_start, end ); 
-
 	snprintf ( rtt, PSIZE, "%lld,%.9ld", 
-		(long long) end.tv_sec, end.tv_nsec ); 
+		(long long) sendtime.tv_sec, sendtime.tv_nsec ); 
 	snprintf ( rtt + strlen ( rtt ), PSIZE, ",%lld,%.9ld\n", 
-		(long long) tdiff.tv_sec, tdiff.tv_nsec );
+		(long long) recvtime.tv_sec, recvtime.tv_nsec );
 
 	ev.events = MTCP_EPOLLOUT;
 	ev.data.sockid = sockid;
@@ -334,8 +344,8 @@ RunEchoClient(void *arg)
 				CloseConnection(ctx, events[i].data.sockid);
 
 			} else if (events[i].events & MTCP_EPOLLOUT) {
-				send_packet ( ctx, events[i].data.sockid ); 
-				recv_packet ( ctx, events[i].data.sockid ); 
+				SendPacket ( ctx, events[i].data.sockid ); 
+				ReceivePacket ( ctx, events[i].data.sockid ); 
 
 			} else if ( events[i].events & MTCP_EPOLLIN ) {
 				assert ( 1 );
@@ -356,6 +366,16 @@ RunEchoClient(void *arg)
 	return NULL;
 }
 /*----------------------------------------------------------------------------*/
+void
+WriterThread ()
+{
+	// Writes active buffer to file, resets buffer count to 0 and clears
+	// the buffer.
+	//
+	// One per core/thread
+	
+}
+/*----------------------------------------------------------------------------*/
 void 
 SignalHandler(int signum)
 {
@@ -370,7 +390,7 @@ static void
 printHelp(const char *prog_name)
 {
 	TRACE_CONFIG("%s -s host_ip -o result_file [-c concurrency]"
-		     "[-N num_cores] [-h]\n",
+		     "[-N num_cores] [-t sleeptime] [-h]\n",
 		     prog_name);
 	exit(EXIT_SUCCESS);
 }
@@ -383,6 +403,7 @@ main(int argc, char **argv)
 	int total_concurrency = 0;
 	int ret;
 	int i, o;
+	int sleeptime;  // To throttle send rate
 
 	char *hostname;
 	int portno;
@@ -390,11 +411,14 @@ main(int argc, char **argv)
 	// to time experiments
 	time_t start;
 
+	// To collect measurements
+	
+	data_bufs
+
 	portno = 8000;
 	hostname = NULL;
-	// This stuff doesn't do anything right now...
 	
-	// TODO do getopts
+	// TODO update opts checking
 	if ( argc < 2 ) {
 		perror ( "You need arguments: \n" );
 		printHelp(argv[0]);
@@ -404,9 +428,10 @@ main(int argc, char **argv)
 	num_cores = GetNumCPUs();
 	core_limit = num_cores;
 	concurrency = 100;
+	sleeptime = 0;
 
 	// TODO argparse; make these actual args later
-	while (-1 != (o = getopt(argc, argv, "N:s:o:c:h"))) {
+	while (-1 != (o = getopt(argc, argv, "N:s:o:c:t:h"))) {
 		switch (o) {
 		case 'N':
 			core_limit = atoi(optarg);
@@ -431,10 +456,13 @@ main(int argc, char **argv)
 			conf_file = optarg;
 			break;
 		case 'c':
-			total_concurrency = atoi ( optarg );
+			total_concurrency = atoi (optarg);
 			break;
 		case 'o':
 			// Output (results) file
+			break;
+		case 't':
+			sleeptime = atoi (optarg);
 			break;
 		case 'h':
 			printHelp(argv[0]);
@@ -442,13 +470,13 @@ main(int argc, char **argv)
 		}
 	}
 
-	if ( hostname == NULL ) {
-		printf ( "Usage:\n" );
-		printHelp ( argv[0] );
+	if (hostname == NULL) {
+		printf ("Usage:\n");
+		printHelp (argv[0]);
 	}
 
-	daddr = inet_addr(hostname);
-	dport = htons(portno);
+	daddr = inet_addr (hostname);
+	dport = htons (portno);
 	saddr = INADDR_ANY;
 
 	/* per-core concurrency = total_concurrency / # cores */
@@ -486,19 +514,19 @@ main(int argc, char **argv)
 		}
 	}
 	
-	start = time ( 0 ); 
-	while ( (time ( 0 ) - start) < 15 ) {
-		for ( i = 0; i < core_limit; i++ ) {
-			if ( done[i] == TRUE ) {
+	start = time (0); 
+	while ((time (0) - start) < 15) {
+		for (i = 0; i < core_limit; i++) {
+			if (done[i] == TRUE) {
 				break;
 			}
 		}
 	}
 	TRACE_INFO ("Done looping--entering shutdown phase\n");
-	for ( i = 0; i < core_limit; i++ ) {
+	for (i = 0; i < core_limit; i++) {
 		done[i] = TRUE;
-		pthread_join(app_thread[i], NULL);
-		TRACE_INFO("Thread %d joined.\n", i);
+		pthread_join (app_thread[i], NULL);
+		TRACE_INFO ("Thread %d joined.\n", i);
 	}
 
 	mtcp_destroy();
