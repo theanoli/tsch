@@ -26,12 +26,12 @@
 #define MAX_CPUS 16
 #define PSIZE 32
 
-#define MAX_URL_LEN 128
-#define MAX_FILE_LEN 128
-#define HTTP_HEADER_LEN 1024
+#define IP_RANGE 1
 
-#define NRTTBUFS 2
-#define RTTBUFSIZE 0x1000000
+#define RTTBUFSIZE 0xA0000
+#define CHARBUFSIZE 64
+#define RTTBUFDUMP RTTBUFSIZE / 0xA00
+#define SAMPLEMOD 8  // collect sample every SAMPLEMOD messages
 
 #define CALC_MD5SUM FALSE
 
@@ -65,23 +65,26 @@ static int core_limit;
 static in_addr_t daddr;
 static in_port_t dport;
 static in_addr_t saddr;
-FILE *fd;
-/*----------------------------------------------------------------------------*/
-struct rtt_buffer {
-	int count;
-	char buf[RTTBUFSIZE];  // ~10 MB at a time
-};
-typedef struct rtt_buffer* rtt_buffer_t;
 /*----------------------------------------------------------------------------*/
 static int concurrency;
 static int max_fds;
+static int sleeptime;
 /*----------------------------------------------------------------------------*/
+int latency;
+typedef char charbuf[CHARBUFSIZE];
 struct thread_context
 {
 	int core;
 
 	mctx_t mctx;
 	int ep;
+
+	// Measurement infrastructure
+	int nmessages;  // track how many messages have been received
+	int collected;  // how many messages have been collected
+	int next_write;	// next message to be written to file
+	FILE *outfile;
+	charbuf *rtt_buf;
 };
 typedef struct thread_context* thread_context_t;
 /*----------------------------------------------------------------------------*/
@@ -91,19 +94,35 @@ thread_context_t
 CreateContext(int core)
 {
 	thread_context_t ctx;
+	char fname[32];
 
-	ctx = (thread_context_t)calloc(1, sizeof(struct thread_context));
+	ctx = (thread_context_t) calloc (1, sizeof (struct thread_context));
 	if (!ctx) {
-		perror("malloc");
-		TRACE_ERROR("Failed to allocate memory for thread context.\n");
+		perror ("malloc");
+		TRACE_ERROR ("Failed to allocate memory for thread context.\n");
 		return NULL;
 	}
 	ctx->core = core;
 
 	ctx->mctx = mtcp_create_context(core);
 	if (!ctx->mctx) {
-		TRACE_ERROR("Failed to create mtcp context.\n");
+		TRACE_ERROR ("Failed to create mtcp context.\n");
 		return NULL;
+	}
+
+	if (latency) {
+		// Set up buffers to collect RTT measurements
+		ctx->rtt_buf = (charbuf *) calloc (1, CHARBUFSIZE * RTTBUFSIZE); 
+		if (ctx->rtt_buf == NULL) {
+			TRACE_ERROR ("Error allocating buffer\n");
+			exit(1);
+		}
+
+		snprintf (fname, 32, "results/rtt_%d", core);
+		if ((ctx->outfile = fopen (fname, "w")) == NULL) {
+			perror ("file creation");
+			TRACE_ERROR ("Couldn't open RTT output file.\n");
+		}
 	}
 
 	return ctx;
@@ -113,7 +132,9 @@ void
 DestroyContext(thread_context_t ctx) 
 {
 	mtcp_destroy_context(ctx->mctx);
-	free(ctx);
+	fclose (ctx->outfile);
+	free (ctx->rtt_buf);
+	free (ctx);
 }
 /*----------------------------------------------------------------------------*/
 static inline int 
@@ -209,7 +230,6 @@ ReceivePacket ( thread_context_t ctx, int sockid )
 	struct timespec sendtime, recvtime;
 
 	char str[PSIZE] = {0};
-	char rtt[PSIZE * 2] = {0};
 
 	rd = mtcp_read ( mctx, sockid, str, PSIZE );
 	if ( rd < 0 ) {
@@ -229,32 +249,54 @@ ReceivePacket ( thread_context_t ctx, int sockid )
 	}
 
 	// Capture receive time
-	end = timestamp (); 	
+	recvtime = timestamp (); 	
+
+	ctx->nmessages++;
+
+	if (latency && ((ctx->nmessages % SAMPLEMOD) == 0)) {
+		// Sample this packet
+		ctx->collected++;
 	
-	// Parse seconds/nanoseconds from received packet
-	secs = strtok_r ( str, ".", &saveptr );
-	ns = strtok_r ( NULL, ".", &saveptr ); 
+		// Parse seconds/nanoseconds from received packet
+		secs = strtok_r (str, ".", &saveptr);
+		ns = strtok_r (NULL, ".", &saveptr); 
 
-	// The received packet got chopped up; RTT is invalid
-	if ((secs == NULL) || (ns == NULL) ) {
-		ev.events = MTCP_EPOLLOUT;
-		ev.data.sockid = sockid;
-		mtcp_epoll_ctl ( ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD,
-					sockid, &ev );
-		return;
-	} else {
-		sendtime.tv_sec = atoi ( secs ); 
-		sendtime.tv_nsec = atoi ( ns ); 
+		// The received packet got chopped up; RTT is invalid
+		if ((secs == NULL) || (ns == NULL) ) {
+			ev.events = MTCP_EPOLLOUT;
+			ev.data.sockid = sockid;
+			mtcp_epoll_ctl (ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD,
+						sockid, &ev);
+			return;
+		} else {
+			sendtime.tv_sec = atoi (secs); 
+			sendtime.tv_nsec = atoi (ns); 
+		}
+
+		snprintf (ctx->rtt_buf[ctx->collected], CHARBUFSIZE, 
+			"%lld,%.9ld,%lld,%.9ld", 
+			(long long) sendtime.tv_sec, sendtime.tv_nsec, 
+			(long long) recvtime.tv_sec, recvtime.tv_nsec);
+
+		// If we've exceeded the threshold for buffer dump, have a
+		// separate thread write the buffer to memory and clear that
+		// section of buffer
+		if ((ctx->collected % RTTBUFDUMP) == 0) {
+			rd = fwrite (ctx->rtt_buf[ctx->next_write],
+				 CHARBUFSIZE, RTTBUFDUMP, ctx->outfile);
+			if (rd < RTTBUFDUMP) {
+				perror ("write");
+				TRACE_ERROR ("RTT dump to file failed\n");
+			}
+			memset (ctx->rtt_buf[ctx->next_write], 0,
+				RTTBUFDUMP * CHARBUFSIZE);
+			ctx->next_write = ++(ctx->collected) % RTTBUFSIZE;
+		}
 	}
-
-	snprintf ( rtt, PSIZE, "%lld,%.9ld", 
-		(long long) sendtime.tv_sec, sendtime.tv_nsec ); 
-	snprintf ( rtt + strlen ( rtt ), PSIZE, ",%lld,%.9ld\n", 
-		(long long) recvtime.tv_sec, recvtime.tv_nsec );
 
 	ev.events = MTCP_EPOLLOUT;
 	ev.data.sockid = sockid;
-	mtcp_epoll_ctl ( ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD, sockid, &ev );
+	mtcp_epoll_ctl (ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD, sockid, &ev);
 }
 /*----------------------------------------------------------------------------*/
 struct timespec
@@ -346,7 +388,7 @@ RunEchoClient(void *arg)
 			} else if (events[i].events & MTCP_EPOLLOUT) {
 				SendPacket ( ctx, events[i].data.sockid ); 
 				ReceivePacket ( ctx, events[i].data.sockid ); 
-
+				usleep (sleeptime);
 			} else if ( events[i].events & MTCP_EPOLLIN ) {
 				assert ( 1 );
 			} else {
@@ -403,17 +445,12 @@ main(int argc, char **argv)
 	int total_concurrency = 0;
 	int ret;
 	int i, o;
-	int sleeptime;  // To throttle send rate
 
 	char *hostname;
 	int portno;
 	
 	// to time experiments
 	time_t start;
-
-	// To collect measurements
-	rtt_buffer rtt_buffers[NRTTBUFS];
-	int curbuf;
 
 	portno = 8000;
 	hostname = NULL;
@@ -477,18 +514,6 @@ main(int argc, char **argv)
 	if (hostname == NULL) {
 		printf ("Usage:\n");
 		printHelp (argv[0]);
-	}
-
-	if (latency) {
-		// Set up buffers to collect RTT measurements
-		curbuf = 0;
-		for (i = 0; i < NBUFS; i++) {
-			rtt_buffers[i] = calloc (sizeof (struct rtt_buffer), 1); 
-			if (rtt_buffers[i] == NULL) {
-				TRACE_ERROR ("Error allocating buffer\n");
-				exit(1);
-			}
-		}
 	}
 
 	daddr = inet_addr (hostname);
