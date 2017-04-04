@@ -69,6 +69,7 @@ static in_addr_t saddr;
 static int concurrency;
 static int max_fds;
 static int sleeptime;
+static char *output_dir = "temp";
 /*----------------------------------------------------------------------------*/
 int latency;
 typedef char charbuf[CHARBUFSIZE];
@@ -94,7 +95,7 @@ thread_context_t
 CreateContext(int core)
 {
 	thread_context_t ctx;
-	char fname[32];
+	char fname[64];
 
 	ctx = (thread_context_t) calloc (1, sizeof (struct thread_context));
 	if (!ctx) {
@@ -118,7 +119,7 @@ CreateContext(int core)
 			exit(1);
 		}
 
-		snprintf (fname, 32, "results/rtt_%d", core);
+		snprintf (fname, 32, "results/rtt_%d.txt", core);
 		if ((ctx->outfile = fopen (fname, "w")) == NULL) {
 			perror ("file creation");
 			TRACE_ERROR ("Couldn't open RTT output file.\n");
@@ -229,6 +230,7 @@ ReceivePacket ( thread_context_t ctx, int sockid )
 	char *ns; 
 	struct timespec sendtime, recvtime;
 
+	char rtt[CHARBUFSIZE] = {0};
 	char str[PSIZE] = {0};
 
 	rd = mtcp_read (mctx, sockid, str, PSIZE);
@@ -254,9 +256,6 @@ ReceivePacket ( thread_context_t ctx, int sockid )
 	ctx->nmessages++;
 
 	if (latency && ((ctx->nmessages % SAMPLEMOD) == 0)) {
-		// Sample this packet
-		ctx->collected++;
-	
 		// Parse seconds/nanoseconds from received packet
 		secs = strtok_r (str, ".", &saveptr);
 		ns = strtok_r (NULL, ".", &saveptr); 
@@ -273,13 +272,13 @@ ReceivePacket ( thread_context_t ctx, int sockid )
 			sendtime.tv_nsec = atoi (ns); 
 		}
 
-		snprintf (ctx->rtt_buf[ctx->collected], CHARBUFSIZE, 
-			"%lld,%.9ld,%lld,%.9ld", 
+		snprintf (rtt, CHARBUFSIZE, "%lld,%.9ld,%lld,%.9ld\n", 
 			(long long) sendtime.tv_sec, sendtime.tv_nsec, 
 			(long long) recvtime.tv_sec, recvtime.tv_nsec);
+		memcpy (ctx->rtt_buf[ctx->collected++], rtt, strlen (rtt));
 
-		// We've exceeded the threshold for buffer dump; write section of
-		// buffer to file
+		// We've exceeded the threshold for buffer dump; write section 
+		// of buffer to file
 		if ((ctx->collected % RTTBUFDUMP) == 0) {
 			rd = fwrite (ctx->rtt_buf[ctx->next_write],
 				 CHARBUFSIZE, RTTBUFDUMP, ctx->outfile);
@@ -421,7 +420,7 @@ static void
 printHelp(const char *prog_name)
 {
 	TRACE_CONFIG("%s -s host_ip -o result_file [-c concurrency]"
-		     "[-N num_cores] [-t sleeptime] [-h]\n",
+		     " [-N num_cores] [-t sleeptime] [-h]\n",
 		     prog_name);
 	exit(EXIT_SUCCESS);
 }
@@ -458,7 +457,7 @@ main(int argc, char **argv)
 	latency = FALSE;
 
 	// TODO argparse; make these actual args later
-	while (-1 != (o = getopt(argc, argv, "N:s:o:c:t:lh"))) {
+	while (-1 != (o = getopt(argc, argv, "N:s:f:o:c:t:lh"))) {
 		switch (o) {
 		case 'N':
 			core_limit = atoi(optarg);
@@ -486,7 +485,7 @@ main(int argc, char **argv)
 			total_concurrency = atoi (optarg);
 			break;
 		case 'o':
-			// Output (results) file
+			output_dir = optarg;
 			break;
 		case 't':
 			sleeptime = atoi (optarg);
@@ -546,7 +545,7 @@ main(int argc, char **argv)
 	}
 	
 	start = time (0); 
-	while ((time (0) - start) < 15) {
+	while ((int) (time (0) - start) < 15) {
 		for (i = 0; i < core_limit; i++) {
 			if (done[i] == TRUE) {
 				break;
