@@ -231,20 +231,20 @@ ReceivePacket ( thread_context_t ctx, int sockid )
 
 	char str[PSIZE] = {0};
 
-	rd = mtcp_read ( mctx, sockid, str, PSIZE );
-	if ( rd < 0 ) {
-		if ( errno != EAGAIN ) {
-			CloseConnection ( ctx, sockid );
+	rd = mtcp_read (mctx, sockid, str, PSIZE);
+	if (rd < 0) {
+		if (errno != EAGAIN) {
+			CloseConnection (ctx, sockid);
 			return;
 		} else {
 			ev.events = MTCP_EPOLLOUT;
 			ev.data.sockid = sockid;
-			mtcp_epoll_ctl ( ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD,
-					sockid, &ev );
+			mtcp_epoll_ctl (ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD,
+					sockid, &ev);
 			return;
 		}
-	} else if ( rd == 0 ) {
-		CloseConnection ( ctx, sockid );
+	} else if (rd == 0) {
+		CloseConnection (ctx, sockid);
 		return;
 	}
 
@@ -262,7 +262,7 @@ ReceivePacket ( thread_context_t ctx, int sockid )
 		ns = strtok_r (NULL, ".", &saveptr); 
 
 		// The received packet got chopped up; RTT is invalid
-		if ((secs == NULL) || (ns == NULL) ) {
+		if ((secs == NULL) || (ns == NULL)) {
 			ev.events = MTCP_EPOLLOUT;
 			ev.data.sockid = sockid;
 			mtcp_epoll_ctl (ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD,
@@ -278,9 +278,8 @@ ReceivePacket ( thread_context_t ctx, int sockid )
 			(long long) sendtime.tv_sec, sendtime.tv_nsec, 
 			(long long) recvtime.tv_sec, recvtime.tv_nsec);
 
-		// If we've exceeded the threshold for buffer dump, have a
-		// separate thread write the buffer to memory and clear that
-		// section of buffer
+		// We've exceeded the threshold for buffer dump; write section of
+		// buffer to file
 		if ((ctx->collected % RTTBUFDUMP) == 0) {
 			rd = fwrite (ctx->rtt_buf[ctx->next_write],
 				 CHARBUFSIZE, RTTBUFDUMP, ctx->outfile);
@@ -290,7 +289,7 @@ ReceivePacket ( thread_context_t ctx, int sockid )
 			}
 			memset (ctx->rtt_buf[ctx->next_write], 0,
 				RTTBUFDUMP * CHARBUFSIZE);
-			ctx->next_write = ++(ctx->collected) % RTTBUFSIZE;
+			ctx->next_write = ctx->collected % RTTBUFSIZE;
 		}
 	}
 
@@ -303,9 +302,9 @@ struct timespec
 diff ( struct timespec start, struct timespec end )
 {
 	struct timespec temp;
-	if ((end.tv_nsec-start.tv_nsec)<0) {
+	if ((end.tv_nsec-start.tv_nsec) < 0) {
 		temp.tv_sec = end.tv_sec-start.tv_sec-1;
-		temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
+		temp.tv_nsec = 1000000000 + end.tv_nsec-start.tv_nsec;
 	} else {
 		temp.tv_sec = end.tv_sec-start.tv_sec;
 		temp.tv_nsec = end.tv_nsec-start.tv_nsec;
@@ -408,16 +407,6 @@ RunEchoClient(void *arg)
 	return NULL;
 }
 /*----------------------------------------------------------------------------*/
-void
-WriterThread ()
-{
-	// Writes active buffer to file, resets buffer count to 0 and clears
-	// the buffer.
-	//
-	// One per core/thread
-	
-}
-/*----------------------------------------------------------------------------*/
 void 
 SignalHandler(int signum)
 {
@@ -483,9 +472,9 @@ main(int argc, char **argv)
 			 * before mtcp_init() is called. You can
 			 * not set core_limit after mtcp_init()
 			 */
-			mtcp_getconf(&mcfg);
+			mtcp_getconf (&mcfg);
 			mcfg.num_cores = core_limit;
-			mtcp_setconf(&mcfg);
+			mtcp_setconf (&mcfg);
 			break;
 		case 's':
 			hostname = optarg;
@@ -506,7 +495,7 @@ main(int argc, char **argv)
 			latency = TRUE;
 			break;
 		case 'h':
-			printHelp(argv[0]);
+			printHelp (argv[0]);
 			break;
 		}
 	}
@@ -521,27 +510,28 @@ main(int argc, char **argv)
 	saddr = INADDR_ANY;
 
 	/* per-core concurrency = total_concurrency / # cores */
-	if (total_concurrency > 0)
+	if (total_concurrency > 0) {
 		concurrency = total_concurrency / core_limit;
+	}
 
 	/* set the max number of fds 3x larger than concurrency */
 	max_fds = concurrency * 3;
 
-	TRACE_CONFIG("Application configuration:\n");
-	TRACE_CONFIG("# of cores: %d\n", core_limit);
-	TRACE_CONFIG("Concurrency: %d\n", total_concurrency);
+	TRACE_CONFIG ("Application configuration:\n");
+	TRACE_CONFIG ("# of cores: %d\n", core_limit);
+	TRACE_CONFIG ("Concurrency: %d\n", total_concurrency);
 
-	ret = mtcp_init("epwget.conf");
+	ret = mtcp_init ("epwget.conf");
 	if (ret) {
-		TRACE_ERROR("Failed to initialize mtcp.\n");
-		exit(EXIT_FAILURE);
+		TRACE_ERROR ("Failed to initialize mtcp.\n");
+		exit (EXIT_FAILURE);
 	}
-	mtcp_getconf(&mcfg);
+	mtcp_getconf (&mcfg);
 	mcfg.max_concurrency = max_fds;
 	mcfg.max_num_buffers = max_fds;
-	mtcp_setconf(&mcfg);
+	mtcp_setconf (&mcfg);
 
-	mtcp_register_signal(SIGINT, SignalHandler);
+	mtcp_register_signal (SIGINT, SignalHandler);
 
 	for (i = 0; i < core_limit; i++) {
 		cores[i] = i;
