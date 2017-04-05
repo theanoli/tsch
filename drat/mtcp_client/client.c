@@ -30,7 +30,7 @@
 
 #define RTTBUFSIZE 0xA0000
 #define CHARBUFSIZE 64
-#define RTTBUFDUMP RTTBUFSIZE / 0xA00
+#define RTTBUFDUMP RTTBUFSIZE - 64
 #define SAMPLEMOD 8  // collect sample every SAMPLEMOD messages
 
 #define CALC_MD5SUM FALSE
@@ -72,7 +72,6 @@ static int sleeptime;
 static char *output_dir = "temp";
 /*----------------------------------------------------------------------------*/
 int latency;
-typedef char charbuf[CHARBUFSIZE];
 struct thread_context
 {
 	int core;
@@ -83,9 +82,9 @@ struct thread_context
 	// Measurement infrastructure
 	int nmessages;  // track how many messages have been received
 	int collected;  // how many messages have been collected
-	int next_write;	// next message to be written to file
+	int next_write; // where to write the next message
 	FILE *outfile;
-	charbuf *rtt_buf;
+	char *rtt_buf;
 };
 typedef struct thread_context* thread_context_t;
 /*----------------------------------------------------------------------------*/
@@ -113,7 +112,7 @@ CreateContext(int core)
 
 	if (latency) {
 		// Set up buffers to collect RTT measurements
-		ctx->rtt_buf = (charbuf *) calloc (1, CHARBUFSIZE * RTTBUFSIZE); 
+		ctx->rtt_buf = (char *) calloc (1, RTTBUFSIZE); 
 		if (ctx->rtt_buf == NULL) {
 			TRACE_ERROR ("Error allocating buffer\n");
 			exit(1);
@@ -132,6 +131,17 @@ CreateContext(int core)
 void 
 DestroyContext(thread_context_t ctx) 
 {
+	int ret; 
+
+	// Write any remaining data to the output file	
+	if (latency && (ctx->next_write > 0)) {
+		ret = fwrite (ctx->rtt_buf, 1, ctx->next_write, ctx->outfile);
+		if (ret < ctx->next_write) {
+			// Don't actually exit: we need to gracefully destroy context
+			perror ("Write to output file");
+		}
+	}
+
 	mtcp_destroy_context(ctx->mctx);
 	fclose (ctx->outfile);
 	free (ctx->rtt_buf);
@@ -223,7 +233,7 @@ ReceivePacket ( thread_context_t ctx, int sockid )
 	mctx_t mctx = ctx->mctx;
 	struct mtcp_epoll_event ev;
 
-	int rd;
+	int ret;
 	char *saveptr;
 
 	char *secs;
@@ -233,8 +243,8 @@ ReceivePacket ( thread_context_t ctx, int sockid )
 	char rtt[CHARBUFSIZE] = {0};
 	char str[PSIZE] = {0};
 
-	rd = mtcp_read (mctx, sockid, str, PSIZE);
-	if (rd < 0) {
+	ret = mtcp_read (mctx, sockid, str, PSIZE);
+	if (ret < 0) {
 		if (errno != EAGAIN) {
 			CloseConnection (ctx, sockid);
 			return;
@@ -245,7 +255,7 @@ ReceivePacket ( thread_context_t ctx, int sockid )
 					sockid, &ev);
 			return;
 		}
-	} else if (rd == 0) {
+	} else if (ret == 0) {
 		CloseConnection (ctx, sockid);
 		return;
 	}
@@ -276,19 +286,18 @@ ReceivePacket ( thread_context_t ctx, int sockid )
 			(long long) sendtime.tv_sec, sendtime.tv_nsec, 
 			(long long) recvtime.tv_sec, recvtime.tv_nsec);
 		memcpy (ctx->rtt_buf[ctx->collected++], rtt, strlen (rtt));
+		ctx->next_write += strlen (rtt);
 
 		// We've exceeded the threshold for buffer dump; write section 
 		// of buffer to file
-		if ((ctx->collected % RTTBUFDUMP) == 0) {
-			rd = fwrite (ctx->rtt_buf[ctx->next_write],
-				 CHARBUFSIZE, RTTBUFDUMP, ctx->outfile);
-			if (rd < RTTBUFDUMP) {
+		if (ctx->next_write >= RTTBUFDUMP) {
+			ret = fwrite (ctx->rtt_buf, 1, ctx->next_write, ctx->outfile);
+			if (ret < ctx->next_write) {
 				perror ("write");
 				TRACE_ERROR ("RTT dump to file failed\n");
 			}
-			memset (ctx->rtt_buf[ctx->next_write], 0,
-				RTTBUFDUMP * CHARBUFSIZE);
-			ctx->next_write = ctx->collected % RTTBUFSIZE;
+			memset (ctx->rtt_buf, 0, RTTBUFSIZE);
+			ctx->next_write = 0;
 		}
 	}
 
@@ -371,7 +380,6 @@ RunEchoClient(void *arg)
 		}	
 
 		for (i = 0; i < nevents; i++) {
-
 			if (events[i].events & MTCP_EPOLLERR) {
 				int err;
 				socklen_t len = sizeof(err);
@@ -379,10 +387,9 @@ RunEchoClient(void *arg)
 				TRACE_APP("[CPU %d] Error on socket %d\n", 
 						core, events[i].data.sockid);
 				if (mtcp_getsockopt(mctx, events[i].data.sockid, 
-							SOL_SOCKET, SO_ERROR, (void *)&err, &len) == 0) {
+					SOL_SOCKET, SO_ERROR, (void *)&err, &len) == 0) {
 				}
 				CloseConnection(ctx, events[i].data.sockid);
-
 			} else if (events[i].events & MTCP_EPOLLOUT) {
 				SendPacket ( ctx, events[i].data.sockid ); 
 				ReceivePacket ( ctx, events[i].data.sockid ); 
@@ -395,7 +402,6 @@ RunEchoClient(void *arg)
 				assert(0);
 			}
 		}
-
 	}
 
 	TRACE_INFO("Thread %d waiting for mtcp to be destroyed.\n", core);
