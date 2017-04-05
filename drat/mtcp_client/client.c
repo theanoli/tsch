@@ -28,10 +28,11 @@
 
 #define IP_RANGE 1
 
-#define RTTBUFSIZE 0xA0000
+#define RTTBUFSIZE 0xA0000  // 660K bytes
 #define CHARBUFSIZE 64
 #define RTTBUFDUMP RTTBUFSIZE - 64
 #define SAMPLEMOD 8  // collect sample every SAMPLEMOD messages
+#define WRITETO 3  // Timeout for writing to file
 
 #define CALC_MD5SUM FALSE
 
@@ -80,11 +81,14 @@ struct thread_context
 	int ep;
 
 	// Measurement infrastructure
-	int nmessages;  // track how many messages have been received
-	int collected;  // how many messages have been collected
-	int next_write; // where to write the next message
-	FILE *outfile;
-	char *rtt_buf;
+	uint32_t nmessages; 	// track how many messages have been received
+	int next_write;		// where to write the next message
+	struct timespec first_send; 	// timestamp of first message sent
+	struct timespec last_recv;	// timestamp of last message received
+	time_t last_writetime;		// last time buffer was dumped to file
+	FILE *lfile;	// latency file
+	FILE *tfile;	// throughput file
+	char *rtt_buf;	// buffer for RTT measurements
 };
 typedef struct thread_context* thread_context_t;
 /*----------------------------------------------------------------------------*/
@@ -119,7 +123,7 @@ CreateContext(int core)
 		}
 
 		snprintf (fname, 32, "results/rtt_%d.txt", core);
-		if ((ctx->outfile = fopen (fname, "w")) == NULL) {
+		if ((ctx->lfile = fopen (fname, "w")) == NULL) {
 			perror ("file creation");
 			TRACE_ERROR ("Couldn't open RTT output file.\n");
 		}
@@ -132,18 +136,37 @@ void
 DestroyContext(thread_context_t ctx) 
 {
 	int ret; 
-
+	char fname[64] = {0};
+	struct timespec exp_start, exp_end;
+	
 	// Write any remaining data to the output file	
 	if (latency && (ctx->next_write > 0)) {
-		ret = fwrite (ctx->rtt_buf, 1, ctx->next_write, ctx->outfile);
+		ret = fwrite (ctx->rtt_buf, 1, ctx->next_write, ctx->lfile);
 		if (ret < ctx->next_write) {
 			// Don't actually exit: we need to gracefully destroy context
-			perror ("Write to output file");
+			perror ("Write to latency file");
+		}
+	}
+
+	if (throughput) {
+		snprintf (fname, 32, "results/tput_%d.txt", core);
+		if ((ctx->tfile = fopen (fname, "w")) == NULL) {
+			perror ("Opening throughput file");
+		}
+	
+		exp_start = ctx->first_send;
+		exp_end = ctx->last_recv;
+		ret = fprintf (ctx->tfile, PSIZE, "%lld,%.9ld,%lld,%.9ld,%d\n", 
+			(long long) exp_start.tv_sec, exp_start.tv_nsec,
+			(long long) exp_end.tv_sec, exp_end.tv_nsec,
+			ctx->nmessages);
+		if (ret < 0) {
+			perror ("Write to tput file");
 		}
 	}
 
 	mtcp_destroy_context(ctx->mctx);
-	fclose (ctx->outfile);
+	fclose (ctx->lfile);
 	free (ctx->rtt_buf);
 	free (ctx);
 }
@@ -217,7 +240,11 @@ SendPacket ( thread_context_t ctx, int sockid )
 
 	char str[PSIZE] = {0};
 
-	start = timestamp (); 
+	start = timestamp ();
+	if (ctx->nmessages == 0) {
+		ctx->last_writetime = time (0);
+		ctx->first_send = start;
+	}	
 	snprintf ( str, PSIZE, "%lld.%.9ld", 
 		(long long) start.tv_sec, start.tv_nsec ); 
 	n = mtcp_write ( mctx, sockid, str, PSIZE ); 
@@ -277,29 +304,41 @@ ReceivePacket ( thread_context_t ctx, int sockid )
 			mtcp_epoll_ctl (ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD,
 						sockid, &ev);
 			return;
-		} else {
-			sendtime.tv_sec = atoi (secs); 
-			sendtime.tv_nsec = atoi (ns); 
 		}
 
-		snprintf (rtt, CHARBUFSIZE, "%lld,%.9ld,%lld,%.9ld\n", 
+		sendtime.tv_sec = atoi (secs); 
+		sendtime.tv_nsec = atoi (ns); 
+
+		ret = snprintf (ctx->rtt_buf[ctx->next_write], CHARBUFSIZE, 
+			"%lld,%.9ld,%lld,%.9ld\n",
 			(long long) sendtime.tv_sec, sendtime.tv_nsec, 
 			(long long) recvtime.tv_sec, recvtime.tv_nsec);
-		memcpy (ctx->rtt_buf[ctx->collected++], rtt, strlen (rtt));
-		ctx->next_write += strlen (rtt);
+		if (ret < 0) {
+			perror ("Dump to buf");
+			TRACE_ERROR ("Dump to buf failed\n");
+		} else {
+			memcpy (ctx->rtt_buf[ctx->next_write], rtt, ret);
+			ctx->next_write += strlen (rtt);
 
-		// We've exceeded the threshold for buffer dump; write section 
-		// of buffer to file
-		if (ctx->next_write >= RTTBUFDUMP) {
-			ret = fwrite (ctx->rtt_buf, 1, ctx->next_write, ctx->outfile);
-			if (ret < ctx->next_write) {
-				perror ("write");
-				TRACE_ERROR ("RTT dump to file failed\n");
+			// We've exceeded the threshold for buffer dump or haven't 
+			// written anything for longer than WRITETO secs; write 
+			// buffer to file
+			if ((ctx->next_write >= RTTBUFDUMP) || 
+				(time (0) - ctx->last_writetime > WRITETO)) {
+				ret = fwrite (ctx->rtt_buf, 1, ctx->next_write, 
+						ctx->lfile);
+				if (ret < ctx->next_write) {
+					perror ("write");
+					TRACE_ERROR ("RTT dump to file failed\n");
+				}
+				memset (ctx->rtt_buf, 0, RTTBUFSIZE);
+				ctx->next_write = 0;
+				ctx->last_writetime = time (0);
 			}
-			memset (ctx->rtt_buf, 0, RTTBUFSIZE);
-			ctx->next_write = 0;
 		}
 	}
+	
+	ctx->last_recv = recvtime;
 
 	ev.events = MTCP_EPOLLOUT;
 	ev.data.sockid = sockid;
