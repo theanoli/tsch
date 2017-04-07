@@ -15,6 +15,12 @@ rm -f $dpdk/include
 
 cd $dpdk16/tools
 bash /proj/sequencer/tsch/dpdk_setup.sh 
+
+if [ $? -gt 0 ]; then
+	echo "DPDK setup failed"
+	exit 1
+fi
+
 bash ./setup_iface_single_process.sh $1
 
 cd $dpdk

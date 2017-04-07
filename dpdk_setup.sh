@@ -17,9 +17,9 @@ dpdk_dir=`echo pwd`
 iface=`ifconfig | awk '!/10\.1\.1\..*/ {iface=$1}
 			/10\.1\.1\..*/ {print iface}'`
 
-if [ $iface == "" ]; then
+if [ "$iface" == "" ]; then
 	echo "Error getting interface name! Exiting..."
-	exit
+	exit 1
 fi
 
 # Get the number of NUMA nodes for this machine type
@@ -89,11 +89,11 @@ for i in "${taskset2[@]}"; do
 done
 
 printf "\n\n++++++++++++++++++++++++++++++++++++++++++++\n"
-if [ $pcinum == "" ]; then
+if [ "$pcinum" == "" ]; then
 	printf "Couldn't find the PCI number! exiting...\n"
 	rm $fname
 	rm $pci_fname
-	exit
+	exit 1
 fi
 
 printf "Interface $iface will be configured for DPDK.\n"

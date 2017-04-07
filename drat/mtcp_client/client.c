@@ -73,6 +73,7 @@ static int sleeptime;
 static char *output_dir = "temp";
 /*----------------------------------------------------------------------------*/
 int latency;
+int throughput;
 struct thread_context
 {
 	int core;
@@ -86,6 +87,8 @@ struct thread_context
 	struct timespec first_send; 	// timestamp of first message sent
 	struct timespec last_recv;	// timestamp of last message received
 	time_t last_writetime;		// last time buffer was dumped to file
+	char lfname[CHARBUFSIZE];
+	char tfname[CHARBUFSIZE];
 	FILE *lfile;	// latency file
 	FILE *tfile;	// throughput file
 	char *rtt_buf;	// buffer for RTT measurements
@@ -98,7 +101,6 @@ thread_context_t
 CreateContext(int core)
 {
 	thread_context_t ctx;
-	char fname[64];
 
 	ctx = (thread_context_t) calloc (1, sizeof (struct thread_context));
 	if (!ctx) {
@@ -122,11 +124,18 @@ CreateContext(int core)
 			exit(1);
 		}
 
-		snprintf (fname, 32, "results/rtt_%d.txt", core);
-		if ((ctx->lfile = fopen (fname, "w")) == NULL) {
+		snprintf (ctx->lfname, CHARBUFSIZE, "results/%s/rtt_%d.dat", 
+			output_dir, core);
+		if ((ctx->lfile = fopen (ctx->lfname, "wb")) == NULL) {
 			perror ("file creation");
 			TRACE_ERROR ("Couldn't open RTT output file.\n");
 		}
+	}
+
+	if (throughput) {
+		// This will get opened later
+		snprintf (ctx->tfname, CHARBUFSIZE, "results/%s/tput_%d.dat",
+			output_dir, core);
 	}
 
 	return ctx;
@@ -136,38 +145,41 @@ void
 DestroyContext(thread_context_t ctx) 
 {
 	int ret; 
-	char fname[64] = {0};
 	struct timespec exp_start, exp_end;
 	
 	// Write any remaining data to the output file	
 	if (latency && (ctx->next_write > 0)) {
+		printf ("Writing to latency file...\n");
 		ret = fwrite (ctx->rtt_buf, 1, ctx->next_write, ctx->lfile);
 		if (ret < ctx->next_write) {
 			// Don't actually exit: we need to gracefully destroy context
 			perror ("Write to latency file");
 		}
+		fclose (ctx->lfile);
 	}
 
 	if (throughput) {
-		snprintf (fname, 32, "results/tput_%d.txt", core);
-		if ((ctx->tfile = fopen (fname, "w")) == NULL) {
+		printf ("Writing to throughput file...\n");
+		if ((ctx->tfile = fopen (ctx->tfname, "wb")) == NULL) {
 			perror ("Opening throughput file");
 		}
 	
 		exp_start = ctx->first_send;
 		exp_end = ctx->last_recv;
-		ret = fprintf (ctx->tfile, PSIZE, "%lld,%.9ld,%lld,%.9ld,%d\n", 
+		ret = fprintf (ctx->tfile, "%lld,%.9ld,%lld,%.9ld,%d\n", 
 			(long long) exp_start.tv_sec, exp_start.tv_nsec,
 			(long long) exp_end.tv_sec, exp_end.tv_nsec,
 			ctx->nmessages);
 		if (ret < 0) {
 			perror ("Write to tput file");
 		}
+		fclose (ctx->tfile);
 	}
-
-	mtcp_destroy_context(ctx->mctx);
-	fclose (ctx->lfile);
+	
+	printf ("Wrote out data (if any); destroying context %d\n", ctx->core);
 	free (ctx->rtt_buf);
+	mtcp_destroy_context(ctx->mctx);
+	printf ("Destroyed the context, freeing struct\n");
 	free (ctx);
 }
 /*----------------------------------------------------------------------------*/
@@ -240,6 +252,7 @@ SendPacket ( thread_context_t ctx, int sockid )
 
 	char str[PSIZE] = {0};
 
+	// usleep (sleeptime);
 	start = timestamp ();
 	if (ctx->nmessages == 0) {
 		ctx->last_writetime = time (0);
@@ -267,7 +280,6 @@ ReceivePacket ( thread_context_t ctx, int sockid )
 	char *ns; 
 	struct timespec sendtime, recvtime;
 
-	char rtt[CHARBUFSIZE] = {0};
 	char str[PSIZE] = {0};
 
 	ret = mtcp_read (mctx, sockid, str, PSIZE);
@@ -309,7 +321,7 @@ ReceivePacket ( thread_context_t ctx, int sockid )
 		sendtime.tv_sec = atoi (secs); 
 		sendtime.tv_nsec = atoi (ns); 
 
-		ret = snprintf (ctx->rtt_buf[ctx->next_write], CHARBUFSIZE, 
+		ret = snprintf (&ctx->rtt_buf[ctx->next_write], CHARBUFSIZE, 
 			"%lld,%.9ld,%lld,%.9ld\n",
 			(long long) sendtime.tv_sec, sendtime.tv_nsec, 
 			(long long) recvtime.tv_sec, recvtime.tv_nsec);
@@ -317,14 +329,14 @@ ReceivePacket ( thread_context_t ctx, int sockid )
 			perror ("Dump to buf");
 			TRACE_ERROR ("Dump to buf failed\n");
 		} else {
-			memcpy (ctx->rtt_buf[ctx->next_write], rtt, ret);
-			ctx->next_write += strlen (rtt);
+			ctx->next_write += ret;
 
 			// We've exceeded the threshold for buffer dump or haven't 
 			// written anything for longer than WRITETO secs; write 
 			// buffer to file
 			if ((ctx->next_write >= RTTBUFDUMP) || 
 				(time (0) - ctx->last_writetime > WRITETO)) {
+				printf ("Writing %d bytes to latency file...\n", ctx->next_write);
 				ret = fwrite (ctx->rtt_buf, 1, ctx->next_write, 
 						ctx->lfile);
 				if (ret < ctx->next_write) {
@@ -419,6 +431,7 @@ RunEchoClient(void *arg)
 		}	
 
 		for (i = 0; i < nevents; i++) {
+			printf ("Got %d events, on event %d\n", nevents, i);
 			if (events[i].events & MTCP_EPOLLERR) {
 				int err;
 				socklen_t len = sizeof(err);
@@ -432,7 +445,6 @@ RunEchoClient(void *arg)
 			} else if (events[i].events & MTCP_EPOLLOUT) {
 				SendPacket ( ctx, events[i].data.sockid ); 
 				ReceivePacket ( ctx, events[i].data.sockid ); 
-				usleep (sleeptime);
 			} else if ( events[i].events & MTCP_EPOLLIN ) {
 				assert ( 1 );
 			} else {
@@ -443,9 +455,11 @@ RunEchoClient(void *arg)
 		}
 	}
 
+	printf ("Destroying mtcp context on thread %d\n", core);
 	TRACE_INFO("Thread %d waiting for mtcp to be destroyed.\n", core);
 	DestroyContext(ctx);
 
+	printf ("Thread %d destoyed.\n", core);
 	TRACE_DBG("Thread %d finished.\n", core);
 	pthread_exit(NULL);
 	return NULL;
@@ -465,7 +479,8 @@ static void
 printHelp(const char *prog_name)
 {
 	TRACE_CONFIG("%s -s host_ip -o result_file [-c concurrency]"
-		     " [-N num_cores] [-t sleeptime] [-h]\n",
+		     " [-N num_cores] [-u sleeptime (usec)] [-h (help)]" 
+			" [-t (throughput)] [-l (latency)]\n",
 		     prog_name);
 	exit(EXIT_SUCCESS);
 }
@@ -478,6 +493,7 @@ main(int argc, char **argv)
 	int total_concurrency = 0;
 	int ret;
 	int i, o;
+	char outdirname[CHARBUFSIZE];
 
 	char *hostname;
 	int portno;
@@ -500,9 +516,10 @@ main(int argc, char **argv)
 	concurrency = 100;
 	sleeptime = 0;
 	latency = FALSE;
+	throughput = FALSE;
 
 	// TODO argparse; make these actual args later
-	while (-1 != (o = getopt(argc, argv, "N:s:f:o:c:t:lh"))) {
+	while (-1 != (o = getopt(argc, argv, "N:s:f:o:c:u:lth"))) {
 		switch (o) {
 		case 'N':
 			core_limit = atoi(optarg);
@@ -532,15 +549,27 @@ main(int argc, char **argv)
 		case 'o':
 			output_dir = optarg;
 			break;
-		case 't':
+		case 'u':
 			sleeptime = atoi (optarg);
 			break;
 		case 'l':
 			latency = TRUE;
 			break;
+		case 't':
+			throughput = TRUE;
+			break;
 		case 'h':
 			printHelp (argv[0]);
 			break;
+		}
+	}
+
+	snprintf (outdirname, CHARBUFSIZE, "results/%s", output_dir);
+	if (throughput || latency) {
+		if (((mkdir (outdirname, S_IRWXU | S_IRWXG | S_IRWXO)) < 0) &&
+			(errno != EEXIST)) {
+			perror ("output dir creation");
+			TRACE_ERROR ("Output directory creation failed!\n");
 		}
 	}
 
