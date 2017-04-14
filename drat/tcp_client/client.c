@@ -197,8 +197,7 @@ int hostname_to_ip(char * hostname , char* ip)
 int 
 main ( int argc, char **argv )
 {
-	char *hostname;
-	char ip[100];
+	char *hostip;
 	
 	int ret; 
 	int sleep;
@@ -218,13 +217,14 @@ main ( int argc, char **argv )
 	do_write = 0;
 	fname = NULL; 
 
-	char *usage = "usage: ./client -h hostname -p portno -o outfile -d experiment duration -w, where -w means 'do write'. If -w is not used, do not need an outfile.";
+
+	char *usage = "usage: ./client -h hostip -p portno -o outfile -d experiment duration -w, where -w means 'do write'. If -w is not used, do not need an outfile.";
 	opterr = 0; 
 	while (( c = getopt ( argc, argv, "h:p:o:d:s:w" ) ) != -1 )
 		switch ( c ) {
 			case 'h':
-				// hostname
-				hostname = optarg;
+				// host IP
+				hostip = optarg;
 				break;
 			case 'p':
 				// portno
@@ -255,48 +255,37 @@ main ( int argc, char **argv )
 				return 1;
 		}
 
-	if ( do_write && ( fname == NULL ) ) {
-		perror ( usage );
-		perror ( "No file name given!" );
+	if (do_write && (fname == NULL)) {
+		perror (usage);
+		perror ("No file name given!");
 		return 1;
-	} else if ( !do_write && ( fname != NULL ) ) {
-		perror ( usage );
-		perror ( "File name given, but no records will be written" );
-		return 1;
-	} else if ( strlen ( fname ) > 128 ) {
-		perror ( "File name must be less than 128 bytes!" );
+	} else if (do_write && strlen (fname) > 128) {
+		perror ("File name must be less than 128 bytes!");
 		return 1;
 	}
 
-	printf ( "Your port number is %d, writefile %s, duration %d, host %s\n", 
-				portno, fname, exp_duration, hostname ); 
+	printf ("Your port number is %d, duration %d, host %s\n", 
+				portno, exp_duration, hostip); 
 
 
-	/*---- Create the socket. The three arguments are: ----*/
-	/* 1) Internet domain 2) Stream socket 3) Default protocol (TCP in this case) */
-	clientSocket = socket(PF_INET, SOCK_STREAM, 0);
+	clientSocket = socket (AF_INET, SOCK_STREAM, 0);
 
-	hostname_to_ip(hostname, ip);
-	printf ( "%s resolved to %s\n", hostname, ip );
- 	
+	printf ("Connecting to %s\n", hostip); 	
+
 	/*---- Configure settings of the server address struct ----*/
-	/* Address family = Internet */
 	serverAddr.sin_family = AF_INET;
-	/* Set port number, using htons function to use proper byte order */
-	serverAddr.sin_port = htons( portno );
-	/* Set IP address to localhost */
-	serverAddr.sin_addr.s_addr = inet_addr( ip );
-	/* Set all bits of the padding field to 0 */
-	memset ( serverAddr.sin_zero, '\0', sizeof serverAddr.sin_zero );  
+	serverAddr.sin_port = htons (portno);
+	serverAddr.sin_addr.s_addr = inet_addr (hostip);
+	memset (serverAddr.sin_zero, '\0', sizeof serverAddr.sin_zero);  
 	
 	/*---- Connect the socket to the server using the address struct ----*/
 	addr_size = sizeof serverAddr;
-	ret = connect ( clientSocket, (struct sockaddr *) &serverAddr, addr_size );
+	ret = connect (clientSocket, (struct sockaddr *) &serverAddr, addr_size);
 	
-	if ( ret < 0 ) {
-		printf ( "Connect failed!\n" );
+	if (ret < 0) {
+		printf ("Connect failed!\n");
+		exit (1);
 	}
-
 	
 	/*---- Open a file for infodump if needed, then run ----*/
 	if ( do_write ) {

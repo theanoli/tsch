@@ -57,6 +57,7 @@
 
 /*----------------------------------------------------------------------------*/
 static pthread_t app_thread[MAX_CPUS];
+static mctx_t g_mctx[MAX_CPUS];
 static int done[MAX_CPUS];
 static char *conf_file = NULL;
 /*----------------------------------------------------------------------------*/
@@ -70,7 +71,8 @@ static in_addr_t saddr;
 static int concurrency;
 static int max_fds;
 static int sleeptime;
-static char *output_dir = "temp";
+static int duration; 
+static char *output_dir;
 /*----------------------------------------------------------------------------*/
 int latency;
 int throughput;
@@ -94,6 +96,7 @@ struct thread_context
 	char *rtt_buf;	// buffer for RTT measurements
 };
 typedef struct thread_context* thread_context_t;
+static struct thread_context *g_ctx[MAX_CPUS];
 /*----------------------------------------------------------------------------*/
 struct timespec diff ( struct timespec start, struct timespec end ); 
 /*----------------------------------------------------------------------------*/
@@ -113,8 +116,10 @@ CreateContext(int core)
 	ctx->mctx = mtcp_create_context(core);
 	if (!ctx->mctx) {
 		TRACE_ERROR ("Failed to create mtcp context.\n");
+		free (ctx);
 		return NULL;
 	}
+	g_mctx[core] = ctx->mctx;
 
 	if (latency) {
 		// Set up buffers to collect RTT measurements
@@ -176,8 +181,8 @@ DestroyContext(thread_context_t ctx)
 		fclose (ctx->tfile);
 	}
 	
-	printf ("Wrote out data (if any); destroying context %d\n", ctx->core);
 	free (ctx->rtt_buf);
+	printf ("Wrote out data (if any); destroying context %d\n", ctx->core);
 	mtcp_destroy_context(ctx->mctx);
 	printf ("Destroyed the context, freeing struct\n");
 	free (ctx);
@@ -197,6 +202,7 @@ CreateConnection(thread_context_t ctx)
 		TRACE_INFO("Failed to create socket!\n");
 		return -1;
 	}
+
 	ret = mtcp_setsock_nonblock(mctx, sockid);
 	if (ret < 0) {
 		TRACE_ERROR("Failed to set socket in nonblocking mode.\n");
@@ -252,7 +258,6 @@ SendPacket ( thread_context_t ctx, int sockid )
 
 	char str[PSIZE] = {0};
 
-	// usleep (sleeptime);
 	start = timestamp ();
 	if (ctx->nmessages == 0) {
 		ctx->last_writetime = time (0);
@@ -391,6 +396,7 @@ RunEchoClient(void *arg)
 		return NULL;
 	}
 	mctx = ctx->mctx;
+	g_ctx[core] = ctx;
 	srand(time(NULL));
 
 	mtcp_init_rss(mctx, saddr, IP_RANGE, daddr, dport);
@@ -431,7 +437,7 @@ RunEchoClient(void *arg)
 		}	
 
 		for (i = 0; i < nevents; i++) {
-			printf ("Got %d events, on event %d\n", nevents, i);
+			//printf ("Got %d events, on event %d\n", nevents, i);
 			if (events[i].events & MTCP_EPOLLERR) {
 				int err;
 				socklen_t len = sizeof(err);
@@ -441,26 +447,26 @@ RunEchoClient(void *arg)
 				if (mtcp_getsockopt(mctx, events[i].data.sockid, 
 					SOL_SOCKET, SO_ERROR, (void *)&err, &len) == 0) {
 				}
-				CloseConnection(ctx, events[i].data.sockid);
+				CloseConnection (ctx, events[i].data.sockid);
 			} else if (events[i].events & MTCP_EPOLLOUT) {
-				SendPacket ( ctx, events[i].data.sockid ); 
-				ReceivePacket ( ctx, events[i].data.sockid ); 
-			} else if ( events[i].events & MTCP_EPOLLIN ) {
-				assert ( 1 );
+				// SendPacket (ctx, events[i].data.sockid); 
+				// ReceivePacket (ctx, events[i].data.sockid); 
+				usleep (sleeptime);
+			} else if (events[i].events & MTCP_EPOLLIN) {
+				printf ("Got an EPOLLIN\n");
+				assert (1);
 			} else {
-				TRACE_ERROR("Socket %d: event: %s\n", 
+				TRACE_ERROR ("Socket %d: event: %s\n", 
 					events[i].data.sockid, EventToString(events[i].events));
-				assert(0);
+				assert (0);
 			}
 		}
 	}
 
 	printf ("Destroying mtcp context on thread %d\n", core);
-	TRACE_INFO("Thread %d waiting for mtcp to be destroyed.\n", core);
 	DestroyContext(ctx);
 
 	printf ("Thread %d destoyed.\n", core);
-	TRACE_DBG("Thread %d finished.\n", core);
 	pthread_exit(NULL);
 	return NULL;
 }
@@ -515,11 +521,11 @@ main(int argc, char **argv)
 	core_limit = num_cores;
 	concurrency = 100;
 	sleeptime = 0;
+	duration = 15;
 	latency = FALSE;
 	throughput = FALSE;
 
-	// TODO argparse; make these actual args later
-	while (-1 != (o = getopt(argc, argv, "N:s:f:o:c:u:lth"))) {
+	while (-1 != (o = getopt(argc, argv, "N:s:f:o:c:u:d:lth"))) {
 		switch (o) {
 		case 'N':
 			core_limit = atoi(optarg);
@@ -552,6 +558,9 @@ main(int argc, char **argv)
 		case 'u':
 			sleeptime = atoi (optarg);
 			break;
+		case 'd':
+			duration = atoi (optarg);
+			break;
 		case 'l':
 			latency = TRUE;
 			break;
@@ -566,6 +575,7 @@ main(int argc, char **argv)
 
 	snprintf (outdirname, CHARBUFSIZE, "results/%s", output_dir);
 	if (throughput || latency) {
+		printf ("Creating output directory for results: %s\n", outdirname);
 		if (((mkdir (outdirname, S_IRWXU | S_IRWXG | S_IRWXO)) < 0) &&
 			(errno != EEXIST)) {
 			perror ("output dir creation");
@@ -592,7 +602,7 @@ main(int argc, char **argv)
 
 	TRACE_CONFIG ("Application configuration:\n");
 	TRACE_CONFIG ("# of cores: %d\n", core_limit);
-	TRACE_CONFIG ("Concurrency: %d\n", total_concurrency);
+	TRACE_CONFIG ("Concurrency: %d\n", concurrency);
 
 	ret = mtcp_init ("epwget.conf");
 	if (ret) {
@@ -619,18 +629,22 @@ main(int argc, char **argv)
 	}
 	
 	start = time (0); 
-	while ((int) (time (0) - start) < 15) {
+	while ((int) (time (0) - start) < duration) {
 		for (i = 0; i < core_limit; i++) {
 			if (done[i] == TRUE) {
 				break;
 			}
 		}
 	}
-	TRACE_INFO ("Done looping--entering shutdown phase\n");
+	printf ("Done looping--entering shutdown phase\n");
 	for (i = 0; i < core_limit; i++) {
+		printf ("Setting thread %d to true\n", i);
 		done[i] = TRUE;
+	}
+
+	for (i = 0; i < core_limit; i++) {
 		pthread_join (app_thread[i], NULL);
-		TRACE_INFO ("Thread %d joined.\n", i);
+		printf ("Thread %d joined.\n", i);
 	}
 
 	mtcp_destroy();

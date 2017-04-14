@@ -191,7 +191,7 @@ CreateListeningSocket(struct thread_context *ctx)
 		return -1;
 	}
 
-	/* bind to port 800 */
+	/* bind to port 8000 */
 	saddr.sin_family = AF_INET;
 	saddr.sin_addr.s_addr = INADDR_ANY;
 	saddr.sin_port = htons(8000);
