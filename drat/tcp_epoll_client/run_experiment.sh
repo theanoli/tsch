@@ -67,7 +67,7 @@ if [ "$OUTDIR" = "" ]; then
 fi
 datadir="results/$OUTDIR"
 
-command="sudo ./client -N $NCORES -s $SERVIP -f $CONF -o $OUTDIR -u $SLEEPTIME -d $DURATION"
+command="./client -N $NCORES -s $SERVIP -o $OUTDIR -u $SLEEPTIME -d $DURATION"
 parameters="NCORES=$NCORES SLEEPTIME(us)=$SLEEPTIME EXPDURATION=$DURATION"
 
 if [ "$LATENCY" -eq 1 ]; then
@@ -91,4 +91,4 @@ echo "Dumping parameters to file and generating plot..."
 echo $parameters > "$datadir/parameters.txt"
 gnuplot -e "datadir='$datadir/'; plot_title='$parameters'" plot_rtt.p
 
-
+eog $datadir/rtt_0.png &

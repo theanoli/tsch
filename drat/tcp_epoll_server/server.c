@@ -8,12 +8,12 @@
 #include <sys/epoll.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <fcntl.h>
 #include <netdb.h>
 #include <string.h>
-#include <time.h>
 #include <pthread.h>
 #include <signal.h>
+
+#include "utilities.h"
 
 #define MAX_EVENTS 4096
 #define MAX_CPUS 16
@@ -27,7 +27,6 @@
 #define MAX(a, b) ((a)>(b)?(a):(b))
 #define MIN(a, b) ((a)<(b)?(a):(b))
 
-int setsock_nonblock (int);
 /*----------------------------------------------------------------------------*/
 struct thread_context
 {
@@ -58,6 +57,35 @@ HandleReadEvent (struct thread_context *ctx, int sockid)
 	}
 
 	ret = write (sockid, buf, PSIZE);
+	if ((ret < 0) && (ret != -EAGAIN)) {
+		return ret;
+	}
+
+	ev.events = EPOLLIN;
+	ev.data.fd = sockid;
+	epoll_ctl (ctx->ep, EPOLL_CTL_MOD, sockid, &ev);
+	return ret;
+}
+/*----------------------------------------------------------------------------*/
+static int
+TimerHandleReadEvent (struct thread_context *ctx, int sockid)
+{
+	// Handles incoming packets by echoing contents back to sender
+	struct epoll_event ev;
+	char buf[BUFSIZE] = {0};
+	int ret;
+	struct timespec recv;
+
+	ret = read (sockid, buf, BUFSIZE);
+	if ((ret < 0) && (ret != -EAGAIN)) {
+		return ret;
+	}
+
+	recv = timestamp ();
+	snprintf (buf + strlen (buf), BUFSIZE, "%lld.%.9ld", 
+			(long long) recv.tv_sec, recv.tv_nsec);
+
+	ret = write (sockid, buf, BUFSIZE);
 	if ((ret < 0) && (ret != -EAGAIN)) {
 		return ret;
 	}
@@ -161,28 +189,6 @@ create_and_bind_socket (void)
 	
 	freeaddrinfo (result);
 	return listener;
-}
-
-int
-setsock_nonblock (int sockfd)
-{
-	// TODO why do we need to do this? 
-	int flags, s;
-	
-	flags = fcntl (sockfd, F_GETFL, 0);
-	if (flags < 0) {
-		perror ("fcntl");
-		return -1;
-	}
-
-	flags |= O_NONBLOCK;
-	s = fcntl (sockfd, F_SETFL, flags);
-	if (s < 0) {
-		perror ("fcntl");
-		return -1; 
-	}
-	
-	return 0;
 }
 
 int CreateListeningSocket (struct thread_context *ctx) 
@@ -304,6 +310,7 @@ RunServerThread (void *arg)
 		}
 	}
 
+	close (listener);
 	pthread_exit (NULL);
 	return NULL;
 }
@@ -336,12 +343,14 @@ main (int argc, char **argv)
 {
 	int ret;
 	int cores[MAX_CPUS];  // for now only 1 core
-	int i, opt;
+	int i, o;
 
-	while (-1 != (opt = getopt (argc, argv, "N:h"))) {
-		switch (opt) {
+	core_limit = 1;
+
+	while (-1 != (o = getopt (argc, argv, "N:h"))) {
+		switch (o) {
 		case 'N':
-			core_limit = 1;  // TODO fix this later
+			core_limit = atoi (optarg);  // TODO fix this later
 			break;
 		case 'h': 
 			printHelp (argv[0]);
