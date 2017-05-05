@@ -84,11 +84,14 @@ if [ ! -e "$datadir" ]; then
 	mkdir $datadir
 fi
 
+echo "Dumping parameters to file..."
+echo $parameters > "$datadir/parameters.txt"
+
 echo "Running experiment with parameters $parameters"
 eval $command
  
-echo "Dumping parameters to file and generating plot..."
-echo $parameters > "$datadir/parameters.txt"
+echo "Generating plot..."
 gnuplot -e "datadir='$datadir/'; plot_title='$parameters'" plot_rtt.p
 
+eog $datadir/rtt_0.png &
 

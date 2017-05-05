@@ -197,27 +197,27 @@ CreateConnection(thread_context_t ctx)
 	int sockid;
 	int ret;
 
-	sockid = mtcp_socket(mctx, AF_INET, SOCK_STREAM, 0);
+	sockid = mtcp_socket (mctx, AF_INET, SOCK_STREAM, 0);
 	if (sockid < 0) {
 		TRACE_INFO("Failed to create socket!\n");
 		return -1;
 	}
 
-	ret = mtcp_setsock_nonblock(mctx, sockid);
-	if (ret < 0) {
-		TRACE_ERROR("Failed to set socket in nonblocking mode.\n");
-		exit(-1);
-	}
+  	ret = mtcp_setsock_block (mctx, sockid);
+// 	if (ret < 0) {
+// 	 	TRACE_ERROR("Failed to set socket in nonblocking mode.\n");
+// 	 	exit(-1);
+// 	}
 
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = daddr;
 	addr.sin_port = dport;
 	
-	ret = mtcp_connect(mctx, sockid, 
+	ret = mtcp_connect (mctx, sockid, 
 			(struct sockaddr *)&addr, sizeof(struct sockaddr_in));
 	if (ret < 0) {
 		if (errno != EINPROGRESS) {
-			perror("mtcp_connect");
+			perror ("mtcp_connect");
 			mtcp_close(mctx, sockid);
 			return -1;
 		}
@@ -233,9 +233,9 @@ CreateConnection(thread_context_t ctx)
 static inline void 
 CloseConnection(thread_context_t ctx, int sockid)
 {
-	mtcp_epoll_ctl(ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_DEL, sockid, NULL);
-	mtcp_close(ctx->mctx, sockid);
-	if (CreateConnection(ctx) < 0) {
+	mtcp_epoll_ctl (ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_DEL, sockid, NULL);
+	mtcp_close (ctx->mctx, sockid);
+	if (CreateConnection (ctx) < 0) {
 		done[ctx->core] = TRUE;
 	}
 }
@@ -336,7 +336,7 @@ ReceivePacket ( thread_context_t ctx, int sockid )
 		} else {
 			ctx->next_write += ret;
 
-			// We've exceeded the threshold for buffer dump or haven't 
+			// We've exceeded the threshold for bufdump or haven't 
 			// written anything for longer than WRITETO secs; write 
 			// buffer to file
 			if ((ctx->next_write >= RTTBUFDUMP) || 
@@ -420,11 +420,10 @@ RunEchoClient(void *arg)
 	}
 	ctx->ep = ep;
 
+	if (CreateConnection (ctx) < 0) {
+		done[core] = TRUE;
+	}
 	while (!done[core]) {
-		if (CreateConnection(ctx) < 0) {
-			done[core] = TRUE;
-			break;
-		}
 
 		nevents = mtcp_epoll_wait(mctx, ep, events, maxevents, -1);
 	
@@ -449,8 +448,8 @@ RunEchoClient(void *arg)
 				}
 				CloseConnection (ctx, events[i].data.sockid);
 			} else if (events[i].events & MTCP_EPOLLOUT) {
-				// SendPacket (ctx, events[i].data.sockid); 
-				// ReceivePacket (ctx, events[i].data.sockid); 
+				SendPacket (ctx, events[i].data.sockid); 
+				ReceivePacket (ctx, events[i].data.sockid); 
 				usleep (sleeptime);
 			} else if (events[i].events & MTCP_EPOLLIN) {
 				printf ("Got an EPOLLIN\n");
@@ -638,7 +637,6 @@ main(int argc, char **argv)
 	}
 	printf ("Done looping--entering shutdown phase\n");
 	for (i = 0; i < core_limit; i++) {
-		printf ("Setting thread %d to true\n", i);
 		done[i] = TRUE;
 	}
 
