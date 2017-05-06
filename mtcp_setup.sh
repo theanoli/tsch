@@ -1,7 +1,7 @@
 #! /bin/bash
 
 mtcp=/proj/sequencer/mtcp
-dpdk16=$mtcp/dpdk-16.04
+dpdk16=$mtcp/dpdk-16.11
 dpdk=$mtcp/dpdk
 
 if [ $# -lt 1 ]; then
@@ -13,14 +13,14 @@ fi
 rm -f $dpdk/lib
 rm -f $dpdk/include
 
-cd $dpdk16/tools
-bash /proj/sequencer/tsch/dpdk_setup.sh 
+bash /proj/sequencer/tsch/dpdk-setup-cp.sh 
 
 if [ $? -gt 0 ]; then
 	echo "DPDK setup failed"
 	exit 1
 fi
 
+cd $dpdk16/tools
 bash ./setup_iface_single_process.sh $1
 
 cd $dpdk
