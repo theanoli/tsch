@@ -203,11 +203,11 @@ CreateConnection(thread_context_t ctx)
 		return -1;
 	}
 
-  	ret = mtcp_setsock_block (mctx, sockid);
-// 	if (ret < 0) {
-// 	 	TRACE_ERROR("Failed to set socket in nonblocking mode.\n");
-// 	 	exit(-1);
-// 	}
+  	ret = mtcp_setsock_nonblock (mctx, sockid);
+ 	if (ret < 0) {
+ 	 	TRACE_ERROR("Failed to set socket in nonblocking mode.\n");
+ 	 	exit(-1);
+ 	}
 
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = daddr;
