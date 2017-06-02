@@ -397,17 +397,17 @@ RunEchoClient(void *arg)
 	}
 	mctx = ctx->mctx;
 	g_ctx[core] = ctx;
-	srand(time(NULL));
+	srand (time (NULL));
 
-	mtcp_init_rss(mctx, saddr, IP_RANGE, daddr, dport);
+	mtcp_init_rss (mctx, saddr, IP_RANGE, daddr, dport);
 
 	daddr_in.s_addr = daddr;
-	fprintf(stderr, "Thread %d connecting to %s:%u\n", 
+	fprintf (stderr, "Thread %d connecting to %s:%u\n", 
 			core, inet_ntoa(daddr_in), ntohs(dport));
 
 	/* Initialization */
 	maxevents = max_fds * 3;
-	ep = mtcp_epoll_create(mctx, maxevents);
+	ep = mtcp_epoll_create (mctx, maxevents);
 	if (ep < 0) {
 		TRACE_ERROR("Failed to create epoll struct!n");
 		exit(EXIT_FAILURE);
@@ -603,7 +603,7 @@ main(int argc, char **argv)
 	TRACE_CONFIG ("# of cores: %d\n", core_limit);
 	TRACE_CONFIG ("Concurrency: %d\n", concurrency);
 
-	ret = mtcp_init ("epwget.conf");
+	ret = mtcp_init ("mtcp.conf");
 	if (ret) {
 		TRACE_ERROR ("Failed to initialize mtcp.\n");
 		exit (EXIT_FAILURE);

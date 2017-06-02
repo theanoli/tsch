@@ -19,7 +19,7 @@
 # Options + arguments
 NCORES=1
 SERVIP="10.0.0.5"
-CONF="epwget.conf"
+CONF="mtcp.conf"
 CONCURRENCY=10000
 OUTDIR=""  # output directory
 SLEEPTIME=10000  # usec
