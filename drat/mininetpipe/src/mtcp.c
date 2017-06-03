@@ -124,9 +124,23 @@ mtcp_write_helper (mctx_t mctx, int sockid, char *buf, int len)
 void
 Init (ArgStruct *p, int *pargc, char ***pargv)
 {
+    // Create some dummy strings to send
+    char *dummy_string = "Hello, world!\n";
+    int len = strlen (dummy_string);
+
+    p->bufflen = len;
+    p->s_ptr = (char *) malloc (len + 1);
+    memcpy (p->s_ptr, dummy_string, len);
+    p->r_ptr = (char *) malloc (len + 1);
+
 	// Set protocol-specific variables
 	p->tr = 0;
 	p->rcv = 1;
+
+    struct mtcp_conf mcfg;
+    mtcp_getconf (&mcfg);
+    mcfg.num_cores = 1;
+    mtcp_setconf (&mcfg);
 	mtcp_init ("mtcp.conf");
 }
 
@@ -281,9 +295,10 @@ RecvData (ArgStruct *p)
                 break;
             }
 
-            bytesLeft -= bytesRead;
-            q += bytesRead;
         }
+        
+        bytesLeft -= bytesRead;
+        q += bytesRead;
     }
 
     if ((bytesLeft > 0) && (bytesRead == 0)) {

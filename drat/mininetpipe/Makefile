@@ -50,5 +50,5 @@ LIBS += -m64 -g -O3 -pthread -lrt -march=native -export-dynamic ${MTCP_FLD}/lib/
 #	$(CC) $(CFLAGS) $(SRC)/netpipe.c $(SRC)/tcp.c -DTCP -o NPtcp -I$(SRC)
 
 mtcp: $(SRC)/mtcp.c $(SRC)/harness.c $(SRC)/harness.h 
-	$(CC) $(CFLAGS) $(SRC)/harness.c $(SRC)/mtcp.c -DTCP -o NPmtcp -I$(SRC) ${INC} ${LIBS} -lmtcp -lnuma -pthread -lps -lrt
+	$(CC) $(CFLAGS) $(SRC)/harness.c $(SRC)/mtcp.c -DTCP -o NPmtcp -I$(SRC) ${INC} ${LIBS} -lmtcp -lnuma -pthread -lrt
 

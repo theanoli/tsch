@@ -28,6 +28,7 @@ main (int argc, char **argv)
 
     /* Let modules initialize related vars, and possibly call a library init
        function that requires argc and argv */
+    printf ("Collecting %d flows.\n", nrtts);
     Init (&args, &argc, &argv);   /* This will set args.tr and args.rcv */
 
     args.host  = NULL;
@@ -49,7 +50,6 @@ main (int argc, char **argv)
                       break;
 
             case 'r': nrtts = atoi (optarg);
-                      printf ("Collecting %d RTTs", nrtts);
                       break;
 
 	        case 'P': args.port = atoi (optarg);
@@ -60,6 +60,7 @@ main (int argc, char **argv)
                      exit (-12);
        }
     }
+    
  
     Setup (&args);
  
@@ -76,9 +77,11 @@ main (int argc, char **argv)
     t0 = When ();
     for (n = 0; n < nrtts; n++) {
         if (args.tr) {
+            printf ("Sending!\n");
             SendData (&args);
             RecvData (&args);
         } else if (args.rcv) {
+            printf ("Receiving!\n");
             RecvData (&args);
             SendData (&args);
         }
@@ -103,6 +106,14 @@ When (void)
     return ((double) tp.tv_sec + (double) tp.tv_usec * 1e-6);
 }
 
+
+void
+PrintUsage (void)
+{
+    // TODO
+    printf ("Should have usage info here!\n");
+    exit (0);
+}
 
 struct timespec
 When2 (void)
