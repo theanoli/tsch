@@ -85,13 +85,49 @@ mtcp_read_helper (mctx_t mctx, int sockid, char *buf, int len)
 }
 
 
+int
+mtcp_write_helper (mctx_t mctx, int sockid, char *buf, int len)
+{
+    int nevents, i;
+    struct mtcp_epoll_event events[NEVENTS];
+    struct mtcp_epoll_event evctl;
+
+    evctl.events = MTCP_EPOLLOUT;
+    evctl.data.sockid = sockid;
+    if (mtcp_epoll_ctl (mctx, ep, MTCP_EPOLL_CTL_ADD, sockid, &evctl) < 0) {
+        perror ("epoll_ctl");
+        exit (1);
+    }
+
+    while (1) {
+        nevents = mtcp_epoll_wait (mctx, ep, events, NEVENTS, -1);
+        if (nevents < 0) {
+            if (errno != EINTR) {
+                perror ("mtcp_epoll_wait");
+            }
+            exit (1);
+        }
+
+        for (i = 0; i < nevents; ++i) {
+            if (events[i].data.sockid == sockid) {
+                mtcp_epoll_ctl (mctx, ep, MTCP_EPOLL_CTL_DEL, sockid, NULL);
+                return mtcp_write (mctx, sockid, buf, len);
+            } else {
+                printf ("Socket error!\n");
+                exit (1);
+            }
+        }
+    }
+}
+
+
 void
 Init (ArgStruct *p, int *pargc, char ***pargv)
 {
 	// Set protocol-specific variables
 	p->tr = 0;
 	p->rcv = 1;
-	mtcp_int ("mtcp.conf");
+	mtcp_init ("mtcp.conf");
 }
 
 
@@ -116,7 +152,7 @@ Setup (ArgStruct *p)
     memset ((char *) lsin2, 0, sizeof (*lsin2));
 
     if (!mctx) {  // why?
-        mtcp_core_affinitize (mtcp_get_hyperthread_sibling (0));
+        mtcp_core_affinitize (0);
         mctx = mtcp_create_context (0);
         ep = mtcp_epoll_create (mctx, NEVENTS);
     }
@@ -175,14 +211,6 @@ Setup (ArgStruct *p)
     // p->upper = send_size + recv_size;
 
     establish (p);
-}
-
-
-static int
-readFully (int fd, void *obuf, int len)
-{
-    // TODO fill this in if needed
-    return 0;
 }
 
 
@@ -297,7 +325,6 @@ RecvRepeat (ArgStruct *p, int *rpt)
 void
 establish (ArgStruct *p)
 {
-    int one = 1;
     socklen_t clen;
     struct protoent *proto;
     
@@ -368,18 +395,17 @@ CleanUp (ArgStruct *p)
 void
 Reset(ArgStruct *p)
 {
-  
-  /* Reset sockets */
-  if (p->reset_conn) {
+    /* Reset sockets */
+    if (p->reset_conn) {
 
-    doing_reset = 1;
-
-    /* Close the sockets */
-    CleanUp2(p);
-
-    /* Now open and connect new sockets */
-    Setup(p);
-  }
+        doing_reset = 1;
+    
+        /* Close the sockets */
+        CleanUp (p);
+    
+        /* Now open and connect new sockets */
+        Setup (p);
+    }
 
 }
 
