@@ -124,14 +124,16 @@ mtcp_write_helper (mctx_t mctx, int sockid, char *buf, int len)
 void
 Init (ArgStruct *p, int *pargc, char ***pargv)
 {
-    // Create some dummy strings to send
-    char *dummy_string = "Hello, world!\n";
-    int len = strlen (dummy_string);
+    p->s_ptr = (char *) malloc (PSIZE);
+    p->r_ptr = (char *) malloc (PSIZE);
+    
+    if ((p->s_ptr == NULL) || (p->r_ptr == NULL)) {
+        printf ("Malloc error!\n");
+        exit (1);
+    }
 
-    p->bufflen = len;
-    p->s_ptr = (char *) malloc (len + 1);
-    memcpy (p->s_ptr, dummy_string, len);
-    p->r_ptr = (char *) malloc (len + 1);
+    memset (p->s_ptr, 0, PSIZE);
+    memset (p->r_ptr, 0, PSIZE);
 
 	// Set protocol-specific variables
 	p->tr = 0;
@@ -229,33 +231,32 @@ Setup (ArgStruct *p)
 
 
 void
-Sync (ArgStruct *p)
-{
-    // TODO fill in if needed
-}
-
-
-void 
-PrepareToReceive (ArgStruct *p)
-{
-    // Not needed
-}
-
-
-void
 SendData (ArgStruct *p)
 {
     int bytesWritten, bytesLeft;
     char *q;
+    struct timespec sendtime;  // this wil get ping-ponged to measure latency
 
     // We're going to assume here that entire msg gets through in one go
     // But keep this check just in case we need it later
-    bytesLeft = p->bufflen;
     bytesWritten = 0;
-    q = p->s_ptr;
-   
+
+    if (p->tr) {
+        // Transmitter (client) should send timestamp
+        sendtime = When2 ();
+        snprintf (p->s_ptr, PSIZE, "%lld,%.9ld%-31s", 
+                (long long) sendtime.tv_sec, sendtime.tv_nsec, ",");
+        q = p->s_ptr;
+    } else {
+        // Receiver (server) should just echo back whatever it got
+        q = p->r_ptr;
+    }    
+    p->bufflen = strlen (q);     
+    bytesLeft = p->bufflen;
+
     while ((bytesLeft > 0) &&
-            (bytesWritten = mtcp_write_helper (mctx, p->commfd, q, bytesLeft)) != 0) {
+            ((bytesWritten = mtcp_write_helper (mctx, p->commfd, q, bytesLeft)) 
+            != 0)) {
         if (bytesWritten < 0) {
             if (errno == EAGAIN) {
                 continue;      // not an actual error
@@ -275,26 +276,26 @@ SendData (ArgStruct *p)
 }
 
 
-void
+char *
 RecvData (ArgStruct *p)
 {
     int bytesLeft;
     int bytesRead;
     char *q;
+    char *buf;
 
-    bytesLeft = p->bufflen;
     bytesRead = 0;
     q = p->r_ptr;
+    bytesLeft = PSIZE - 1;
 
     while ((bytesLeft > 0) &&
-        (bytesRead = mtcp_read_helper (mctx, p->commfd, q, bytesLeft)) != 0) {
+        ((bytesRead = mtcp_read_helper (mctx, p->commfd, q, bytesLeft)) != 0)) {
         if (bytesRead < 0) {
             if (errno == EAGAIN) {
                 continue;
             } else {
                 break;
             }
-
         }
         
         bytesLeft -= bytesRead;
@@ -307,6 +308,37 @@ RecvData (ArgStruct *p)
         printf ("tester: read: error encountered, errno=%d\n", errno);
         exit (401);
     }
+    
+    if (p->tr) {
+        struct timespec recvtime = When2 ();        
+        buf = malloc (PSIZE * 2);
+        if (buf == NULL) {
+            printf ("Malloc error!\n");
+            exit (1);
+        }
+
+        snprintf (buf, PSIZE, "%s", p->r_ptr);
+        snprintf (buf + PSIZE - 1, PSIZE, "%lld,%.9ld\n", 
+                (long long) recvtime.tv_sec, recvtime.tv_nsec);
+        printf ("Printing %s\n", buf);
+        return buf;
+    } else {
+        return NULL;
+    }
+}
+
+
+void
+Sync (ArgStruct *p)
+{
+    // TODO fill in if needed
+}
+
+
+void 
+PrepareToReceive (ArgStruct *p)
+{
+    // Not needed
 }
 
 

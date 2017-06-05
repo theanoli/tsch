@@ -28,7 +28,7 @@ main (int argc, char **argv)
 
     /* Let modules initialize related vars, and possibly call a library init
        function that requires argc and argv */
-    printf ("Collecting %d flows.\n", nrtts);
+    printf ("Collecting %d latency measurements.\n", nrtts);
     Init (&args, &argc, &argv);   /* This will set args.tr and args.rcv */
 
     args.host  = NULL;
@@ -65,7 +65,7 @@ main (int argc, char **argv)
     Setup (&args);
  
     if (args.tr) {
-        if ((out = fopen (s, "w")) == NULL) {
+        if ((out = fopen (s, "wb")) == NULL) {
             fprintf (stderr,"Can't open %s for output\n", s);
             exit (1);
         }
@@ -74,16 +74,23 @@ main (int argc, char **argv)
     }
  
     /* Get some number of latency measurements */
+    char *timing;
     t0 = When ();
     for (n = 0; n < nrtts; n++) {
         if (args.tr) {
-            printf ("Sending!\n");
             SendData (&args);
-            RecvData (&args);
+            timing = RecvData (&args);
+            if (strlen (timing) > 0) {
+               fwrite (timing, strlen (timing), 1, out);
+            }
+            memset (args.s_ptr, 0, PSIZE);
+            memset (args.r_ptr, 0, PSIZE);
+            memset (timing, 0, PSIZE * 2);
         } else if (args.rcv) {
-            printf ("Receiving!\n");
             RecvData (&args);
             SendData (&args);
+            memset (args.s_ptr, 0, PSIZE);
+            memset (args.r_ptr, 0, PSIZE);
         }
     }
     tlast = (When () - t0)/(2*nrtts);
@@ -98,6 +105,15 @@ main (int argc, char **argv)
 }
 
 
+void
+PrintUsage (void)
+{
+    // TODO
+    printf ("Should have usage info here!\n");
+    exit (0);
+}
+
+
 double
 When (void)
 {
@@ -106,14 +122,6 @@ When (void)
     return ((double) tp.tv_sec + (double) tp.tv_usec * 1e-6);
 }
 
-
-void
-PrintUsage (void)
-{
-    // TODO
-    printf ("Should have usage info here!\n");
-    exit (0);
-}
 
 struct timespec
 When2 (void)

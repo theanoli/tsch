@@ -9,6 +9,7 @@
 #include <unistd.h> 
 #include <time.h>
 
+#define PSIZE   32
 #define DEFPORT 8000
 
 // TCP-specific
@@ -93,7 +94,7 @@ void PrepareToReceive(ArgStruct *p);
 
 void SendData(ArgStruct *p);
 
-void RecvData(ArgStruct *p);
+char *RecvData(ArgStruct *p);
 
 void SendTime(ArgStruct *p, double *t);
 
