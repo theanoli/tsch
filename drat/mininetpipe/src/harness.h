@@ -47,7 +47,7 @@ struct argstruct
             commfd;        /* Communication file descriptor                 */
     short   port;          /* Port used for connection                      */
 
-    char    *r_ptr;        /* Pointer to current location in send buffer    */
+    char    *r_ptr;        /* Pointer to current location in receive buffer    */
     char    *r_ptr_saved;  /* Pointer for saving value of r_ptr             */
     char    *s_buff;       /* Aligned send buffer                           */
     char    *s_buff_orig;  /* Original unaligned send buffer                */

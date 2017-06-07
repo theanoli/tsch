@@ -14,8 +14,10 @@ main (int argc, char **argv)
 {
     FILE *out;          /* Output data file                          */
     char s[255];        /* Empty string */
+    int default_out;    /* bool; use default outfile? */
     int nrtts;
-    double t0, tlast;
+    int sleep_interval; /* How long to sleep b/t latency pings (usec) */
+    double t0, one_way_latency;
 
     ArgStruct args;     /* Arguments to be passed to protocol modules */
 
@@ -23,23 +25,25 @@ main (int argc, char **argv)
     int n;
 
     /* Initialize vars that may change from default due to arguments */
-    strcpy (s, "np.out");   /* Default output file */
+    default_out = 1;
+    sleep_interval = 0;
     nrtts = NRTTS;
 
     /* Let modules initialize related vars, and possibly call a library init
        function that requires argc and argv */
-    printf ("Collecting %d latency measurements.\n", nrtts);
     Init (&args, &argc, &argv);   /* This will set args.tr and args.rcv */
 
     args.host  = NULL;
     args.port = DEFPORT; /* just in case the user doesn't set this. */
 
     /* Parse the arguments. See Usage for description */
-    while ((c = getopt (argc, argv, "h:o:P:r:")) != -1)
+    while ((c = getopt (argc, argv, "h:o:r:P:s:")) != -1)
     {
         switch (c)
         {
-            case 'o': strcpy (s, optarg);
+            case 'o': default_out = 0;
+                      memset (s, 0, 255);
+                      strcpy (s, optarg);
                       printf ("Sending output to %s\n", s); fflush(stdout);
                       break;
 
@@ -55,13 +59,24 @@ main (int argc, char **argv)
 	        case 'P': args.port = atoi (optarg);
 		              break;
 
+            case 's': sleep_interval = atoi (optarg);
+                      break;
+
             default: 
                      PrintUsage (); 
                      exit (-12);
        }
     }
     
- 
+    if (default_out) {
+        int exp_timestamp;
+        exp_timestamp = (int) time (0);
+        snprintf (s, 255, "results/%d_%d_%d.out", exp_timestamp, nrtts,
+                    sleep_interval);
+    }
+
+    printf ("Collecting %d latency measurements.\n", nrtts);
+
     Setup (&args);
  
     if (args.tr) {
@@ -83,18 +98,16 @@ main (int argc, char **argv)
             if (strlen (timing) > 0) {
                fwrite (timing, strlen (timing), 1, out);
             }
-            memset (args.s_ptr, 0, PSIZE);
-            memset (args.r_ptr, 0, PSIZE);
-            memset (timing, 0, PSIZE * 2);
+            usleep (sleep_interval);
         } else if (args.rcv) {
             RecvData (&args);
             SendData (&args);
-            memset (args.s_ptr, 0, PSIZE);
-            memset (args.r_ptr, 0, PSIZE);
         }
     }
-    tlast = (When () - t0)/(2*nrtts);
-    printf ("RTT: %f\n", tlast);
+    // One-way latency
+    one_way_latency = (When () - t0)/(2*nrtts);
+    printf ("Latency: %f\n", one_way_latency);
+    printf ("Printed results to file %s\n", s);
 
     // Clean up the sockets, close open FDs
     if (args.tr) {

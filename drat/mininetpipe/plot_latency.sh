@@ -1,7 +1,10 @@
 #! /bin/bash
 
 # Delete padding spaces
-cat np.out | tr -d " "
+file="results/`ls ./results | sort | head -1`"
+cat $file | tr -d " "
+expname=${file%*.*}
 
-gnuplot plot_latency.p
-eog plot_latency.png
+echo $expname
+gnuplot -e "expname='$fname'" plot_latency.p
+eog $expname.png

@@ -320,7 +320,6 @@ RecvData (ArgStruct *p)
         snprintf (buf, PSIZE, "%s", p->r_ptr);
         snprintf (buf + PSIZE - 1, PSIZE, "%lld,%.9ld\n", 
                 (long long) recvtime.tv_sec, recvtime.tv_nsec);
-        printf ("Printing %s\n", buf);
         return buf;
     } else {
         return NULL;
