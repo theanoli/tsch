@@ -112,4 +112,8 @@ void Reset(ArgStruct *p);
 
 void PrintUsage();
 
+void SignalHandler (int signum);
+
+void ExitStrategy ();
+
 int getopt( int argc, char * const argv[], const char *optstring);

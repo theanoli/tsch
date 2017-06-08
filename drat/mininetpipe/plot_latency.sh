@@ -1,7 +1,7 @@
 #! /bin/bash
 
 # Delete padding spaces
-file="results/`ls ./results | sort | head -1`"
+file="results/`ls ./results | sort | tail -1`"
 cat $file | tr -d " "
 
 # Remove file extension from filename

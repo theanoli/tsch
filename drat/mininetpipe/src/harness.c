@@ -9,17 +9,18 @@
 
 extern char *optarg;
 
+// Initialize these here so they are accessible to signal handler
+ArgStruct args;     /* Arguments to be passed to protocol modules */
+FILE *out;          /* Output data file                          */
+
 int 
 main (int argc, char **argv)
 {
-    FILE *out;          /* Output data file                          */
     char s[255];        /* Empty string */
     int default_out;    /* bool; use default outfile? */
     int nrtts;
     int sleep_interval; /* How long to sleep b/t latency pings (usec) */
     double t0, one_way_latency;
-
-    ArgStruct args;     /* Arguments to be passed to protocol modules */
 
     int c;
     int n;
@@ -29,15 +30,13 @@ main (int argc, char **argv)
     sleep_interval = 0;
     nrtts = NRTTS;
 
-    /* Let modules initialize related vars, and possibly call a library init
-       function that requires argc and argv */
-    Init (&args, &argc, &argv);   /* This will set args.tr and args.rcv */
+    signal (SIGINT, SignalHandler);
 
-    args.host  = NULL;
+    args.host = NULL;
     args.port = DEFPORT; /* just in case the user doesn't set this. */
 
     /* Parse the arguments. See Usage for description */
-    while ((c = getopt (argc, argv, "h:o:r:P:s:")) != -1)
+    while ((c = getopt (argc, argv, "o:H:r:P:s:h")) != -1)
     {
         switch (c)
         {
@@ -47,7 +46,7 @@ main (int argc, char **argv)
                       printf ("Sending output to %s\n", s); fflush(stdout);
                       break;
 
-            case 'h': args.tr = 1;       /* -h implies transmit node */
+            case 'H': args.tr = 1;       /* -h implies transmit node */
                       args.rcv = 0;
                       args.host = (char *) malloc (strlen (optarg) + 1);
                       strcpy (args.host, optarg);
@@ -62,6 +61,9 @@ main (int argc, char **argv)
             case 's': sleep_interval = atoi (optarg);
                       break;
 
+            case 'h': PrintUsage ();
+                      exit (0);
+
             default: 
                      PrintUsage (); 
                      exit (-12);
@@ -71,12 +73,15 @@ main (int argc, char **argv)
     if (default_out) {
         int exp_timestamp;
         exp_timestamp = (int) time (0);
-        snprintf (s, 255, "results/%d_%d_%d.out", exp_timestamp, nrtts,
+        snprintf (s, 255, "results/%d-r%d-s%d.out", exp_timestamp, nrtts,
                     sleep_interval);
     }
 
     printf ("Collecting %d latency measurements.\n", nrtts);
 
+    /* Let modules initialize related vars, and possibly call a library init
+       function that requires argc and argv */
+    Init (&args, &argc, &argv);   /* This will set args.tr and args.rcv */
     Setup (&args);
  
     if (args.tr) {
@@ -90,30 +95,31 @@ main (int argc, char **argv)
  
     /* Get some number of latency measurements */
     char *timing;
+    int counter = 0;
+
     t0 = When ();
-    for (n = 0; n < nrtts; n++) {
-        if (args.tr) {
+    if (args.tr) {
+        for (n = 0; n < nrtts; n++) {
             SendData (&args);
             timing = RecvData (&args);
             if (strlen (timing) > 0) {
                fwrite (timing, strlen (timing), 1, out);
             }
             usleep (sleep_interval);
-        } else if (args.rcv) {
+            counter++;
+        }
+        one_way_latency = (When () - t0)/(2*nrtts);
+        printf ("Latency: %f\n", one_way_latency);
+        printf ("Printed results to file %s\n", s);
+    } else if (args.rcv) {
+        while (1) {
             RecvData (&args);
             SendData (&args);
+            counter++;
         }
     }
-    // One-way latency
-    one_way_latency = (When () - t0)/(2*nrtts);
-    printf ("Latency: %f\n", one_way_latency);
-    printf ("Printed results to file %s\n", s);
 
-    // Clean up the sockets, close open FDs
-    if (args.tr) {
-        fclose (out);
-    }
-    CleanUp (&args);
+    ExitStrategy ();
     return 0;
 }
 
@@ -121,8 +127,39 @@ main (int argc, char **argv)
 void
 PrintUsage (void)
 {
-    // TODO
-    printf ("Should have usage info here!\n");
+    // TODO ohrPs
+    printf ("\n");
+    printf ("To run server, run 'sudo ./NPmtcp'\n");
+    printf ("To run client, run 'sudo ./NPmtcp -h server-hostname ...'\n\n");
+    printf ("Options (client only unless otherwise specified):\n");
+    printf ("\t-o\twhere to write latency output; default\n"
+            "\t\tresults/timestamp+opts\n");
+    printf ("\t-H\tIP/hostname of receiver\n");
+    printf ("\t-r\tnumber of latency measurements to collect\n"
+            "\t\t(ping packets to send); default 1000\n");
+    printf ("\t-P\t(client AND server) port number, default 8000\n");
+    printf ("\t-s\tsleeptime for throttling client send rate\n");
+    printf ("\t-h\t(client or server) print usage\n");
+    printf ("\n");
+    exit (0);
+}
+
+
+void
+ExitStrategy (void)
+{
+    // Clean up the sockets, close open FDs
+    if (args.tr) {
+        fclose (out);
+    }
+    CleanUp (&args);
+}
+
+
+void
+SignalHandler (int signum) {
+    printf ("Got signal %d\n...", signum);
+    ExitStrategy ();
     exit (0);
 }
 
@@ -139,6 +176,8 @@ When (void)
 struct timespec
 When2 (void)
 {
+    // More precise timestamping function; uses machine time instead of
+    // clock time to avoid sync issues
     struct timespec spec;
 
     clock_gettime (CLOCK_MONOTONIC, &spec);
