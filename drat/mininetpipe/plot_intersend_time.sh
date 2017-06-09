@@ -8,5 +8,7 @@ cat $file | tr -d " "
 expname=${file%*.*}
 
 echo $expname
-gnuplot -e "expname='$expname'" plot_latency.p
-eog $expname"_rtt.png"
+gnuplot -e "expname='$expname'" plot_intersend_time.p
+eog $expname"_intersend.png"
+
+

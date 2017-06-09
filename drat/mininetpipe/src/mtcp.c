@@ -135,10 +135,6 @@ Init (ArgStruct *p, int *pargc, char ***pargv)
     memset (p->s_ptr, 0, PSIZE);
     memset (p->r_ptr, 0, PSIZE);
 
-	// Set protocol-specific variables
-	p->tr = 0;
-	p->rcv = 1;
-
     struct mtcp_conf mcfg;
     mtcp_getconf (&mcfg);
     mcfg.num_cores = 1;

@@ -20,7 +20,7 @@ main (int argc, char **argv)
     int default_out;    /* bool; use default outfile? */
     int nrtts;
     int sleep_interval; /* How long to sleep b/t latency pings (usec) */
-    double t0, one_way_latency;
+    double t0, duration, rtt;
 
     int c;
     int n;
@@ -34,6 +34,10 @@ main (int argc, char **argv)
 
     args.host = NULL;
     args.port = DEFPORT; /* just in case the user doesn't set this. */
+
+    // This gets swapped for instances that specify a host (-H opt)
+    args.tr = 0;
+    args.rcv = 1;
 
     /* Parse the arguments. See Usage for description */
     while ((c = getopt (argc, argv, "o:H:r:P:s:h")) != -1)
@@ -101,16 +105,25 @@ main (int argc, char **argv)
     if (args.tr) {
         for (n = 0; n < nrtts; n++) {
             SendData (&args);
-            timing = RecvData (&args);
-            if (strlen (timing) > 0) {
+            RecvData (&args);
+
+            if ((strlen (timing) > 0) && (n > 1)) {
                fwrite (timing, strlen (timing), 1, out);
             }
             usleep (sleep_interval);
             counter++;
         }
-        one_way_latency = (When () - t0)/(2*nrtts);
-        printf ("Latency: %f\n", one_way_latency);
+
+        duration = When () - t0;
+        rtt = duration/nrtts;
+        
+        // Note these are inflated by the I/O done to record individual
+        // packet RTTs
+        printf ("\n");
+        printf ("Average RTT: %f\n", rtt);
+        printf ("Experiment duration: %f\n", duration);
         printf ("Printed results to file %s\n", s);
+
     } else if (args.rcv) {
         while (1) {
             RecvData (&args);
@@ -127,7 +140,6 @@ main (int argc, char **argv)
 void
 PrintUsage (void)
 {
-    // TODO ohrPs
     printf ("\n");
     printf ("To run server, run 'sudo ./NPmtcp'\n");
     printf ("To run client, run 'sudo ./NPmtcp -h server-hostname ...'\n\n");
@@ -138,7 +150,8 @@ PrintUsage (void)
     printf ("\t-r\tnumber of latency measurements to collect\n"
             "\t\t(ping packets to send); default 1000\n");
     printf ("\t-P\t(client AND server) port number, default 8000\n");
-    printf ("\t-s\tsleeptime for throttling client send rate\n");
+    printf ("\t-s\tsleeptime for throttling client send rate\n"
+            "(default 0)\n");
     printf ("\t-h\t(client or server) print usage\n");
     printf ("\n");
     exit (0);
@@ -167,6 +180,7 @@ SignalHandler (int signum) {
 double
 When (void)
 {
+    // Low-resolution timestamp for coarse-grained measurements
     struct timeval tp;
     gettimeofday (&tp, NULL);
     return ((double) tp.tv_sec + (double) tp.tv_usec * 1e-6);
@@ -197,4 +211,3 @@ diff (struct timespec start, struct timespec end)
         temp.tv_nsec = end.tv_nsec - start.tv_nsec;
     }
     return temp;
-}
