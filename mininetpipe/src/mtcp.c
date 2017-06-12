@@ -324,47 +324,6 @@ RecvData (ArgStruct *p)
 
 
 void
-Sync (ArgStruct *p)
-{
-    // TODO fill in if needed
-}
-
-
-void 
-PrepareToReceive (ArgStruct *p)
-{
-    // Not needed
-}
-
-
-void
-SendTime (ArgStruct *p, double *t)
-{
-    // TODO fill in if needed
-}
-
-
-void
-RecvTime (ArgStruct *p, double *t)
-{
-    // TODO fill in if needed
-}
-
-
-void
-SendRepeat (ArgStruct *p, int rpt)
-{
-    // TODO fill in if needed
-}
-
-
-void 
-RecvRepeat (ArgStruct *p, int *rpt)
-{
-    // TODO fill in if needed
-}
-
-void
 establish (ArgStruct *p)
 {
     socklen_t clen;
@@ -451,8 +410,54 @@ Reset(ArgStruct *p)
 
 }
 
+
+/* Dummy functions -----------------------------------------------------------*/
+// May need filling in later
+
 void
-AfterAlignmentInit(ArgStruct *p)
+Sync (ArgStruct *p)
+{
+    // TODO fill in if needed
+}
+
+
+void 
+PrepareToReceive (ArgStruct *p)
+{
+    // Not needed
+}
+
+
+void
+SendTime (ArgStruct *p, double *t)
+{
+    // TODO fill in if needed
+}
+
+
+void
+RecvTime (ArgStruct *p, double *t)
+{
+    // TODO fill in if needed
+}
+
+
+void
+SendRepeat (ArgStruct *p, int rpt)
+{
+    // TODO fill in if needed
+}
+
+
+void 
+RecvRepeat (ArgStruct *p, int *rpt)
+{
+    // TODO fill in if needed
+}
+
+
+void
+AfterAlignmentInit (ArgStruct *p)
 {
 
 }

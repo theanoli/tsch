@@ -8,6 +8,7 @@ cat $file | tr -d " "
 expname=${file%*.*}
 
 # Generate a file with the inter-sending times
+octave convert_raw_to_usec.oct $expname
 octave generate_deltas.oct $expname
 
 # Generate a plot from the inter-send times

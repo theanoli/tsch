@@ -4,10 +4,8 @@ arg_list = argv ();
 expname = arg_list {1};
 
 printf ("%s\n", expname);
-x = csvread ([expname ".out"]);
+x = csvread ([expname ".dat"]);
 
-# Convert to usec
-y = [(x(:, 1)*(10**6)) + (x(:, 2)/(10**3))];
-z = diff (y (:, 1));
+y = diff (x (:, 1));
 
-save ("-ascii", [expname ".delta"], "z");
+save ("-ascii", [expname ".delta"], "y");

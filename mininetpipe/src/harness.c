@@ -77,17 +77,17 @@ main (int argc, char **argv)
     if (default_out) {
         int exp_timestamp;
         exp_timestamp = (int) time (0);
-        snprintf (s, 255, "results/%d-r%d-s%d.out", exp_timestamp, nrtts,
-                    sleep_interval);
+        snprintf (s, 255, "results/%s-%d-r%d-s%d.out", whichproto,
+                exp_timestamp, nrtts, sleep_interval);
     }
 
-    printf ("Collecting %d latency measurements.\n", nrtts);
+    printf ("Collecting %d latency measurements to file %s.\n", nrtts, s);
 
     /* Let modules initialize related vars, and possibly call a library init
        function that requires argc and argv */
     Init (&args, &argc, &argv);   /* This will set args.tr and args.rcv */
     Setup (&args);
- 
+
     if (args.tr) {
         if ((out = fopen (s, "wb")) == NULL) {
             fprintf (stderr,"Can't open %s for output\n", s);
@@ -105,7 +105,7 @@ main (int argc, char **argv)
     if (args.tr) {
         for (n = 0; n < nrtts; n++) {
             SendData (&args);
-            RecvData (&args);
+            timing = RecvData (&args);
 
             if ((strlen (timing) > 0) && (n > 1)) {
                fwrite (timing, strlen (timing), 1, out);
@@ -141,8 +141,8 @@ void
 PrintUsage (void)
 {
     printf ("\n");
-    printf ("To run server, run 'sudo ./NPmtcp'\n");
-    printf ("To run client, run 'sudo ./NPmtcp -h server-hostname ...'\n\n");
+    printf ("To run server, run 'sudo ./NPxyz'\n");
+    printf ("To run client, run 'sudo ./NPxyz -H server-hostname ...'\n\n");
     printf ("Options (client only unless otherwise specified):\n");
     printf ("\t-o\twhere to write latency output; default\n"
             "\t\tresults/timestamp+opts\n");
@@ -211,3 +211,4 @@ diff (struct timespec start, struct timespec end)
         temp.tv_nsec = end.tv_nsec - start.tv_nsec;
     }
     return temp;
+}

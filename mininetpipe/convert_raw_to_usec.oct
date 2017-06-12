@@ -1,0 +1,12 @@
+#! /bin/octave
+
+arg_list = argv ();
+expname = arg_list {1};
+
+printf ("%s\n", expname);
+x = csvread ([expname ".out"]);
+
+# Convert to usec
+y = [x(:, 1)*(10**6) + x(:, 2)/(10**3), x(:, 3)*(10**6) + x(:, 4)/(10**3)];
+
+save ("-ascii", [expname ".dat"], "y");

@@ -5,7 +5,7 @@
 #      tcp         : You start the receiver and transmitter manually
 #      mtcp        : Same as TCP, but uses the mTCP user-mode stack
 #
-#      For more information, see the function printusage() in netpipe.c
+#      For more information, see the function PrintUsage () in harness.c
 #
 ########################################################################
 
@@ -13,7 +13,7 @@ CC         = gcc
 CFLAGS     = -g -O3 -Wall -Werror
 SRC        = ./src
 
-all:tcp 
+all: tcp 
 
 clean:
 	rm -f *.o NP* np.out
@@ -46,9 +46,9 @@ LIBS += -m64 -g -O3 -pthread -lrt -march=native -export-dynamic ${MTCP_FLD}/lib/
 
 #--- Compile the binaries ---#
 
-# tcp: $(SRC)/tcp.c $(SRC)/harness.c $(SRC)/harness.h 
-#	$(CC) $(CFLAGS) $(SRC)/netpipe.c $(SRC)/tcp.c -DTCP -o NPtcp -I$(SRC)
+tcp: $(SRC)/tcp.c $(SRC)/harness.c $(SRC)/harness.h 
+	$(CC) $(CFLAGS) $(SRC)/harness.c $(SRC)/tcp.c -DTCP -Dwhichproto=\"TCP\" -o NPtcp -I$(SRC)
 
 mtcp: $(SRC)/mtcp.c $(SRC)/harness.c $(SRC)/harness.h 
-	$(CC) $(CFLAGS) $(SRC)/harness.c $(SRC)/mtcp.c -DTCP -o NPmtcp -I$(SRC) ${INC} ${LIBS} -lmtcp -lnuma -pthread -lrt
+	$(CC) $(CFLAGS) $(SRC)/harness.c $(SRC)/mtcp.c -DTCP -Dwhichproto=\"mTCP\" -o NPmtcp -I$(SRC) ${INC} ${LIBS} -lmtcp -lnuma -pthread -lrt
 
