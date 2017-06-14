@@ -1,13 +1,11 @@
 #! /bin/bash
 
 # Must include path relative to the mininetpipe directory
-files=()
 counter=1
 files=""
 plot_cmd=""
 
 for var in "$@"; do
-    i=(($i + 1))
     expname=${var%*.*}
     octave convert_raw_to_usec.oct $expname
     files=$files" $expname"
