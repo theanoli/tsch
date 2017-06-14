@@ -1,5 +1,6 @@
 #! /bin/bash
 
+# Must include path relative to the mininetpipe directory
 while [ "$1" != "" ]; do
     case $1 in 
         -m | --mtcp )   shift
@@ -14,18 +15,29 @@ while [ "$1" != "" ]; do
     shift
 done
 
-files=" "
+files=""
+plot_cmd=""
+counter=1
 
 if [ "$mtcp" != "" ]; then
     cat $mtcp | tr -d " "
-    files=$files" $mtcp"
+    expname=${mtcp%*.*}
+    octave convert_raw_to_usec.oct $expname
+    files=$files" $expname"
+    plot_cmd=$plot_cmd" \"$expname.dat\" using ($counter):(\$2-\$1) title \"mTCP ($expname)\", "
+    counter=$((counter + 1))
 fi
 
 if [ "$tcp" != "" ]; then
     cat $tcp | tr -d " "
-    files=$files" $tcp"
+    expname=${tcp%*.*}
+    octave convert_raw_to_usec.oct $expname
+    files=$files" $expname"
+    plot_cmd=$plot_cmd"\"$expname.dat\" using ($counter):(\$2-\$1) title \"TCP ($expname)\""
+    counter=$((counter + 1))
 fi
 
 echo "Plotting files$files..."
-gnuplot -e "files='$files'" plot_latency_multiprotocol.p
-eog $files"_rtt.png"
+echo "Using plot command $plot_cmd"
+gnuplot -e "files='$files'; plot_args='$plot_cmd'" plot_latency_multiprotocol.p
+eog "results/plots_rtt.png"

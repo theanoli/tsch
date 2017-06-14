@@ -12,4 +12,4 @@ octave convert_raw_to_usec.oct $expname
 
 echo $expname
 gnuplot -e "expname='$expname'" plot_latency.p
-eog $expname".png"
+eog $expname"_rtt.png"
