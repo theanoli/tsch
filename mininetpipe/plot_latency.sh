@@ -1,7 +1,7 @@
 #! /bin/bash
 
 # Delete padding spaces
-file="results/`ls ./results | grep "\.out" | sort | tail -1`"
+file="results/`ls ./results -t | grep "\.out" | head -1`"
 cat $file | tr -d " "
 echo $file
 
