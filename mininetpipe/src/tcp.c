@@ -171,6 +171,7 @@ RecvData (ArgStruct *p)
 
     if ((bytesLeft > 0) && (bytesRead == 0)) {
         printf ("tester: \"end of file\" encountered on reading from socket\n");
+        exit (400);
 
     } else if (bytesRead == -1) {
         printf ("tester: read: error encountered, errno=%d\n", errno);
@@ -247,31 +248,17 @@ establish (ArgStruct *p)
 void 
 CleanUp (ArgStruct *p)
 {
-   char *quit = "QUIT";
-   int q;
-
    printf ("Quitting!\n");
 
    if (p->tr) {
-
-      q = write (p->commfd, quit, 5);
-      q = read (p->commfd, quit, 5);
       close (p->commfd);
 
    } else if (p->rcv) {
-
-      q = read (p->commfd,quit, 5);
-      q = write (p->commfd,quit,5);
       close (p->commfd);
       close (p->servicefd);
 
    }
 
-   // Shut up the compiler
-   if (q > 0) 
-       return;
-   else
-       return;
 }
 
 

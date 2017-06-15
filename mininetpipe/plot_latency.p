@@ -6,12 +6,9 @@ unset label
 set xtic auto
 set ytic auto
 #set yrange [0:180]
-set title "Client-server RTT: mTCP (".expname.")"
+set title "Client-server RTT ".expname
 set xlabel "Time (us)"
 set ylabel "1 RTT (us)"
-
-# stats expname.".out" using ($1 + $2/(10**9)):(($3*(10**6) + $4/(10**3)) - ($1*(10**6) + $2/(10**3))) name "plt"
-# plot expname.".out" using ($1 + $2/(10**9) - plt_min_x):(($3*(10**6) + $4/(10**3)) - ($1*(10**6) + $2/(10**3))) title "RTT (us)"
 
 stats expname.".dat" using 1:($2 - $1) name "plt"
 plot expname.".dat" using ($1 - plt_min_x):($2 - $1) title "RTT (us)"
