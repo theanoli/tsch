@@ -205,7 +205,7 @@ establish (ArgStruct *p)
         }
 
         // For UDP, this will let multiple processes to bind to the same port;
-        // any messages sent to that port will be delivered to all processes
+        // here we want it so we can immediately reuse the same socket
         if (setsockopt (p->commfd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof (int))) {
             perror ("tester: server: unable to setsockopt!");
             exit (557);
