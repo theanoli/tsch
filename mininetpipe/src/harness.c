@@ -99,7 +99,7 @@ main (int argc, char **argv)
  
     /* Get some number of latency measurements */
     char *timing;
-    int counter = 0;
+    uint64_t counter = 0;
 
     t0 = When ();
     if (args.tr) {
@@ -111,7 +111,6 @@ main (int argc, char **argv)
                fwrite (timing, strlen (timing), 1, out);
             }
             usleep (sleep_interval);
-            counter++;
         }
 
         duration = When () - t0;
@@ -128,8 +127,34 @@ main (int argc, char **argv)
         while (1) {
             RecvData (&args);
             SendData (&args);
+        }
+    }
+
+    /* Get throughput measurements */
+    t0 = When ();
+    if (args.tr) {
+        // Send some huge number of packets
+        while (1) {
+            SendData (&args);
+            RecvData (&args);
+        }
+    } else {
+        // Give clients time to ramp up send rate/stabilize
+        while ((t0 + 5) > When ()) {
+            RecvData (&args);
+            SendData (&args);
+        }
+
+        // Start counting packets for EXPDURATION seconds
+        t0 = When ();
+        while ((duration = When () - t0) < EXPDURATION) {
+            RecvData (&args);
+            SendData (&args);
             counter++;
         }
+
+        printf ("Received %" PRIu64 " packets in %f seconds\n", counter, duration);
+        printf ("Throughput is %f\n", counter/duration);
     }
 
     ExitStrategy ();
