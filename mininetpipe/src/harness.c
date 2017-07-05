@@ -20,10 +20,9 @@ main (int argc, char **argv)
     int default_out;    /* bool; use default outfile? */
     int nrtts;
     int sleep_interval; /* How long to sleep b/t latency pings (usec) */
-    double t0, duration, rtt;
+    double t0, duration;
 
     int c;
-    int n;
 
     /* Initialize vars that may change from default due to arguments */
     default_out = 1;
@@ -50,7 +49,7 @@ main (int argc, char **argv)
                       printf ("Sending output to %s\n", s); fflush(stdout);
                       break;
 
-            case 'H': args.tr = 1;       /* -h implies transmit node */
+            case 'H': args.tr = 1;       /* -H implies transmit node */
                       args.rcv = 0;
                       args.host = (char *) malloc (strlen (optarg) + 1);
                       strcpy (args.host, optarg);
@@ -81,8 +80,6 @@ main (int argc, char **argv)
                 exp_timestamp, nrtts, sleep_interval);
     }
 
-    printf ("Collecting %d latency measurements to file %s.\n", nrtts, s);
-
     /* Let modules initialize related vars, and possibly call a library init
        function that requires argc and argv */
     Init (&args, &argc, &argv);   /* This will set args.tr and args.rcv */
@@ -98,39 +95,44 @@ main (int argc, char **argv)
     }
  
     /* Get some number of latency measurements */
-    char *timing;
-    uint64_t counter = 0;
+    // printf ("Collecting %d latency measurements to file %s.\n", nrtts, s);
 
-    t0 = When ();
-    if (args.tr) {
-        for (n = 0; n < nrtts; n++) {
-            SendData (&args);
-            timing = RecvData (&args);
+    // char *timing;
+    // int n;
+    // double rtt;
+    //
+    // t0 = When ();
+    // if (args.tr) {
+    //     for (n = 0; n < nrtts; n++) {
+    //         SendData (&args);
+    //         timing = RecvData (&args);
 
-            if ((strlen (timing) > 0) && (n > 1)) {
-               fwrite (timing, strlen (timing), 1, out);
-            }
-            usleep (sleep_interval);
-        }
+    //         if ((strlen (timing) > 0) && (n > 1)) {
+    //            fwrite (timing, strlen (timing), 1, out);
+    //         }
+    //         usleep (sleep_interval);
+    //     }
 
-        duration = When () - t0;
-        rtt = duration/nrtts;
-        
-        // Note these are inflated by the I/O done to record individual
-        // packet RTTs
-        printf ("\n");
-        printf ("Average RTT: %f\n", rtt);
-        printf ("Experiment duration: %f\n", duration);
-        printf ("Printed results to file %s\n", s);
+    //     duration = When () - t0;
+    //     rtt = duration/nrtts;
+    //     
+    //     // Note these are inflated by the I/O done to record individual
+    //     // packet RTTs
+    //     printf ("\n");
+    //     printf ("Average RTT: %f\n", rtt);
+    //     printf ("Experiment duration: %f\n", duration);
+    //     printf ("Printed results to file %s\n", s);
 
-    } else if (args.rcv) {
-        while (1) {
-            RecvData (&args);
-            SendData (&args);
-        }
-    }
+    // } else if (args.rcv) {
+    //     while (1) {
+    //         RecvData (&args);
+    //         SendData (&args);
+    //     }
+    // }
 
     /* Get throughput measurements */
+    uint64_t counter = 0;
+
     t0 = When ();
     if (args.tr) {
         // Send some huge number of packets
@@ -138,7 +140,7 @@ main (int argc, char **argv)
             SendData (&args);
             RecvData (&args);
         }
-    } else {
+    } else if (args.rcv) {
         // Give clients time to ramp up send rate/stabilize
         while ((t0 + 5) > When ()) {
             RecvData (&args);
@@ -146,6 +148,7 @@ main (int argc, char **argv)
         }
 
         // Start counting packets for EXPDURATION seconds
+        printf ("Starting counting packets for throughput...\n");
         t0 = When ();
         while ((duration = When () - t0) < EXPDURATION) {
             RecvData (&args);
@@ -154,7 +157,7 @@ main (int argc, char **argv)
         }
 
         printf ("Received %" PRIu64 " packets in %f seconds\n", counter, duration);
-        printf ("Throughput is %f\n", counter/duration);
+        printf ("Throughput is %f PPS\n", counter/duration);
     }
 
     ExitStrategy ();
