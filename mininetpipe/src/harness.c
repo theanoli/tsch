@@ -139,10 +139,15 @@ main (int argc, char **argv)
         while (1) {
             SendData (&args);
             RecvData (&args);
+            counter++;
+            if (counter % 1000 == 0) {
+                printf ("Just sent packet %" PRIu64 "\n", counter);
+            }
         }
     } else if (args.rcv) {
         // Give clients time to ramp up send rate/stabilize
         while ((t0 + 5) > When ()) {
+            // Check for connections and echo back packets
             RecvData (&args);
             SendData (&args);
         }
@@ -157,7 +162,7 @@ main (int argc, char **argv)
         }
 
         printf ("Received %" PRIu64 " packets in %f seconds\n", counter, duration);
-        printf ("Throughput is %f PPS\n", counter/duration);
+        printf ("Throughput is %f pps\n", counter/duration);
     }
 
     ExitStrategy ();

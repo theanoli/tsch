@@ -20,34 +20,37 @@ clean:
 
 #--- All the stuff needed to compile mTCP ---#
 # DPDK library and header 
-DPDK_INC=/proj/sequencer/mtcp/dpdk/include
-DPDK_LIB=/proj/sequencer/mtcp/dpdk/lib/
+DPDK_INC	= /proj/sequencer/mtcp/dpdk/include
+DPDK_LIB	= /proj/sequencer/mtcp/dpdk/lib/
 
 # mTCP library and header 
-MTCP_FLD    =/proj/sequencer/mtcp/mtcp
-MTCP_INC    =-I${MTCP_FLD}/include
-MTCP_LIB    =-L${MTCP_FLD}/lib
+MTCP_FLD    = /proj/sequencer/mtcp/mtcp
+MTCP_INC    = -I${MTCP_FLD}/include
+MTCP_LIB    = -L${MTCP_FLD}/lib
 MTCP_TARGET = ${MTCP_LIB}/libmtcp.a
 
 UTIL_FLD = /proj/sequencer/mtcp/util
 UTIL_INC = -I${UTIL_FLD}/include
 
-INC = -I./include/ ${UTIL_INC} ${MTCP_INC} -I${UTIL_FLD}/include
-LIBS = ${MTCP_LIB}
+INC 	= -I./include/ ${UTIL_INC} ${MTCP_INC} -I${UTIL_FLD}/include
+LIBS	= ${MTCP_LIB}
 
 # CFLAGS for DPDK-related compilation
-INC += ${MTCP_INC}
+INC 	+= ${MTCP_INC}
 DPDK_MACHINE_FLAGS = $(shell cat /proj/sequencer/mtcp/dpdk/include/cflags.txt)
-INC += ${DPDK_MACHINE_FLAGS} -I${DPDK_INC} -include $(DPDK_INC)/rte_config.h
+INC 	+= ${DPDK_MACHINE_FLAGS} -I${DPDK_INC} -include $(DPDK_INC)/rte_config.h
 
 DPDK_LIB_FLAGS = $(shell cat /proj/sequencer/mtcp/dpdk/lib/ldflags.txt)
-LIBS += -m64 -g -O3 -pthread -lrt -march=native -export-dynamic ${MTCP_FLD}/lib/libmtcp.a -L../../dpdk/lib -lnuma -lmtcp -lpthread -lrt -ldl ${DPDK_LIB_FLAGS}
+LIBS 	+= -m64 -g -O3 -pthread -lrt -march=native -export-dynamic ${MTCP_FLD}/lib/libmtcp.a -L../../dpdk/lib -lnuma -lmtcp -lpthread -lrt -ldl ${DPDK_LIB_FLAGS}
 
 
 #--- Compile the binaries ---#
 
 tcp: $(SRC)/tcp.c $(SRC)/harness.c $(SRC)/harness.h 
 	$(CC) $(CFLAGS) $(SRC)/harness.c $(SRC)/tcp.c -DTCP -Dwhichproto=\"TCP\" -o NPtcp -I$(SRC)
+
+etcp: $(SRC)/tcp_epoll.c $(SRC)/harness.c $(SRC)/harness.h 
+	$(CC) $(CFLAGS) $(SRC)/harness.c $(SRC)/tcp_epoll.c -DTCP -Dwhichproto=\"eTCP\" -o NPetcp -I$(SRC)
 
 udp: $(SRC)/udp.c $(SRC)/harness.c $(SRC)/harness.h 
 	$(CC) $(CFLAGS) $(SRC)/harness.c $(SRC)/udp.c -DTCP -Dwhichproto=\"UDP\" -o NPudp -I$(SRC)

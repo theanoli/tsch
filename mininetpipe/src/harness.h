@@ -12,7 +12,7 @@
 
 #define PSIZE   32
 #define DEFPORT 8000
-#define EXPDURATION 60
+#define EXPDURATION 10
 
 // TCP-specific
 #if defined(TCP)
