@@ -20,7 +20,7 @@ tcp_accept_helper (int sockid, struct sockaddr *addr, socklen_t *addrlen)
     event.data.fd = sockid;
 
     if (epoll_ctl (ep, EPOLL_CTL_ADD, sockid, &event) == -1) {
-        perror ("epoll_ctl");
+        perror ("epoll_ctl 1");
         exit (1);
     }
 
@@ -60,7 +60,7 @@ tcp_read_helper (int sockid, char *buf, int len)
     event.events = EPOLLIN;
     event.data.fd = sockid;
     if (epoll_ctl (ep, EPOLL_CTL_ADD, sockid, &event) == -1) {
-        perror ("epoll_ctl");
+        perror ("epoll_ctl 2");
         exit (1);
     }
 
@@ -96,7 +96,7 @@ tcp_write_helper (int sockid, char *buf, int len)
     event.events = EPOLLOUT;
     event.data.fd = sockid;
     if (epoll_ctl (ep, EPOLL_CTL_ADD, sockid, &event) == -1) {
-        perror ("epoll_ctl");
+        perror ("epoll_ctl 3");
         exit (1);
     }
 
@@ -111,7 +111,7 @@ tcp_write_helper (int sockid, char *buf, int len)
 
         for (i = 0; i < nevents; i++) {
             if (events[i].data.fd == sockid) {
-                epoll_ctl (ep, EPOLL_CTL_ADD, sockid, NULL);
+                epoll_ctl (ep, EPOLL_CTL_DEL, sockid, NULL);
                 return write (sockid, buf, len);
             } else {
                 printf ("Socket error!\n");
@@ -143,6 +143,7 @@ void
 Setup (ArgStruct *p)
 {
     // Initialize connections: create socket, bind, listen (in establish)
+    // Also creates epoll instance
     int sockfd;
     struct sockaddr_in *lsin1, *lsin2;
     char *host;
@@ -157,6 +158,8 @@ Setup (ArgStruct *p)
 
     memset ((char *) lsin1, 0, sizeof (*lsin1));
     memset ((char *) lsin2, 0, sizeof (*lsin2));
+
+    ep = epoll_create (NEVENTS);
 
     if ((sockfd = socket (socket_family, SOCK_STREAM | SOCK_NONBLOCK, 0)) < 0) {
         printf ("tester: can't open stream socket!\n");
@@ -300,6 +303,129 @@ RecvData (ArgStruct *p)
 
 
 void
+ThroughputSetup (ArgStruct *p)
+{
+    int sockfd; 
+    struct sockaddr_in *lsin1, *lsin2;
+    char *host;
+    struct hostent *addr;
+    struct protoent *proto;
+    int socket_family = AF_INET;
+    double t0, duration;
+
+    int nevents;
+    struct epoll_event events[MAXEVENTS];
+    struct epoll_event event;
+
+    host = p->host;
+
+    lsin1 = &(p->prot.sin1);
+    lsin2 = &(p->prot.sin2);
+    
+    memset ((char *) lsin1, 0, sizeof (*lsin1));
+    memset ((char *) lsin2, 0, sizeof (*lsin2));
+    
+    ep = epoll_create (NEVENTS);
+
+    if ((sockfd = socket (socket_family, SOCK_STREAM | SOCK_NONBLOCK, 0)) < 0) {
+        printf ("tester: can't open stream socket!\n");
+        exit (-4);
+    }
+
+    if (!(proto = getprotobyname ("tcp"))) {
+        printf ("tester: protocol 'tcp' unknown!\n");
+        exit (555);
+    }
+
+    if (p->tr) {
+        if (atoi (host) > 0) {
+            lsin1->sin_family = AF_INET;
+            lsin1->sin_addr.s_addr = inet_addr (host);
+        } else {
+            if ((addr = gethostbyname (host)) == NULL) {
+                printf ("tester: invalid hostname '%s'\n", host);
+                exit (-5);
+            }
+
+            lsin1->sin_family = addr->h_addrtype;
+            memcpy (addr->h_addr, (char *) &(lsin1->sin_addr.s_addr), addr->h_length);
+        }
+
+        lsin1->sin_port = htons (p->port);
+        p->commfd = sockfd;
+    } else if (p->rcv) {
+        memset ((char *) lsin1, 0, sizeof (*lsin1));
+        lsin1->sin_family       = AF_INET;
+        lsin1->sin_addr.s_addr  = htonl (INADDR_ANY);
+        lsin1->sin_port         = htons (p->port);
+
+        if (bind (sockfd, (struct sockaddr *) lsin1, sizeof (*lsin1)) < 0) {
+            printf ("tester: server: bind on local address failed! errno=%d\n", errno);
+            exit (-6);
+        }
+
+        p->servicefd = sockfd;
+    }
+
+    establish (p);    
+}
+
+void
+throughput_establish (ArgStruct *p)
+{
+    // TODO this FD needs to get added to an epoll instance
+    socklen_t clen;
+    struct protoent *proto;
+
+    clen = (socklen_t) sizeof (p->prot.sin2);
+    
+    if (p->tr) {
+        while ((connect (p->commfd, (struct sockaddr *) &(p->prot.sin1), 
+                        sizeof (p->prot.sin1)) < 0) && (errno != EINPROGRESS)) {
+            if (!doing_reset || errno != ECONNREFUSED) {
+                printf ("client: cannot connect to server! errno=%d\n", errno);
+                exit (-10);
+            }
+        }
+    } else if (p->rcv) {
+        listen (p->servicefd, 1024);
+
+        t0 = When ();
+        while ((t0 + 5) > When ()) {
+            nevents = epoll_wait (ep, events, MAXEVENTS, -1); 
+            if (nevents < 0) {
+                if (errno != EINTR) {
+                    perror ("epoll_wait");
+                }
+                exit (1);
+            }
+
+            for (i = 0; i < nevents; i++) {
+                if (events[i].data.fd == p->servicefd) {
+                    while (1) {
+                        p->commfd = accept (p->servicefd, &(p->prot.sin2), &clen);
+
+                        // Go through all the descriptors until exhausted
+                        if (p->commfd == -1) {
+                           if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+                               break;
+                           } else {
+                               perror ("accept");
+                               break;
+                           }
+                        }
+
+                        // TODO set socket to nonblocking
+                        // TODO add descriptor to epoll instance
+                    }
+                } 
+            }
+        }
+    }
+}
+
+
+void
 establish (ArgStruct *p)
 {
     socklen_t clen;
@@ -316,12 +442,12 @@ establish (ArgStruct *p)
             }
         }
     } else if (p->rcv) {
-        listen (p->servicefd, 5);
+        listen (p->servicefd, 1024);
         p->commfd = tcp_accept_helper (p->servicefd,     
                                 (struct sockaddr *) &(p->prot.sin2), &clen);
         while (p->commfd < 0 && errno == EAGAIN) {
             p->commfd = tcp_accept_helper (p->servicefd,     
-                                    (struct sockaddr *) &(p->prot.sin2), &clen);
+                                (struct sockaddr *) &(p->prot.sin2), &clen);
         }
 
         if (p->commfd < 0) {

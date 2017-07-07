@@ -83,16 +83,18 @@ main (int argc, char **argv)
     /* Let modules initialize related vars, and possibly call a library init
        function that requires argc and argv */
     Init (&args, &argc, &argv);   /* This will set args.tr and args.rcv */
-    Setup (&args);
 
-    if (args.tr) {
-        if ((out = fopen (s, "wb")) == NULL) {
-            fprintf (stderr,"Can't open %s for output\n", s);
-            exit (1);
-        }
-    } else {
-        out = stdout;
-    }
+    /* FOR LATENCY */
+    // Setup (&args);
+
+    // if (args.tr) {
+    //     if ((out = fopen (s, "wb")) == NULL) {
+    //         fprintf (stderr,"Can't open %s for output\n", s);
+    //         exit (1);
+    //     }
+    // } else {
+    //     out = stdout;
+    // }
  
     /* Get some number of latency measurements */
     // printf ("Collecting %d latency measurements to file %s.\n", nrtts, s);
@@ -129,6 +131,10 @@ main (int argc, char **argv)
     //         SendData (&args);
     //     }
     // }
+
+    /* FOR THROUGHPUT */
+    /* Do setup */
+    Setup (&args);
 
     /* Get throughput measurements */
     uint64_t counter = 0;
@@ -204,7 +210,7 @@ ExitStrategy (void)
 
 void
 SignalHandler (int signum) {
-    printf ("Got signal %d\n...", signum);
+    printf ("Got signal %d\n...\n", signum);
     ExitStrategy ();
     exit (0);
 }
