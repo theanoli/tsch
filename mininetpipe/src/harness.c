@@ -20,7 +20,7 @@ main (int argc, char **argv)
     int default_out;    /* bool; use default outfile? */
     int nrtts;
     int sleep_interval; /* How long to sleep b/t latency pings (usec) */
-    double t0, duration;
+    // double t0, duration;
 
     int c;
 
@@ -134,42 +134,42 @@ main (int argc, char **argv)
 
     /* FOR THROUGHPUT */
     /* Do setup */
-    Setup (&args);
+    ThroughputSetup (&args);
 
     /* Get throughput measurements */
-    uint64_t counter = 0;
+    // uint64_t counter = 0;
 
-    t0 = When ();
-    if (args.tr) {
-        // Send some huge number of packets
-        while (1) {
-            SendData (&args);
-            RecvData (&args);
-            counter++;
-            if (counter % 1000 == 0) {
-                printf ("Just sent packet %" PRIu64 "\n", counter);
-            }
-        }
-    } else if (args.rcv) {
-        // Give clients time to ramp up send rate/stabilize
-        while ((t0 + 5) > When ()) {
-            // Check for connections and echo back packets
-            RecvData (&args);
-            SendData (&args);
-        }
+    // t0 = When ();
+    // if (args.tr) {
+    //     // Send some huge number of packets
+    //     while (1) {
+    //         SendData (&args);
+    //         RecvData (&args);
+    //         counter++;
+    //         if (counter % 1000 == 0) {
+    //             printf ("Just sent packet %" PRIu64 "\n", counter);
+    //         }
+    //     }
+    // } else if (args.rcv) {
+    //     // Give clients time to ramp up send rate/stabilize
+    //     while ((t0 + 5) > When ()) {
+    //         // Check for connections and echo back packets
+    //         RecvData (&args);
+    //         SendData (&args);
+    //     }
 
-        // Start counting packets for EXPDURATION seconds
-        printf ("Starting counting packets for throughput...\n");
-        t0 = When ();
-        while ((duration = When () - t0) < EXPDURATION) {
-            RecvData (&args);
-            SendData (&args);
-            counter++;
-        }
+    //     // Start counting packets for EXPDURATION seconds
+    //     printf ("Starting counting packets for throughput...\n");
+    //     t0 = When ();
+    //     while ((duration = When () - t0) < EXPDURATION) {
+    //         RecvData (&args);
+    //         SendData (&args);
+    //         counter++;
+    //     }
 
-        printf ("Received %" PRIu64 " packets in %f seconds\n", counter, duration);
-        printf ("Throughput is %f pps\n", counter/duration);
-    }
+    //     printf ("Received %" PRIu64 " packets in %f seconds\n", counter, duration);
+    //     printf ("Throughput is %f pps\n", counter/duration);
+    // }
 
     ExitStrategy ();
     return 0;
@@ -202,7 +202,7 @@ ExitStrategy (void)
 {
     // Clean up the sockets, close open FDs
     if (args.tr) {
-        fclose (out);
+        // TODO fclose (out);
     }
     CleanUp (&args);
 }

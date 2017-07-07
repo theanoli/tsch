@@ -24,9 +24,6 @@ tcp_accept_helper (int sockid, struct sockaddr *addr, socklen_t *addrlen)
         exit (1);
     }
 
-    // TODO this part will need to get put into a thread eventually/somehow; this
-    // should be a continuous process
-    // Also need to be putting the accepted FDs into the watch list
     while (1) {
         nevents = epoll_wait (ep, events, NEVENTS, -1);
         if (nevents < 0) {
@@ -311,11 +308,8 @@ ThroughputSetup (ArgStruct *p)
     struct hostent *addr;
     struct protoent *proto;
     int socket_family = AF_INET;
-    double t0, duration;
 
-    int nevents;
-    struct epoll_event events[MAXEVENTS];
-    struct epoll_event event;
+    printf ("*** Setting up connection(s)... ***\n");
 
     host = p->host;
 
@@ -327,6 +321,7 @@ ThroughputSetup (ArgStruct *p)
     
     ep = epoll_create (NEVENTS);
 
+    printf ("\tCreating socket...\n");
     if ((sockfd = socket (socket_family, SOCK_STREAM | SOCK_NONBLOCK, 0)) < 0) {
         printf ("tester: can't open stream socket!\n");
         exit (-4);
@@ -367,7 +362,7 @@ ThroughputSetup (ArgStruct *p)
         p->servicefd = sockfd;
     }
 
-    establish (p);    
+    throughput_establish (p);    
 }
 
 void
@@ -376,6 +371,12 @@ throughput_establish (ArgStruct *p)
     // TODO this FD needs to get added to an epoll instance
     socklen_t clen;
     struct protoent *proto;
+    int nevents, i;
+    struct epoll_event events[NEVENTS];
+    struct epoll_event event;
+    double t0, duration;
+
+    printf ("*** Establishing connection... ***\n");
 
     clen = (socklen_t) sizeof (p->prot.sin2);
     
@@ -387,12 +388,23 @@ throughput_establish (ArgStruct *p)
                 exit (-10);
             }
         }
+        printf ("\tConnection successful!\n");
     } else if (p->rcv) {
+        event.events = EPOLLIN;
+        event.data.fd = p->servicefd;
+
+        if (epoll_ctl (ep, EPOLL_CTL_ADD, p->servicefd, &event) == -1) {
+            perror ("epoll_ctl");
+            exit (1);
+        }
+
         listen (p->servicefd, 1024);
 
         t0 = When ();
-        while ((t0 + 5) > When ()) {
-            nevents = epoll_wait (ep, events, MAXEVENTS, -1); 
+        printf ("\tStarting loop to wait for connections...\n");
+
+        while ((duration = (t0 + 10) - When ()) > 0) {
+            nevents = epoll_wait (ep, events, MAXEVENTS, duration); 
             if (nevents < 0) {
                 if (errno != EINTR) {
                     perror ("epoll_wait");
@@ -401,11 +413,15 @@ throughput_establish (ArgStruct *p)
             }
 
             for (i = 0; i < nevents; i++) {
+                printf ("\tChecking event %d of %d\n", i, nevents);
                 if (events[i].data.fd == p->servicefd) {
                     while (1) {
-                        p->commfd = accept (p->servicefd, &(p->prot.sin2), &clen);
+                        printf ("\tPossible incoming connection!\n");
+                        char hostbuf[NI_MAXHOST], portbuf[NI_MAXSERV];
+                        
+                        p->commfd = accept (p->servicefd, 
+                                (struct sockaddr *) &(p->prot.sin2), &clen);
 
-                        // Go through all the descriptors until exhausted
                         if (p->commfd == -1) {
                            if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
                                break;
@@ -415,8 +431,31 @@ throughput_establish (ArgStruct *p)
                            }
                         }
 
-                        // TODO set socket to nonblocking
-                        // TODO add descriptor to epoll instance
+                        getnameinfo ((struct sockaddr *) &p->prot.sin2, clen, hostbuf, sizeof (hostbuf),
+                                portbuf, sizeof (portbuf),
+                                NI_NUMERICHOST | NI_NUMERICSERV);
+                                            
+                        printf ("Accepted connection: descriptor %d, host %s, "
+                                "port %s\n", p->commfd, hostbuf, portbuf);
+
+                        if (!(proto = getprotobyname ("tcp"))) {
+                            printf ("unknown protocol!\n");
+                            exit (555);
+                        }
+
+                        // Set socket to nonblocking
+                        if (setsock_nonblock (p->commfd) < 0) {
+                            printf ("Error setting socket to non-blocking!\n");
+                            continue;
+                        }
+
+                        // Add descriptor to epoll instance
+                        event.data.fd = p->commfd;
+                        event.events = EPOLLIN | EPOLLET;  // TODO check this
+                        if (epoll_ctl (ep, EPOLL_CTL_ADD, p->commfd, &event) < 0) {
+                            perror ("epoll_ctl");
+                            exit (1);
+                        }
                     }
                 } 
             }
@@ -470,7 +509,7 @@ CleanUp (ArgStruct *p)
    if (p->tr) {
       close (p->commfd);
 
-   } else if ( p->rcv ) {
+   } else if (p->rcv) {
       close (p->commfd);
       close (p->servicefd);
       close (ep);
@@ -493,6 +532,27 @@ Reset(ArgStruct *p)
         Setup (p);
     }
 
+}
+
+
+int
+setsock_nonblock (int fd)
+{
+    int flags;
+
+    flags = fcntl (fd, F_GETFL, 0);
+    if (flags == -1) {
+        perror ("fcntl");
+        return -1;
+    }
+
+    flags |= O_NONBLOCK;
+    if (fcntl (fd, F_SETFL, flags) == -1) {
+        perror ("fcntl");
+        return -1;
+    }
+
+    return 0;
 }
 
 

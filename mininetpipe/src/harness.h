@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
@@ -13,6 +14,7 @@
 #define PSIZE   32
 #define DEFPORT 8000
 #define EXPDURATION 10
+#define MAXEVENTS 16
 
 // TCP-specific
 #if defined(TCP)
@@ -88,7 +90,13 @@ void Init(ArgStruct *p, int* argc, char*** argv);
 
 void Setup(ArgStruct *p);
 
+void ThroughputSetup (ArgStruct *p);
+
 void establish(ArgStruct *p);
+
+void throughput_establish (ArgStruct *p);
+
+int setsock_nonblock (int fd);
 
 void Sync(ArgStruct *p);
 
