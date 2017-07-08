@@ -300,6 +300,77 @@ RecvData (ArgStruct *p)
 
 
 void
+Echo (ArgStruct *p, int expduration, uint64_t *counter_p, double *duration_p)
+{
+    // Loop through for EXPDURATION seconds and count each packet you send out
+    double t0, duration;
+    int n, i, done;
+    struct epoll_event events[MAXEVENTS];
+
+    *counter_p = 0;
+
+    t0 = When ();
+    while ((duration = When () - t0) < EXPDURATION) {
+        n = epoll_wait (ep, events, MAXEVENTS, EXPDURATION * 1000);
+        if (n < 0) {
+            perror ("epoll_wait");
+            exit (1);
+        }
+        printf ("Got %d events\n", n);
+
+        for (i = 0; i < n; i++) {
+            // Check for errors
+            if ((events[i].events & EPOLLERR) ||
+                    (events[i].events & EPOLLHUP) ||
+                    !(events[i].events & EPOLLIN)) {
+                printf ("epoll error!\n");
+                close (events[i].data.fd);
+                continue;
+            } else if (events[i].data.fd == p->servicefd) {
+                continue;
+            } else {
+                // There's data to be read
+                done = 0;
+                int bytesRead, bytesWritten;
+                char *q;
+
+                bytesRead = 0;
+                q = p->r_ptr;
+
+                while ((bytesRead = read (events[i].data.fd, q, PSIZE - 1)) > 0) {
+                    q += bytesRead;
+                }
+                
+                if (errno != EAGAIN) {
+                    if (bytesRead < 0) {
+                        perror ("server read");
+                    }
+                    done = 1;  // Close this socket
+                } else {
+                    // We've read all the data; echo it back to the client
+                    printf ("About to write %s to the socket...\n", p->r_ptr);
+                    bytesWritten = write (events[i].data.fd, p->r_ptr, 
+                            sizeof (p->r_ptr));
+                    if (bytesWritten < sizeof (p->r_ptr)) {
+                        // TODO treat this as an error or not?
+                        printf ("Some echoed bytes didn't make it!\n");
+                    }
+                    (*counter_p)++;
+                    memset (p->r_ptr, 0, PSIZE - 1);
+                }
+
+                if (done) {
+                    close (events[i].data.fd);
+                }
+            }
+        }
+    }
+
+    *duration_p = duration;
+}
+
+
+void
 ThroughputSetup (ArgStruct *p)
 {
     int sockfd; 
@@ -431,7 +502,8 @@ throughput_establish (ArgStruct *p)
                            }
                         }
 
-                        getnameinfo ((struct sockaddr *) &p->prot.sin2, clen, hostbuf, sizeof (hostbuf),
+                        getnameinfo ((struct sockaddr *) &p->prot.sin2, 
+                                clen, hostbuf, sizeof (hostbuf),
                                 portbuf, sizeof (portbuf),
                                 NI_NUMERICHOST | NI_NUMERICSERV);
                                             
@@ -456,6 +528,15 @@ throughput_establish (ArgStruct *p)
                             perror ("epoll_ctl");
                             exit (1);
                         }
+                    }
+                } else {
+                    if (events[i].events & EPOLLIN) {
+                        int nread;
+                        char buf[128];
+
+                        nread = read (events[i].data.fd, buf, 128);
+                        nread = write (events[i].data.fd, buf, sizeof (buf));
+                        printf ("Ignoring %d bytes\n", nread);
                     }
                 } 
             }

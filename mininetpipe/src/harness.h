@@ -106,6 +106,8 @@ void SendData(ArgStruct *p);
 
 char *RecvData(ArgStruct *p);
 
+void Echo (ArgStruct *p, int expduration, uint64_t *counter_p, double *duration_p);
+
 void SendTime(ArgStruct *p, double *t);
 
 void RecvTime(ArgStruct *p, double *t);
