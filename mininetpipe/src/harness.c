@@ -155,7 +155,6 @@ main (int argc, char **argv)
             if (counter % 1000 == 0) {
                 printf ("Just sent packet %" PRIu64 "\n", counter);
             }
-            sleep (1);
         }
     } else if (args.rcv) {
         // Give clients time to ramp up send rate/stabilize
@@ -178,8 +177,9 @@ void
 PrintUsage (void)
 {
     printf ("\n");
-    printf ("To run server, run 'sudo ./NPxyz'\n");
-    printf ("To run client, run 'sudo ./NPxyz -H server-hostname ...'\n\n");
+    printf ("To run server, run '[sudo] ./NPxyz'\n");
+    printf ("To run client, run '[sudo] ./NPxyz -H server-hostname ...'\n");
+    printf ("(mTCP is the only transport that needs sudo [for now])\n\n");
     printf ("Options (client only unless otherwise specified):\n");
     printf ("\t-o\twhere to write latency output; default\n"
             "\t\tresults/timestamp+opts\n");

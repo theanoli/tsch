@@ -3,6 +3,7 @@
 #include <sys/epoll.h>
 
 #define NEVENTS 10
+#define DEBUG 0
 
 int doing_reset = 0;
 int ep = -1;
@@ -316,7 +317,8 @@ Echo (ArgStruct *p, int expduration, uint64_t *counter_p, double *duration_p)
             perror ("epoll_wait");
             exit (1);
         }
-        printf ("Got %d events\n", n);
+        if (DEBUG)
+            printf ("Got %d events\n", n);
 
         for (i = 0; i < n; i++) {
             // Check for errors
@@ -348,7 +350,8 @@ Echo (ArgStruct *p, int expduration, uint64_t *counter_p, double *duration_p)
                     done = 1;  // Close this socket
                 } else {
                     // We've read all the data; echo it back to the client
-                    printf ("About to write %s to the socket...\n", p->r_ptr);
+                    if (DEBUG) 
+                        printf ("About to write %s to the socket...\n", p->r_ptr);
                     bytesWritten = write (events[i].data.fd, p->r_ptr, 
                             sizeof (p->r_ptr));
                     if (bytesWritten < sizeof (p->r_ptr)) {
