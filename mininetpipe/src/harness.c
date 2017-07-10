@@ -139,29 +139,18 @@ main (int argc, char **argv)
 
     /* Get throughput measurements */
     uint64_t counter = 0;
-    //char sbuf[] = "hello, world!\n";
-    //char rbuf[16];
-    //int nsent, nrecvd;
 
     if (args.tr) {
         // Send some huge number of packets
         printf ("Getting ready to send data...\n");
         while (1) {
-            //nsent = write (args.commfd, sbuf, 16);
-            //nrecvd = read (args.commfd, rbuf, 16);
-            SendData (&args);
-            RecvData (&args);
+            SimpleWrite (&args);
             counter++;
             if (counter % 1000 == 0) {
                 printf ("Just sent packet %" PRIu64 "\n", counter);
             }
         }
     } else if (args.rcv) {
-        // Give clients time to ramp up send rate/stabilize
-        Echo (&args, 5, &counter, &duration);
-
-        // Start counting packets for EXPDURATION seconds
-        printf ("Starting counting packets for throughput...\n");
         Echo (&args, 5, &counter, &duration);
 
         printf ("Received %" PRIu64 " packets in %f seconds\n", counter, duration);

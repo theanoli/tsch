@@ -303,22 +303,34 @@ RecvData (ArgStruct *p)
 void
 Echo (ArgStruct *p, int expduration, uint64_t *counter_p, double *duration_p)
 {
-    // Loop through for EXPDURATION seconds and count each packet you send out
-    double t0, duration;
+    // Loop through for expduration seconds and count each packet you send out
+    // Start counting packets after a few seconds to stabilize connection(s)
+    double tnull, t0, duration;
     int n, i, done;
     struct epoll_event events[MAXEVENTS];
+    int countstart = 0;
 
     *counter_p = 0;
 
-    t0 = When ();
-    while ((duration = When () - t0) < EXPDURATION) {
-        n = epoll_wait (ep, events, MAXEVENTS, EXPDURATION * 1000);
+    t0 = 0;  // Silence compiler
+    tnull = When ();
+    // Add a two-second delay to let the clients stabilize
+    while ((duration = When () - tnull) < expduration + 2) {
+        n = epoll_wait (ep, events, MAXEVENTS, expduration * 1000);
+
         if (n < 0) {
             perror ("epoll_wait");
             exit (1);
         }
+        
         if (DEBUG)
             printf ("Got %d events\n", n);
+
+        // If we've passed the warm-up period, start the counter
+        if ((duration > 2) && (countstart == 0)) {
+            countstart = 1; 
+            t0 = When ();
+        }
 
         for (i = 0; i < n; i++) {
             // Check for errors
@@ -329,6 +341,7 @@ Echo (ArgStruct *p, int expduration, uint64_t *counter_p, double *duration_p)
                 close (events[i].data.fd);
                 continue;
             } else if (events[i].data.fd == p->servicefd) {
+                // Someone is trying to connect; ignore
                 continue;
             } else {
                 // There's data to be read
@@ -358,7 +371,10 @@ Echo (ArgStruct *p, int expduration, uint64_t *counter_p, double *duration_p)
                         // TODO treat this as an error or not?
                         printf ("Some echoed bytes didn't make it!\n");
                     }
-                    (*counter_p)++;
+                   
+                    if (countstart) {
+                        (*counter_p)++;
+                    } 
                     memset (p->r_ptr, 0, PSIZE - 1);
                 }
 
@@ -369,7 +385,35 @@ Echo (ArgStruct *p, int expduration, uint64_t *counter_p, double *duration_p)
         }
     }
 
-    *duration_p = duration;
+    *duration_p = When () - t0;
+}
+
+
+void
+SimpleWrite (ArgStruct *p)
+{
+    // Client-side; send as much as possible to the server
+    // We shouldn't need to do epoll on the client side, since we only
+    // want one connection to the server per client program
+    
+    char buffer[PSIZE];
+    int n;
+
+    snprintf (buffer, PSIZE, "%s", "hello, world!");
+
+    n = write (p->commfd, buffer, PSIZE);
+    if (n < 0) {
+        perror ("write to server");
+        exit (1);
+    }
+
+    memset (buffer, 0, PSIZE);
+
+    n = read (p->commfd, buffer, PSIZE);
+    if (n < 0) {
+        perror ("read from server");
+        exit (1);
+    }
 }
 
 
@@ -382,6 +426,7 @@ ThroughputSetup (ArgStruct *p)
     struct hostent *addr;
     struct protoent *proto;
     int socket_family = AF_INET;
+    int flags;
 
     printf ("*** Setting up connection(s)... ***\n");
 
@@ -395,8 +440,12 @@ ThroughputSetup (ArgStruct *p)
     
     ep = epoll_create (NEVENTS);
 
+    flags = SOCK_STREAM;
+    if (p->rcv) {
+        flags |= SOCK_NONBLOCK;
+    } 
     printf ("\tCreating socket...\n");
-    if ((sockfd = socket (socket_family, SOCK_STREAM | SOCK_NONBLOCK, 0)) < 0) {
+    if ((sockfd = socket (socket_family, flags, 0)) < 0) {
         printf ("tester: can't open stream socket!\n");
         exit (-4);
     }
@@ -487,7 +536,6 @@ throughput_establish (ArgStruct *p)
             }
 
             for (i = 0; i < nevents; i++) {
-                printf ("\tChecking event %d of %d\n", i, nevents);
                 if (events[i].data.fd == p->servicefd) {
                     while (1) {
                         printf ("\tPossible incoming connection!\n");
@@ -537,9 +585,10 @@ throughput_establish (ArgStruct *p)
                         int nread;
                         char buf[128];
 
-                        nread = read (events[i].data.fd, buf, 128);
-                        nread = write (events[i].data.fd, buf, sizeof (buf));
-                        printf ("Ignoring %d bytes\n", nread);
+                        nread = read (events[i].data.fd, buf, PSIZE);
+                        nread = write (events[i].data.fd, buf, PSIZE);
+                        if (nread) {
+                        }
                     }
                 } 
             }
