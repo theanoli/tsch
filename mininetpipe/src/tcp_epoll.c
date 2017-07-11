@@ -148,6 +148,7 @@ Setup (ArgStruct *p)
     struct hostent *addr;
     struct protoent *proto;
     int socket_family = AF_INET;
+    int flags;
 
     host = p->host;
 
@@ -159,7 +160,11 @@ Setup (ArgStruct *p)
 
     ep = epoll_create (NEVENTS);
 
-    if ((sockfd = socket (socket_family, SOCK_STREAM | SOCK_NONBLOCK, 0)) < 0) {
+    flags = SOCK_STREAM;
+    if (p->rcv) {
+        flags |= SOCK_NONBLOCK;
+    }
+    if ((sockfd = socket (socket_family, flags, 0)) < 0) {
         printf ("tester: can't open stream socket!\n");
         exit (-4);
     }
@@ -200,6 +205,45 @@ Setup (ArgStruct *p)
     }
 
     establish (p);
+}
+
+
+char *TimestampWrite (ArgStruct *p)
+{
+    // Send and receive an echoed timestamp
+    char pbuffer[PSIZE];  // for packets
+    char *dbuffer;  // for data, to pass up to harness
+    int n;
+    struct timespec sendtime, recvtime;
+
+    sendtime = When2 ();
+    snprintf (pbuffer, PSIZE, "%lld,%.9ld%-31s",
+            (long long) sendtime.tv_sec, sendtime.tv_nsec, ",");
+    n = write (p->commfd, pbuffer, PSIZE - 1);
+    if (n < 0) {
+        perror ("write");
+        exit (1);
+    }
+
+    memset (pbuffer, 0, PSIZE);
+    
+    n = read (p->commfd, pbuffer, PSIZE);
+    if (n < 0) {
+        perror ("read");
+        exit (1);
+    }
+    recvtime = When2 ();        
+
+    dbuffer = malloc (PSIZE * 2);
+    if (dbuffer == NULL) {
+        printf ("Malloc error!\n");
+        exit (1);
+    }
+
+    snprintf (dbuffer, PSIZE, "%s", pbuffer);
+    snprintf (dbuffer + PSIZE - 1, PSIZE, "%lld,%.9ld\n", 
+            (long long) recvtime.tv_sec, recvtime.tv_nsec);
+    return dbuffer;
 }
 
 

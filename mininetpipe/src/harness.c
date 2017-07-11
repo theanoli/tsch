@@ -113,8 +113,7 @@ main (int argc, char **argv)
         t0 = When ();
         if (args.tr) {
             for (n = 0; n < nrtts; n++) {
-                SendData (&args);
-                timing = RecvData (&args);
+                timing = TimestampWrite (&args); 
 
                 if ((strlen (timing) > 0) && (n > 1)) {
                    fwrite (timing, strlen (timing), 1, out);

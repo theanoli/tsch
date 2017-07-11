@@ -108,6 +108,8 @@ char *RecvData(ArgStruct *p);
 
 void SimpleWrite (ArgStruct *p);
 
+char *TimestampWrite (ArgStruct *p);
+
 void Echo (ArgStruct *p, int expduration, uint64_t *counter_p, double *duration_p);
 
 void SendTime(ArgStruct *p, double *t);
