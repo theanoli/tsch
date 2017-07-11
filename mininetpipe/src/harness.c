@@ -20,16 +20,16 @@ main (int argc, char **argv)
     int default_out;    /* bool; use default outfile? */
     int nrtts;
     int sleep_interval; /* How long to sleep b/t latency pings (usec) */
-    int latency;        /* Either do latency (1) or throughput (0) */
     double duration;
 
     int c;
 
     /* Initialize vars that may change from default due to arguments */
-    latency = 1;  // Default to do latency; this is arbitrary
     default_out = 1;
     sleep_interval = 0;
     nrtts = NRTTS;
+    args.latency = 1;  // Default to do latency; this is arbitrary
+    args.expduration = 5;
 
     signal (SIGINT, SignalHandler);
 
@@ -66,7 +66,7 @@ main (int argc, char **argv)
             case 's': sleep_interval = atoi (optarg);
                       break;
 
-            case 't': latency = 0;
+            case 't': args.latency = 0;
                       break;
 
             case 'h': PrintUsage ();
@@ -90,7 +90,7 @@ main (int argc, char **argv)
     Init (&args, &argc, &argv);   /* This will set args.tr and args.rcv */
 
     /* FOR LATENCY */
-    if (latency) {
+    if (args.latency) {
         Setup (&args);
 
         if (args.tr) {
@@ -133,8 +133,7 @@ main (int argc, char **argv)
 
         } else if (args.rcv) {
             while (1) {
-                RecvData (&args);
-                SendData (&args);
+                Echo (&args);
             }
         }
 
@@ -143,11 +142,12 @@ main (int argc, char **argv)
         ThroughputSetup (&args);
 
         // Get throughput measurements
-        uint64_t counter = 0;
 
         if (args.tr) {
             // Send some huge number of packets
             printf ("Getting ready to send data...\n");
+            uint64_t counter = 0;
+            
             while (1) {
                 SimpleWrite (&args);
                 counter++;
@@ -156,10 +156,11 @@ main (int argc, char **argv)
                 }
             }
         } else if (args.rcv) {
-            Echo (&args, 5, &counter, &duration);
+            Echo (&args);
 
-            printf ("Received %" PRIu64 " packets in %f seconds\n", counter, duration);
-            printf ("Throughput is %f pps\n", counter/duration);
+            printf ("Received %" PRIu64 " packets in %f seconds\n", 
+                    args.counter, args.duration);
+            printf ("Throughput is %f pps\n", args.counter/args.duration);
         }
     }
 

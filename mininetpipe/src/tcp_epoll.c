@@ -48,78 +48,6 @@ tcp_accept_helper (int sockid, struct sockaddr *addr, socklen_t *addrlen)
 }
 
 
-int
-tcp_read_helper (int sockid, char *buf, int len)
-{
-    int nevents, i;
-    struct epoll_event events[NEVENTS];
-    struct epoll_event event;
-
-    event.events = EPOLLIN;
-    event.data.fd = sockid;
-    if (epoll_ctl (ep, EPOLL_CTL_ADD, sockid, &event) == -1) {
-        perror ("epoll_ctl 2");
-        exit (1);
-    }
-
-    while (1) {
-        nevents = epoll_wait (ep, events, NEVENTS, -1);
-        if (nevents < 0) {
-            if (errno != EINTR) {
-                perror ("epoll_wait");
-            }
-            exit (1);
-        }
-
-        for (i = 0; i < nevents; i++) {
-            if (events[i].data.fd == sockid) {
-                epoll_ctl (ep, EPOLL_CTL_DEL, sockid, NULL);
-                return read (sockid, buf, len);
-            } else {
-                printf ("Socket error!\n");
-                exit (1);
-            }
-        }
-    }
-}
-        
-
-int
-tcp_write_helper (int sockid, char *buf, int len)
-{
-    int nevents, i;
-    struct epoll_event events[NEVENTS];
-    struct epoll_event event;
-
-    event.events = EPOLLOUT;
-    event.data.fd = sockid;
-    if (epoll_ctl (ep, EPOLL_CTL_ADD, sockid, &event) == -1) {
-        perror ("epoll_ctl 3");
-        exit (1);
-    }
-
-    while (1) {
-        nevents = epoll_wait (ep, events, NEVENTS, -1);
-        if (nevents < 0) {
-            if (errno != EINTR) {
-                perror ("epoll_wait");
-            }
-            exit (1);
-        }
-
-        for (i = 0; i < nevents; i++) {
-            if (events[i].data.fd == sockid) {
-                epoll_ctl (ep, EPOLL_CTL_DEL, sockid, NULL);
-                return write (sockid, buf, len);
-            } else {
-                printf ("Socket error!\n");
-                exit (1);
-            }
-        }
-    }
-}
-
-
 void
 Init (ArgStruct *p, int *pargc, char ***pargv)
 {
@@ -248,104 +176,7 @@ char *TimestampWrite (ArgStruct *p)
 
 
 void
-SendData (ArgStruct *p)
-{
-    int bytesWritten, bytesLeft;
-    char *q;
-    struct timespec sendtime;  // this wil get ping-ponged to measure latency
-
-    // We're going to assume here that entire msg gets through in one go
-    // But keep this check just in case we need it later
-    bytesWritten = 0;
-
-    if (p->tr) {
-        // Transmitter (client) should send timestamp
-        sendtime = When2 ();
-        snprintf (p->s_ptr, PSIZE, "%lld,%.9ld%-31s", 
-                (long long) sendtime.tv_sec, sendtime.tv_nsec, ",");
-        q = p->s_ptr;
-    } else {
-        // Receiver (server) should just echo back whatever it got
-        q = p->r_ptr;
-    }    
-    p->bufflen = strlen (q);     
-    bytesLeft = p->bufflen;
-
-    while ((bytesLeft > 0) &&
-            ((bytesWritten = tcp_write_helper (p->commfd, q, bytesLeft)) 
-            != 0)) {
-        if (bytesWritten < 0) {
-            if (errno == EAGAIN) {
-                continue;      // not an actual error
-            } else {
-                break;
-            }
-        }
-
-        bytesLeft -= bytesWritten;
-        q += bytesWritten;
-    }
-
-    if (bytesWritten < 0) {
-        printf ("tester: write: error encountered, errno=%d\n", errno);
-        exit (401);
-    }
-}
-
-
-char *
-RecvData (ArgStruct *p)
-{
-    int bytesLeft;
-    int bytesRead;
-    char *q;
-    char *buf;
-
-    bytesRead = 0;
-    q = p->r_ptr;
-    bytesLeft = PSIZE - 1;
-
-    while ((bytesLeft > 0) &&
-        ((bytesRead = tcp_read_helper (p->commfd, q, bytesLeft)) != 0)) {
-        if (bytesRead < 0) {
-            if (errno == EAGAIN) {
-                continue;
-            } else {
-                break;
-            }
-        }
-        
-        bytesLeft -= bytesRead;
-        q += bytesRead;
-    }
-
-    if ((bytesLeft > 0) && (bytesRead == 0)) {
-        printf ("tester: EOF encountered on reading from socket\n");
-    } else if (bytesRead == -1) {
-        printf ("tester: read: error encountered, errno=%d\n", errno);
-        exit (401);
-    }
-    
-    if (p->tr) {
-        struct timespec recvtime = When2 ();        
-        buf = malloc (PSIZE * 2);
-        if (buf == NULL) {
-            printf ("Malloc error!\n");
-            exit (1);
-        }
-
-        snprintf (buf, PSIZE, "%s", p->r_ptr);
-        snprintf (buf + PSIZE - 1, PSIZE, "%lld,%.9ld\n", 
-                (long long) recvtime.tv_sec, recvtime.tv_nsec);
-        return buf;
-    } else {
-        return NULL;
-    }
-}
-
-
-void
-Echo (ArgStruct *p, int expduration, uint64_t *counter_p, double *duration_p)
+Echo (ArgStruct *p)
 {
     // Loop through for expduration seconds and count each packet you send out
     // Start counting packets after a few seconds to stabilize connection(s)
@@ -354,13 +185,15 @@ Echo (ArgStruct *p, int expduration, uint64_t *counter_p, double *duration_p)
     struct epoll_event events[MAXEVENTS];
     int countstart = 0;
 
-    *counter_p = 0;
+    p->counter = 0;
 
     t0 = 0;  // Silence compiler
     tnull = When ();
+
     // Add a two-second delay to let the clients stabilize
-    while ((duration = When () - tnull) < expduration + 2) {
-        n = epoll_wait (ep, events, MAXEVENTS, expduration * 1000);
+    while ((duration = When () - tnull) < (p->expduration + 2)) {
+        printf ("duration: %f, tnull %f, expduration %d\n", duration, tnull, p->expduration + 2);
+        n = epoll_wait (ep, events, MAXEVENTS, p->expduration * 1000);
 
         if (n < 0) {
             perror ("epoll_wait");
@@ -417,7 +250,7 @@ Echo (ArgStruct *p, int expduration, uint64_t *counter_p, double *duration_p)
                     }
                    
                     if (countstart) {
-                        (*counter_p)++;
+                        (p->counter)++;
                     } 
                     memset (p->r_ptr, 0, PSIZE - 1);
                 }
@@ -429,7 +262,7 @@ Echo (ArgStruct *p, int expduration, uint64_t *counter_p, double *duration_p)
         }
     }
 
-    *duration_p = When () - t0;
+    p->duration = When () - t0;
 }
 
 
@@ -731,6 +564,80 @@ setsock_nonblock (int fd)
 
     return 0;
 }
+
+
+/* Obsolete functions? */
+int
+tcp_read_helper (int sockid, char *buf, int len)
+{
+    int nevents, i;
+    struct epoll_event events[NEVENTS];
+    struct epoll_event event;
+
+    event.events = EPOLLIN;
+    event.data.fd = sockid;
+    if (epoll_ctl (ep, EPOLL_CTL_ADD, sockid, &event) == -1) {
+        perror ("epoll_ctl 2");
+        exit (1);
+    }
+
+    while (1) {
+        nevents = epoll_wait (ep, events, NEVENTS, -1);
+        if (nevents < 0) {
+            if (errno != EINTR) {
+                perror ("epoll_wait");
+            }
+            exit (1);
+        }
+
+        for (i = 0; i < nevents; i++) {
+            if (events[i].data.fd == sockid) {
+                epoll_ctl (ep, EPOLL_CTL_DEL, sockid, NULL);
+                return read (sockid, buf, len);
+            } else {
+                printf ("Socket error!\n");
+                exit (1);
+            }
+        }
+    }
+}
+        
+
+int
+tcp_write_helper (int sockid, char *buf, int len)
+{
+    int nevents, i;
+    struct epoll_event events[NEVENTS];
+    struct epoll_event event;
+
+    event.events = EPOLLOUT;
+    event.data.fd = sockid;
+    if (epoll_ctl (ep, EPOLL_CTL_ADD, sockid, &event) == -1) {
+        perror ("epoll_ctl 3");
+        exit (1);
+    }
+
+    while (1) {
+        nevents = epoll_wait (ep, events, NEVENTS, -1);
+        if (nevents < 0) {
+            if (errno != EINTR) {
+                perror ("epoll_wait");
+            }
+            exit (1);
+        }
+
+        for (i = 0; i < nevents; i++) {
+            if (events[i].data.fd == sockid) {
+                epoll_ctl (ep, EPOLL_CTL_DEL, sockid, NULL);
+                return write (sockid, buf, len);
+            } else {
+                printf ("Socket error!\n");
+                exit (1);
+            }
+        }
+    }
+}
+
 
 
 /* Dummy functions -----------------------------------------------------------*/

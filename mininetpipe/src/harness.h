@@ -63,10 +63,12 @@ struct argstruct
     int     source_node;   /* Set to -1 (MPI_ANY_SOURCE) if -z specified    */
     int     reset_conn;    /* Reset connection flag                         */
 
-    // for latency measurements
-    char    *rtt_buf;       /* Buffer for each RTT measurement */
-    int     next_write;     /* Where to write the next message */
-    time_t  last_writetime; /* Last time buffer was dumped to file */
+    int     latency;        /* Measure latency (1) or throughput (0)        */
+
+    // for throughput measurements
+    int     expduration;    /* How long to count packets                    */
+    uint64_t counter;       /* For counting packets!                        */
+    double  duration;       /* Measured time over which packets are blasted */
 
     /* Now we work with a union of information for protocol dependent stuff  */
     ProtocolStruct prot;
@@ -110,7 +112,7 @@ void SimpleWrite (ArgStruct *p);
 
 char *TimestampWrite (ArgStruct *p);
 
-void Echo (ArgStruct *p, int expduration, uint64_t *counter_p, double *duration_p);
+void Echo (ArgStruct *p);
 
 void SendTime(ArgStruct *p, double *t);
 
