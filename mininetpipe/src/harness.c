@@ -132,9 +132,7 @@ main (int argc, char **argv)
             printf ("Printed results to file %s\n", s);
 
         } else if (args.rcv) {
-            while (1) {
-                Echo (&args);
-            }
+            Echo (&args);
         }
 
     } else {
