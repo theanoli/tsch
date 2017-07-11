@@ -20,11 +20,13 @@ main (int argc, char **argv)
     int default_out;    /* bool; use default outfile? */
     int nrtts;
     int sleep_interval; /* How long to sleep b/t latency pings (usec) */
+    int latency;        /* Either do latency (1) or throughput (0) */
     double duration;
 
     int c;
 
     /* Initialize vars that may change from default due to arguments */
+    latency = 1;  // Default to do latency; this is arbitrary
     default_out = 1;
     sleep_interval = 0;
     nrtts = NRTTS;
@@ -64,6 +66,9 @@ main (int argc, char **argv)
             case 's': sleep_interval = atoi (optarg);
                       break;
 
+            case 't': latency = 0;
+                      break;
+
             case 'h': PrintUsage ();
                       exit (0);
 
@@ -85,76 +90,78 @@ main (int argc, char **argv)
     Init (&args, &argc, &argv);   /* This will set args.tr and args.rcv */
 
     /* FOR LATENCY */
-    // Setup (&args);
+    if (latency) {
+        Setup (&args);
 
-    // if (args.tr) {
-    //     if ((out = fopen (s, "wb")) == NULL) {
-    //         fprintf (stderr,"Can't open %s for output\n", s);
-    //         exit (1);
-    //     }
-    // } else {
-    //     out = stdout;
-    // }
- 
-    /* Get some number of latency measurements */
-    // printf ("Collecting %d latency measurements to file %s.\n", nrtts, s);
+        if (args.tr) {
+            if ((out = fopen (s, "wb")) == NULL) {
+                fprintf (stderr,"Can't open %s for output\n", s);
+                exit (1);
+            }
+        } else {
+            out = stdout;
+        }
+     
+        // Get some number of latency measurements
+        printf ("Collecting %d latency measurements to file %s.\n", nrtts, s);
 
-    // char *timing;
-    // int n;
-    // double rtt;
-    // double t0;
-    //
-    // t0 = When ();
-    // if (args.tr) {
-    //     for (n = 0; n < nrtts; n++) {
-    //         SendData (&args);
-    //         timing = RecvData (&args);
+        char *timing;
+        int n;
+        double rtt;
+        double t0;
+        
+        t0 = When ();
+        if (args.tr) {
+            for (n = 0; n < nrtts; n++) {
+                SendData (&args);
+                timing = RecvData (&args);
 
-    //         if ((strlen (timing) > 0) && (n > 1)) {
-    //            fwrite (timing, strlen (timing), 1, out);
-    //         }
-    //         usleep (sleep_interval);
-    //     }
+                if ((strlen (timing) > 0) && (n > 1)) {
+                   fwrite (timing, strlen (timing), 1, out);
+                }
+                usleep (sleep_interval);
+            }
 
-    //     duration = When () - t0;
-    //     rtt = duration/nrtts;
-    //     
-    //     // Note these are inflated by the I/O done to record individual
-    //     // packet RTTs
-    //     printf ("\n");
-    //     printf ("Average RTT: %f\n", rtt);
-    //     printf ("Experiment duration: %f\n", duration);
-    //     printf ("Printed results to file %s\n", s);
+            duration = When () - t0;
+            rtt = duration/nrtts;
+            
+            // Note these are inflated by the I/O done to record individual
+            // packet RTTs
+            printf ("\n");
+            printf ("Average RTT: %f\n", rtt);
+            printf ("Experiment duration: %f\n", duration);
+            printf ("Printed results to file %s\n", s);
 
-    // } else if (args.rcv) {
-    //     while (1) {
-    //         RecvData (&args);
-    //         SendData (&args);
-    //     }
-    // }
-
-    /* FOR THROUGHPUT */
-    /* Do setup */
-    ThroughputSetup (&args);
-
-    /* Get throughput measurements */
-    uint64_t counter = 0;
-
-    if (args.tr) {
-        // Send some huge number of packets
-        printf ("Getting ready to send data...\n");
-        while (1) {
-            SimpleWrite (&args);
-            counter++;
-            if (counter % 1000 == 0) {
-                printf ("Just sent packet %" PRIu64 "\n", counter);
+        } else if (args.rcv) {
+            while (1) {
+                RecvData (&args);
+                SendData (&args);
             }
         }
-    } else if (args.rcv) {
-        Echo (&args, 5, &counter, &duration);
 
-        printf ("Received %" PRIu64 " packets in %f seconds\n", counter, duration);
-        printf ("Throughput is %f pps\n", counter/duration);
+    } else {
+        /* FOR THROUGHPUT */
+        ThroughputSetup (&args);
+
+        // Get throughput measurements
+        uint64_t counter = 0;
+
+        if (args.tr) {
+            // Send some huge number of packets
+            printf ("Getting ready to send data...\n");
+            while (1) {
+                SimpleWrite (&args);
+                counter++;
+                if (counter % 1000 == 0) {
+                    printf ("Just sent packet %" PRIu64 "\n", counter);
+                }
+            }
+        } else if (args.rcv) {
+            Echo (&args, 5, &counter, &duration);
+
+            printf ("Received %" PRIu64 " packets in %f seconds\n", counter, duration);
+            printf ("Throughput is %f pps\n", counter/duration);
+        }
     }
 
     ExitStrategy ();
@@ -178,6 +185,7 @@ PrintUsage (void)
     printf ("\t-P\t(client AND server) port number, default 8000\n");
     printf ("\t-s\tsleeptime for throttling client send rate\n"
             "(default 0)\n");
+    printf ("\t-t\tmeasure throughput (default latency)\n");
     printf ("\t-h\t(client or server) print usage\n");
     printf ("\n");
     exit (0);
