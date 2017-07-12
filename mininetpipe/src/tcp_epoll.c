@@ -136,6 +136,34 @@ Setup (ArgStruct *p)
 }
 
 
+void
+SimpleWrite (ArgStruct *p)
+{
+    // Client-side; send as much as possible to the server
+    // We shouldn't need to do epoll on the client side, since we only
+    // want one connection to the server per client program
+    
+    char buffer[PSIZE];
+    int n;
+
+    snprintf (buffer, PSIZE, "%s", "hello, world!");
+
+    n = write (p->commfd, buffer, PSIZE);
+    if (n < 0) {
+        perror ("write to server");
+        exit (1);
+    }
+
+    memset (buffer, 0, PSIZE);
+
+    n = read (p->commfd, buffer, PSIZE);
+    if (n < 0) {
+        perror ("read from server");
+        exit (1);
+    }
+}
+
+
 char *TimestampWrite (ArgStruct *p)
 {
     // Send and receive an echoed timestamp
@@ -185,6 +213,24 @@ Echo (ArgStruct *p)
     struct epoll_event events[MAXEVENTS];
     int countstart = 0;
 
+    if (p->latency) {
+        // We only have one client; add it to the events list
+        struct epoll_event event;
+
+        if (setsock_nonblock (p->commfd) < 0) {
+            printf ("Error setting socket to non-blocking!\n");
+            exit (1);
+        }
+        
+        event.events = EPOLLIN | EPOLLET;
+        event.data.fd = p->commfd;
+
+        if (epoll_ctl (ep, EPOLL_CTL_ADD, p->commfd, &event) == -1) {
+            perror ("epoll_ctl");
+            exit (1);
+        }
+    }
+
     p->counter = 0;
 
     t0 = 0;  // Silence compiler
@@ -215,25 +261,28 @@ Echo (ArgStruct *p)
                     !(events[i].events & EPOLLIN)) {
                 printf ("epoll error!\n");
                 close (events[i].data.fd);
-                continue;
+                if (p->latency) {
+                    exit (1);
+                } else {
+                    continue;
+                }
             } else if (events[i].data.fd == p->servicefd) {
                 // Someone is trying to connect; ignore
                 continue;
             } else {
                 // There's data to be read
                 done = 0;
-                int bytesRead, bytesWritten;
+                int n;
                 char *q;
 
-                bytesRead = 0;
                 q = p->r_ptr;
 
-                while ((bytesRead = read (events[i].data.fd, q, PSIZE - 1)) > 0) {
-                    q += bytesRead;
+                while ((n = read (events[i].data.fd, q, PSIZE - 1)) > 0) {
+                    q += n;
                 }
                 
                 if (errno != EAGAIN) {
-                    if (bytesRead < 0) {
+                    if (n < 0) {
                         perror ("server read");
                     }
                     done = 1;  // Close this socket
@@ -241,9 +290,9 @@ Echo (ArgStruct *p)
                     // We've read all the data; echo it back to the client
                     if (DEBUG) 
                         printf ("About to write %s to the socket...\n", p->r_ptr);
-                    bytesWritten = write (events[i].data.fd, p->r_ptr, 
+                    n = write (events[i].data.fd, p->r_ptr, 
                             sizeof (p->r_ptr));
-                    if (bytesWritten < sizeof (p->r_ptr)) {
+                    if (n < sizeof (p->r_ptr)) {
                         // TODO treat this as an error or not?
                         printf ("Some echoed bytes didn't make it!\n");
                     }
@@ -262,34 +311,6 @@ Echo (ArgStruct *p)
     }
 
     p->duration = When () - t0;
-}
-
-
-void
-SimpleWrite (ArgStruct *p)
-{
-    // Client-side; send as much as possible to the server
-    // We shouldn't need to do epoll on the client side, since we only
-    // want one connection to the server per client program
-    
-    char buffer[PSIZE];
-    int n;
-
-    snprintf (buffer, PSIZE, "%s", "hello, world!");
-
-    n = write (p->commfd, buffer, PSIZE);
-    if (n < 0) {
-        perror ("write to server");
-        exit (1);
-    }
-
-    memset (buffer, 0, PSIZE);
-
-    n = read (p->commfd, buffer, PSIZE);
-    if (n < 0) {
-        perror ("read from server");
-        exit (1);
-    }
 }
 
 
@@ -363,6 +384,7 @@ ThroughputSetup (ArgStruct *p)
 
     throughput_establish (p);    
 }
+
 
 void
 throughput_establish (ArgStruct *p)
