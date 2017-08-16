@@ -12,8 +12,6 @@ expname=${file%*.*}
 echo "Converting raw data to microseconds..."
 octave convert_raw_to_usec.oct $expname
 
-tail -n +6 $expname.dat > $expname.tmp && mv $expname.tmp $expname.dat
-
 echo "Generating deltas..."
 octave generate_deltas.oct $expname
 
@@ -21,6 +19,6 @@ octave generate_deltas.oct $expname
 echo $expname
 
 echo "Gnuplotting..."
-gnuplot -e "expname='$expname'; bin_width=5" plot_intersend_time.p
+gnuplot -e "expname='$expname'; bin_width=0.1" plot_intersend_time.p
 eog $expname"_intersend.png"
 
