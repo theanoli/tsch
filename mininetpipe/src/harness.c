@@ -20,7 +20,7 @@ main (int argc, char **argv)
     int default_out;    /* bool; use default outfile? */
     int nrtts;
     int sleep_interval; /* How long to sleep b/t latency pings (usec) */
-    double duration;
+    // double duration;
 
     int c;
 
@@ -29,7 +29,7 @@ main (int argc, char **argv)
     sleep_interval = 0;
     nrtts = NRTTS;
     args.latency = 1;  // Default to do latency; this is arbitrary
-    args.expduration = 1000;
+    args.expduration = 1000;  // Some big number for latency, don't care  
 
     signal (SIGINT, SignalHandler);
 
@@ -41,7 +41,7 @@ main (int argc, char **argv)
     args.rcv = 1;
 
     /* Parse the arguments. See Usage for description */
-    while ((c = getopt (argc, argv, "o:H:r:P:s:h")) != -1)
+    while ((c = getopt (argc, argv, "o:H:r:P:s:th")) != -1)
     {
         switch (c)
         {
@@ -79,19 +79,21 @@ main (int argc, char **argv)
        }
     }
     
-    if (default_out) {
-        int exp_timestamp;
-        exp_timestamp = (int) time (0);
-        snprintf (s, 255, "results/%s-%d-r%d-s%d.out", whichproto,
-                exp_timestamp, nrtts, sleep_interval);
-    }
-
     /* Let modules initialize related vars, and possibly call a library init
        function that requires argc and argv */
     Init (&args, &argc, &argv);   /* This will set args.tr and args.rcv */
 
     /* FOR LATENCY */
     if (args.latency) {
+
+        // Use default filename construction for results
+        if (default_out) {
+            int exp_timestamp;
+            exp_timestamp = (int) time (0);
+            snprintf (s, 255, "results/%s-%d-r%d-s%d.out", whichproto,
+                    exp_timestamp, nrtts, sleep_interval);
+        }
+
         Setup (&args);
 
         if (args.tr) {
@@ -104,32 +106,36 @@ main (int argc, char **argv)
         }
      
         // Get some number of latency measurements
-        printf ("Collecting %d latency measurements to file %s.\n", nrtts, s);
+        printf ("Collecting latency measurements to file %s.\n", s);
 
-        char *timing;
         int n;
         double rtt;
         double t0;
         
-        t0 = When ();
         if (args.tr) {
-            for (n = 0; n < nrtts; n++) {
-                timing = TimestampWrite (&args); 
-
-                if ((strlen (timing) > 0) && (n > 1)) {
-                   fwrite (timing, strlen (timing), 1, out);
-                }
+            // Warm up
+            for (n = 0; n < (nrtts / 4); n++) {
+                SimpleWrite (&args);
                 usleep (sleep_interval);
             }
 
-            duration = When () - t0;
-            rtt = duration/nrtts;
-            
+            // Take measurements
+            t0 = When ();
+            for (n = 0; n < nrtts; n++) {
+                TimestampWrite (&args); 
+                fwrite (args.lbuff, strlen (args.lbuff), 1, out);
+                usleep (sleep_interval);
+            }
+
+            args.duration = When () - t0;
+            rtt = args.duration/nrtts;
+
             // Note these are inflated by the I/O done to record individual
             // packet RTTs
             printf ("\n");
             printf ("Average RTT: %f\n", rtt);
-            printf ("Experiment duration: %f\n", duration);
+            printf ("Experiment duration: %f for %d packets\n", 
+                    args.duration, nrtts);
             printf ("Printed results to file %s\n", s);
 
         } else if (args.rcv) {
@@ -141,18 +147,13 @@ main (int argc, char **argv)
         ThroughputSetup (&args);
 
         // Get throughput measurements
-
         if (args.tr) {
             // Send some huge number of packets
-            printf ("Getting ready to send data...\n");
             uint64_t counter = 0;
             
             while (1) {
                 SimpleWrite (&args);
                 counter++;
-                if (counter % 1000 == 0) {
-                    printf ("Just sent packet %" PRIu64 "\n", counter);
-                }
             }
         } else if (args.rcv) {
             Echo (&args);

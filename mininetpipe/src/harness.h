@@ -52,9 +52,6 @@ struct argstruct
     short   port;          /* Port used for connection                      */
 
     char    *r_ptr;        /* Pointer to current location in receive buffer    */
-    char    *r_ptr_saved;  /* Pointer for saving value of r_ptr             */
-    char    *s_buff;       /* Aligned send buffer                           */
-    char    *s_buff_orig;  /* Original unaligned send buffer                */
     char    *s_ptr;        /* Pointer to current location in send buffer    */
 
     int     bufflen,       /* Length of transmitted buffer                  */
@@ -64,6 +61,7 @@ struct argstruct
     int     reset_conn;    /* Reset connection flag                         */
 
     int     latency;        /* Measure latency (1) or throughput (0)        */
+    char    *lbuff;          /* For saving latency measurements */
 
     // for throughput measurements
     int     expduration;    /* How long to count packets                    */
@@ -110,7 +108,7 @@ char *RecvData(ArgStruct *p);
 
 void SimpleWrite (ArgStruct *p);
 
-char *TimestampWrite (ArgStruct *p);
+void TimestampWrite (ArgStruct *p);
 
 void Echo (ArgStruct *p);
 

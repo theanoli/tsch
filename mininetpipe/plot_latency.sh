@@ -8,6 +8,7 @@ echo $file
 # Remove file extension from filename
 expname=${file%*.*}
 
+echo "Converting raw data to microseconds..."
 octave convert_raw_to_usec.oct $expname
 
 echo $expname

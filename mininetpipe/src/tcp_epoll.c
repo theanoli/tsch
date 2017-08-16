@@ -54,8 +54,10 @@ Init (ArgStruct *p, int *pargc, char ***pargv)
     // Initialize buffers to put incoming/outgoing data
     p->s_ptr = (char *) malloc (PSIZE);
     p->r_ptr = (char *) malloc (PSIZE);
+    p->lbuff = (char *) malloc (PSIZE * 2);
 
-    if ((p->s_ptr == NULL) || (p->r_ptr == NULL)) {
+    if ((p->s_ptr == NULL) || (p->r_ptr == NULL) 
+            || (p->lbuff == NULL)) {
         printf ("Malloc error!\n");
         exit (1);
     }
@@ -139,8 +141,9 @@ Setup (ArgStruct *p)
 void
 SimpleWrite (ArgStruct *p)
 {
-    // Client-side; send as much as possible to the server
-    // We shouldn't need to do epoll on the client side, since we only
+    // Client-side; send as much as possible to the server,
+    // then receive data (and throw it away on function exit).
+    // We shouldn't do epoll on the client side, since we only
     // want one connection to the server per client program
     
     char buffer[PSIZE];
@@ -164,22 +167,27 @@ SimpleWrite (ArgStruct *p)
 }
 
 
-char *TimestampWrite (ArgStruct *p)
+void TimestampWrite (ArgStruct *p)
 {
-    // Send and receive an echoed timestamp
+    // Send and then receive an echoed timestamp.
+    // Return a pointer to the stored timestamp. 
+
     char pbuffer[PSIZE];  // for packets
-    char *dbuffer;  // for data, to pass up to harness
     int n;
     struct timespec sendtime, recvtime;
 
     sendtime = When2 ();
     snprintf (pbuffer, PSIZE, "%lld,%.9ld%-31s",
             (long long) sendtime.tv_sec, sendtime.tv_nsec, ",");
+
     n = write (p->commfd, pbuffer, PSIZE - 1);
     if (n < 0) {
         perror ("write");
         exit (1);
     }
+
+    if (DEBUG)
+        printf ("pbuffer: %s, %d bytes written\n", pbuffer, n);
 
     memset (pbuffer, 0, PSIZE);
     
@@ -190,16 +198,11 @@ char *TimestampWrite (ArgStruct *p)
     }
     recvtime = When2 ();        
 
-    dbuffer = malloc (PSIZE * 2);
-    if (dbuffer == NULL) {
-        printf ("Malloc error!\n");
-        exit (1);
-    }
-
-    snprintf (dbuffer, PSIZE, "%s", pbuffer);
-    snprintf (dbuffer + PSIZE - 1, PSIZE, "%lld,%.9ld\n", 
+    if (DEBUG)
+        printf ("Got timestamp: %s, %d bytes read\n", pbuffer, n);
+    snprintf (p->lbuff, PSIZE, "%s", pbuffer);
+    snprintf (p->lbuff + PSIZE - 1, PSIZE, "%lld,%.9ld\n", 
             (long long) recvtime.tv_sec, recvtime.tv_nsec);
-    return dbuffer;
 }
 
 
@@ -249,6 +252,7 @@ Echo (ArgStruct *p)
             printf ("Got %d events\n", n);
 
         // If we've passed the warm-up period, start the counter
+        // and the throughput timer
         if ((duration > 2) && (countstart == 0)) {
             countstart = 1; 
             t0 = When ();
@@ -267,7 +271,8 @@ Echo (ArgStruct *p)
                     continue;
                 }
             } else if (events[i].data.fd == p->servicefd) {
-                // Someone is trying to connect; ignore
+                // Someone is trying to connect; ignore. All clients should have
+                // connected already.
                 continue;
             } else {
                 // There's data to be read
@@ -275,6 +280,8 @@ Echo (ArgStruct *p)
                 int n;
                 char *q;
 
+                // This is dangerous because p->r_ptr is only PSIZE bytes long
+                // TODO figure this out
                 q = p->r_ptr;
 
                 while ((n = read (events[i].data.fd, q, PSIZE - 1)) > 0) {
@@ -288,10 +295,12 @@ Echo (ArgStruct *p)
                     done = 1;  // Close this socket
                 } else {
                     // We've read all the data; echo it back to the client
+                    n = write (events[i].data.fd, p->r_ptr, q - p->r_ptr);
+
                     if (DEBUG) 
-                        printf ("About to write %s to the socket...\n", p->r_ptr);
-                    n = write (events[i].data.fd, p->r_ptr, 
-                            sizeof (p->r_ptr));
+                        printf ("Wrote %d bytes of %s to the socket...\n", 
+                                n, p->r_ptr);
+                    
                     if (n < sizeof (p->r_ptr)) {
                         // TODO treat this as an error or not?
                         printf ("Some echoed bytes didn't make it!\n");
@@ -436,7 +445,6 @@ throughput_establish (ArgStruct *p)
             for (i = 0; i < nevents; i++) {
                 if (events[i].data.fd == p->servicefd) {
                     while (1) {
-                        printf ("\tPossible incoming connection!\n");
                         char hostbuf[NI_MAXHOST], portbuf[NI_MAXSERV];
                         
                         p->commfd = accept (p->servicefd, 
@@ -492,6 +500,8 @@ throughput_establish (ArgStruct *p)
             }
         }
     }
+
+    printf ("Setup complete... getting ready to start experiment\n");
 }
 
 
