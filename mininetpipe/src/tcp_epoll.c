@@ -279,31 +279,30 @@ Echo (ArgStruct *p)
             } else {
                 // There's data to be read
                 done = 0;
-                int n;
                 char *q;
 
                 // This is dangerous because p->r_ptr is only PSIZE bytes long
                 // TODO figure this out
                 q = p->r_ptr;
 
-                while ((n = read (events[i].data.fd, q, PSIZE - 1)) > 0) {
-                    q += n;
+                while ((j = read (events[i].data.fd, q, PSIZE - 1)) > 0) {
+                    q += j;
                 }
                 
                 if (errno != EAGAIN) {
-                    if (n < 0) {
+                    if (j < 0) {
                         perror ("server read");
                     }
                     done = 1;  // Close this socket
                 } else {
                     // We've read all the data; echo it back to the client
-                    n = write (events[i].data.fd, p->r_ptr, q - p->r_ptr);
+                    j = write (events[i].data.fd, p->r_ptr, q - p->r_ptr);
 
                     if (DEBUG) 
                         printf ("Wrote %d bytes of %s to the socket...\n", 
-                                n, p->r_ptr);
+                                j, p->r_ptr);
                     
-                    if (n < sizeof (p->r_ptr)) {
+                    if (j < sizeof (q - p->r_ptr)) {
                         // TODO treat this as an error or not?
                         printf ("Some echoed bytes didn't make it!\n");
                     }

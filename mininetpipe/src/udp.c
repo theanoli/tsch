@@ -198,9 +198,11 @@ Echo (ArgStruct *p)
     tnull = When ();
 
     // Wait three seconds to let clients come online
-    printf ("Waiting for clients to start up...\n");
-    while ((duration = When () - tnull) < (3)) {
+    if (!p->latency) {
+        printf ("Waiting for clients to start up...\n");
+        while ((duration = When () - tnull) < (3)) {
 
+        }
     }
 
     // Add a two-second delay to let clients stabilize
@@ -208,10 +210,12 @@ Echo (ArgStruct *p)
     printf ("Assuming all clients have connected...\n");
     while ((duration = When () - tnull) < (p->expduration + 2)) {
 
-        if ((duration > 2) && (countstart == 0)) {
-            printf ("Starting to count packets for throughput...\n");
-            countstart = 1; 
-            t0 = When ();
+        if (!p->latency) {
+            if ((duration > 2) && (countstart == 0)) {
+                printf ("Starting to count packets for throughput...\n");
+                countstart = 1; 
+                t0 = When ();
+            }
         }
 
         int n; 

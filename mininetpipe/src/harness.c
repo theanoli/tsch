@@ -131,7 +131,7 @@ main (int argc, char **argv)
             rtt = args.duration/nrtts;
 
             // Note these are inflated by the I/O done to record individual
-            // packet RTTs
+            // packet RTTs as well as sleep time (if any)
             printf ("\n");
             printf ("Average RTT: %f\n", rtt);
             printf ("Experiment duration: %f for %d packets\n", 
