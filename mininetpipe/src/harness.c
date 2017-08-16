@@ -149,13 +149,13 @@ main (int argc, char **argv)
         // Get throughput measurements
         if (args.tr) {
             // Send some huge number of packets
-            uint64_t counter = 0;
-            
+            printf ("Sending a ton of packets to the server...\n");
             while (1) {
                 SimpleWrite (&args);
-                counter++;
             }
         } else if (args.rcv) {
+            printf ("Getting ready to receive packets...\n");
+
             Echo (&args);
 
             printf ("Received %" PRIu64 " packets in %f seconds\n", 

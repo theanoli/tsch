@@ -93,7 +93,6 @@ Setup (ArgStruct *p)
     }
 
     establish (p);
-
 }
 
 
@@ -198,10 +197,19 @@ Echo (ArgStruct *p)
     t0 = 0;  // Silence compiler
     tnull = When ();
 
+    // Wait three seconds to let clients come online
+    printf ("Waiting for clients to start up...\n");
+    while ((duration = When () - tnull) < (3)) {
+
+    }
+
     // Add a two-second delay to let clients stabilize
+    tnull = When ();  // Restart timer
+    printf ("Assuming all clients have connected...\n");
     while ((duration = When () - tnull) < (p->expduration + 2)) {
 
         if ((duration > 2) && (countstart == 0)) {
+            printf ("Starting to count packets for throughput...\n");
             countstart = 1; 
             t0 = When ();
         }
