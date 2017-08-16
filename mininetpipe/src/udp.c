@@ -1,24 +1,32 @@
 #include "harness.h"
 
+#define DEBUG 0
+
 int doing_reset = 0;
 
 void
 Init (ArgStruct *p, int *pargc, char ***pargv)
 {
     p->reset_conn = 0;
+    
+    p->s_ptr = (char *) malloc (PSIZE);
+    p->r_ptr = (char *) malloc (PSIZE);
+    p->lbuff = (char *) malloc (PSIZE * 2);
+
+    if ((p->s_ptr == NULL) || (p->r_ptr == NULL) 
+            || (p->lbuff == NULL)) {
+        printf ("Malloc error!\n");
+        exit (1);
+    }
+
+    memset (p->s_ptr, 0, PSIZE);
+    memset (p->r_ptr, 0, PSIZE);
+    memset (p->lbuff, 0, PSIZE * 2);
 }
 
 void
 Setup (ArgStruct *p)
 {
-    p->s_ptr = (char *) malloc (PSIZE);
-    p->r_ptr = (char *) malloc (PSIZE);
-
-    if ((p->s_ptr == NULL) || (p->r_ptr == NULL)) {
-        printf ("Malloc error!\n");
-        exit (1);
-    }
-
     int sockfd;
     struct sockaddr_in *lsin1, *lsin2;
     char *host;
@@ -90,95 +98,142 @@ Setup (ArgStruct *p)
 
 
 void
-SendData (ArgStruct *p)
+SimpleWrite (ArgStruct *p)
 {
-    int bytesWritten, bytesLeft;
-    char *q = NULL;
-    struct timespec sendtime;
+    // This will run only on the client side. Send some data, 
+    // receive some data and get rid of it at function exit.
+    // OK to reallocate a buffer every time we call this because
+    // we don't really need to worry too much about client performance.
+    // TODO any reason to use a random string? Any reason to force
+    // a string of length PSIZE?
+    char buffer[PSIZE];
+    int n;
+
     struct sockaddr_in *remote = NULL;
     socklen_t len;
 
-    bytesLeft = p->bufflen;
-    bytesWritten = 0;
+    remote = &(p->prot.sin1);
+    len = sizeof (*remote); 
 
-    if (p->tr) {
-        remote = &(p->prot.sin1);
-        sendtime = When2 ();
-        snprintf (p->s_ptr, PSIZE, "%lld, %.9ld%-31s",
-                (long long) sendtime.tv_sec, sendtime.tv_nsec, ",");
-        q = p->s_ptr;
-    } else if (p->rcv) {
-        remote = &(p->prot.sin2);
-        q = p->r_ptr;
+    snprintf (buffer, PSIZE, "%s", "hello, world!");
+
+    n = sendto (p->commfd, buffer, PSIZE, 0, 
+            (struct sockaddr *) remote, len);
+    if (n < 0) {
+        perror ("write to server");
+        exit (1);
     }
 
-    p->bufflen = strlen (q);
-    bytesLeft = p->bufflen;
-    len = sizeof (*remote);
+    memset (buffer, 0, PSIZE);
 
-    while ((bytesLeft > 0) &&
-            (bytesWritten = sendto (p->commfd, q, bytesLeft, 0, 
-                                    (struct sockaddr *) remote, 
-                                    len)) > 0) {
-        bytesLeft -= bytesWritten;
-        q += bytesWritten;
-    }
-    
-    if (bytesWritten == -1) {
-        perror ("tester: send: error encountered");
-        exit (401);
+    n = recvfrom (p->commfd, buffer, PSIZE, 0,
+            (struct sockaddr *) remote, &len);
+    if (n < 0) {
+        perror ("read from server");
+        exit (1);
     }
 }
 
 
-char *
-RecvData (ArgStruct *p)
+void TimestampWrite (ArgStruct *p)
 {
-    int bytesLeft;
-    int bytesRead;
-    char *q;
-    char *buf;
-    struct sockaddr_in *remote;
+    // Send and then receive an echoed timestamp.
+    // Return a pointer to the stored timestamp. 
+
+    int n;
+    struct timespec sendtime, recvtime;
+    struct sockaddr_in *remote = NULL;
     socklen_t len;
 
-    bytesRead = 0;
-    q = p->r_ptr;
-    bytesLeft = PSIZE - 1;
+    remote = &(p->prot.sin1);
+    len = sizeof (*remote); 
+    sendtime = When2 ();
+    snprintf (p->s_ptr, PSIZE, "%lld,%.9ld%-31s",
+            (long long) sendtime.tv_sec, sendtime.tv_nsec, ",");
+
+    n = sendto (p->commfd, p->s_ptr, PSIZE - 1, 0,
+            (struct sockaddr *) remote, len); 
+    if (n < 0) {
+        perror ("write");
+        exit (1);
+    }
+
+    if (DEBUG)
+        printf ("send buffer: %s, %d bytes written\n", p->s_ptr, n);
+
+    memset (p->s_ptr, 0, PSIZE);
+    
+    n = recvfrom (p->commfd, p->s_ptr, PSIZE, 0, 
+            (struct sockaddr *) remote, &len);
+    if (n < 0) {
+        perror ("read");
+        exit (1);
+    }
+    recvtime = When2 ();        
+
+    if (DEBUG)
+        printf ("Got timestamp: %s, %d bytes read\n", p->s_ptr, n);
+    snprintf (p->lbuff, PSIZE, "%s", p->s_ptr);
+    snprintf (p->lbuff + PSIZE - 1, PSIZE, "%lld,%.9ld\n", 
+            (long long) recvtime.tv_sec, recvtime.tv_nsec);
+}
+
+
+void
+Echo (ArgStruct *p)
+{
+    // Server-side only!
+    // Loop through for expduration seconds and count each packet you send out
+    // Start counting packets after a few seconds to stabilize connection(s)
+    double tnull, t0, duration;
+    int countstart = 0;
+    struct sockaddr_in *remote = NULL;
+    socklen_t len;
 
     remote = &(p->prot.sin2);
     len = sizeof (*remote);
 
-    while ((bytesLeft > 0) &&
-           (bytesRead = recvfrom (p->commfd, q, bytesLeft, 0, 
-                                  (struct sockaddr *) remote, 
-                                  &len)) > 0) {
-        bytesLeft -= bytesRead;
-        q += bytesRead;
-    }
+    p->counter = 0;
 
-    if ((bytesLeft > 0) && (bytesRead == 0)) {
-        printf ("tester: \"end of file\" encountered on reading from socket\n");
+    t0 = 0;  // Silence compiler
+    tnull = When ();
 
-    } else if (bytesRead == -1) {
-        perror ("tester: recv: error encountered");
-        exit (401);
-    }
+    // Add a two-second delay to let clients stabilize
+    while ((duration = When () - tnull) < (p->expduration + 2)) {
 
-    if (p->tr) {
-        struct timespec recvtime = When2 ();
-        if ((buf = malloc (PSIZE * 2)) == NULL) {
-            printf ("Malloc error!\n");
+        if ((duration > 2) && (countstart == 0)) {
+            countstart = 1; 
+            t0 = When ();
+        }
+
+        int n; 
+        char *q;
+
+        // Read data from client 
+        q = p->r_ptr;
+        n = recvfrom (p->commfd, q, PSIZE - 1, 0, 
+                (struct sockaddr *) remote, &len);
+        if (n < 0) {
+            perror ("read");
             exit (1);
         }
 
-        snprintf (buf, PSIZE, "%s", p->r_ptr);
-        snprintf (buf + PSIZE - 1, PSIZE, "%lld,%.9ld\n",
-                (long long) recvtime.tv_sec, recvtime.tv_nsec);
-        return buf;
-    } else {
-        // No timestamp from the receiver
-        return NULL;
+        // Echo data back to client
+        n = sendto (p->commfd, p->r_ptr, PSIZE - 1, 0, 
+                (struct sockaddr *) remote, len);
+        if (n < 0) {
+            perror ("write");
+            exit (1);
+        }
+
+        // Count successfully echoed packets
+        if (countstart) {
+            (p->counter)++;
+        }
+                
     }
+
+    p->duration = When () - t0;
 }
 
 
@@ -214,6 +269,14 @@ establish (ArgStruct *p)
 
     printf ("Established the connection...\n");
 }
+
+
+void
+ThroughputSetup (ArgStruct *p)
+{
+    Setup (p);
+}
+
 
 void 
 CleanUp (ArgStruct *p)

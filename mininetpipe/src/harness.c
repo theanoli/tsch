@@ -246,3 +246,4 @@ diff (struct timespec start, struct timespec end)
     }
     return temp;
 }
+

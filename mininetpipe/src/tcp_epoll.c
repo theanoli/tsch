@@ -64,6 +64,7 @@ Init (ArgStruct *p, int *pargc, char ***pargv)
 
     memset (p->s_ptr, 0, PSIZE);
     memset (p->r_ptr, 0, PSIZE);
+    memset (p->lbuff, 0, PSIZE * 2);
 }
 
 
@@ -141,7 +142,7 @@ Setup (ArgStruct *p)
 void
 SimpleWrite (ArgStruct *p)
 {
-    // Client-side; send as much as possible to the server,
+    // Client-side; send some amount of data to the server,
     // then receive data (and throw it away on function exit).
     // We shouldn't do epoll on the client side, since we only
     // want one connection to the server per client program
@@ -209,10 +210,11 @@ void TimestampWrite (ArgStruct *p)
 void
 Echo (ArgStruct *p)
 {
+    // Server-side only!
     // Loop through for expduration seconds and count each packet you send out
     // Start counting packets after a few seconds to stabilize connection(s)
     double tnull, t0, duration;
-    int n, i, done;
+    int j, n, i, done;
     struct epoll_event events[MAXEVENTS];
     int countstart = 0;
 
@@ -309,7 +311,8 @@ Echo (ArgStruct *p)
                     if (countstart) {
                         (p->counter)++;
                     } 
-                    memset (p->r_ptr, 0, PSIZE - 1);
+                    // Probably don't need this as timestamps always increase
+                    // memset (p->r_ptr, 0, PSIZE - 1);
                 }
 
                 if (done) {
