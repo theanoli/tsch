@@ -158,7 +158,7 @@ main (int argc, char **argv)
 
             Echo (&args);
 
-            printf ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+            printf ("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
             printf ("Received %" PRIu64 " packets in %f seconds\n", 
                     args.counter, args.duration);
             printf ("Throughput is %f pps\n", args.counter/args.duration);
