@@ -1,4 +1,4 @@
-########################################################################
+#/######################################################################
 # This is the makefile for this test harness.
 # Type make with one of the following choices for environments:
 #
@@ -48,9 +48,6 @@ LIBS 	+= -m64 -g -O3 -pthread -lrt -march=native -export-dynamic ${MTCP_FLD}/lib
 
 tcp: $(SRC)/tcp.c $(SRC)/harness.c $(SRC)/harness.h 
 	$(CC) $(CFLAGS) $(SRC)/harness.c $(SRC)/tcp.c -DTCP -Dwhichproto=\"TCP\" -o NPtcp -I$(SRC)
-
-etcp: $(SRC)/tcp_epoll.c $(SRC)/harness.c $(SRC)/harness.h 
-	$(CC) $(CFLAGS) $(SRC)/harness.c $(SRC)/tcp_epoll.c -DTCP -Dwhichproto=\"eTCP\" -o NPetcp -I$(SRC)
 
 udp: $(SRC)/udp.c $(SRC)/harness.c $(SRC)/harness.h 
 	$(CC) $(CFLAGS) $(SRC)/harness.c $(SRC)/udp.c -DTCP -Dwhichproto=\"UDP\" -o NPudp -I$(SRC)
