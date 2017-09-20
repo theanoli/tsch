@@ -6,6 +6,7 @@ unset label
 set xtic auto
 set ytic auto
 #set yrange [0:180]
+set datafile separator ","
 set title "Client-server RTT ".expname
 set xlabel "Time (us)"
 set ylabel "1 RTT (us)"

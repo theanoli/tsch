@@ -6,6 +6,11 @@ expname = arg_list {1};
 printf ("%s\n", expname);
 x = csvread ([expname ".dat"]);
 
-y = diff (x (:, 1));
+c2_shifted = circshift (x(:, 2), 1);
+mat_shifted = [x(:, 1), c2_shifted];
+mat_shifted = mat_shifted (2:end, :);
 
-save ("-ascii", [expname ".delta"], "y");
+y = mat_shifted (:, 1) - mat_shifted (:, 2);
+
+csvwrite ([expname ".delta"], y);
+

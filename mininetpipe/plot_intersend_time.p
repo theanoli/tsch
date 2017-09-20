@@ -7,7 +7,7 @@ set key off
 unset log
 unset label
 
-set title "RTT intersending times: mTCP (".expname.")"
+set title "RTT intersending times: ".expname.")"
 set xlabel "Intersending time (us)"
 set ylabel "Count"
 
@@ -19,4 +19,3 @@ bin_number(x) = floor(x/bin_width)
 rounded(x) = bin_width * ( bin_number(x) + 0.5 )
 
 plot expname.".delta" using (rounded($1)):(1) smooth frequency with boxes
-

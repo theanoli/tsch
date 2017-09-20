@@ -1,16 +1,20 @@
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h> 
 #include <string.h>
 #include <sys/types.h>
 #include <sys/time.h> 
-#include <stdlib.h> 
-#include <unistd.h> 
 #include <time.h>
+#include <unistd.h> 
 
 #define PSIZE   32
 #define DEFPORT 8000
+#define EXPDURATION 10
+#define MAXEVENTS 16
 
 // TCP-specific
 #if defined(TCP)
@@ -48,9 +52,6 @@ struct argstruct
     short   port;          /* Port used for connection                      */
 
     char    *r_ptr;        /* Pointer to current location in receive buffer    */
-    char    *r_ptr_saved;  /* Pointer for saving value of r_ptr             */
-    char    *s_buff;       /* Aligned send buffer                           */
-    char    *s_buff_orig;  /* Original unaligned send buffer                */
     char    *s_ptr;        /* Pointer to current location in send buffer    */
 
     int     bufflen,       /* Length of transmitted buffer                  */
@@ -59,10 +60,13 @@ struct argstruct
     int     source_node;   /* Set to -1 (MPI_ANY_SOURCE) if -z specified    */
     int     reset_conn;    /* Reset connection flag                         */
 
-    // for latency measurements
-    char    *rtt_buf;       /* Buffer for each RTT measurement */
-    int     next_write;     /* Where to write the next message */
-    time_t  last_writetime; /* Last time buffer was dumped to file */
+    int     latency;        /* Measure latency (1) or throughput (0)        */
+    char    *lbuff;          /* For saving latency measurements */
+
+    // for throughput measurements
+    int     expduration;    /* How long to count packets                    */
+    uint64_t counter;       /* For counting packets!                        */
+    double  duration;       /* Measured time over which packets are blasted */
 
     /* Now we work with a union of information for protocol dependent stuff  */
     ProtocolStruct prot;
@@ -86,7 +90,13 @@ void Init(ArgStruct *p, int* argc, char*** argv);
 
 void Setup(ArgStruct *p);
 
+void ThroughputSetup (ArgStruct *p);
+
 void establish(ArgStruct *p);
+
+void throughput_establish (ArgStruct *p);
+
+int setsock_nonblock (int fd);
 
 void Sync(ArgStruct *p);
 
@@ -95,6 +105,12 @@ void PrepareToReceive(ArgStruct *p);
 void SendData(ArgStruct *p);
 
 char *RecvData(ArgStruct *p);
+
+void SimpleWrite (ArgStruct *p);
+
+void TimestampWrite (ArgStruct *p);
+
+void Echo (ArgStruct *p);
 
 void SendTime(ArgStruct *p, double *t);
 

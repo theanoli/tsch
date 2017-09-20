@@ -20,15 +20,16 @@ main (int argc, char **argv)
     int default_out;    /* bool; use default outfile? */
     int nrtts;
     int sleep_interval; /* How long to sleep b/t latency pings (usec) */
-    double t0, duration, rtt;
+    // double duration;
 
     int c;
-    int n;
 
     /* Initialize vars that may change from default due to arguments */
     default_out = 1;
     sleep_interval = 0;
     nrtts = NRTTS;
+    args.latency = 1;  // Default to do latency; this is arbitrary
+    args.expduration = 1000;  // Some big number for latency, don't care  
 
     signal (SIGINT, SignalHandler);
 
@@ -40,7 +41,7 @@ main (int argc, char **argv)
     args.rcv = 1;
 
     /* Parse the arguments. See Usage for description */
-    while ((c = getopt (argc, argv, "o:H:r:P:s:h")) != -1)
+    while ((c = getopt (argc, argv, "o:H:r:P:s:th")) != -1)
     {
         switch (c)
         {
@@ -50,7 +51,7 @@ main (int argc, char **argv)
                       printf ("Sending output to %s\n", s); fflush(stdout);
                       break;
 
-            case 'H': args.tr = 1;       /* -h implies transmit node */
+            case 'H': args.tr = 1;       /* -H implies transmit node */
                       args.rcv = 0;
                       args.host = (char *) malloc (strlen (optarg) + 1);
                       strcpy (args.host, optarg);
@@ -65,6 +66,10 @@ main (int argc, char **argv)
             case 's': sleep_interval = atoi (optarg);
                       break;
 
+            case 't': args.latency = 0;
+                      args.expduration = 5;
+                      break;
+
             case 'h': PrintUsage ();
                       exit (0);
 
@@ -74,61 +79,90 @@ main (int argc, char **argv)
        }
     }
     
-    if (default_out) {
-        int exp_timestamp;
-        exp_timestamp = (int) time (0);
-        snprintf (s, 255, "results/%s-%d-r%d-s%d.out", whichproto,
-                exp_timestamp, nrtts, sleep_interval);
-    }
-
-    printf ("Collecting %d latency measurements to file %s.\n", nrtts, s);
-
     /* Let modules initialize related vars, and possibly call a library init
        function that requires argc and argv */
     Init (&args, &argc, &argv);   /* This will set args.tr and args.rcv */
-    Setup (&args);
 
-    if (args.tr) {
-        if ((out = fopen (s, "wb")) == NULL) {
-            fprintf (stderr,"Can't open %s for output\n", s);
-            exit (1);
+    /* FOR LATENCY */
+    if (args.latency) {
+
+        // Use default filename construction for results
+        if (default_out) {
+            int exp_timestamp;
+            exp_timestamp = (int) time (0);
+            snprintf (s, 255, "results/%s-%d-r%d-s%d.out", whichproto,
+                    exp_timestamp, nrtts, sleep_interval);
         }
-    } else {
-        out = stdout;
-    }
- 
-    /* Get some number of latency measurements */
-    char *timing;
-    int counter = 0;
 
-    t0 = When ();
-    if (args.tr) {
-        for (n = 0; n < nrtts; n++) {
-            SendData (&args);
-            timing = RecvData (&args);
+        Setup (&args);
 
-            if ((strlen (timing) > 0) && (n > 1)) {
-               fwrite (timing, strlen (timing), 1, out);
+        if (args.tr) {
+            if ((out = fopen (s, "wb")) == NULL) {
+                fprintf (stderr,"Can't open %s for output\n", s);
+                exit (1);
             }
-            usleep (sleep_interval);
-            counter++;
+        } else {
+            out = stdout;
+        }
+     
+        // Get some number of latency measurements
+        printf ("Collecting latency measurements to file %s.\n", s);
+
+        int n;
+        double rtt;
+        double t0;
+        
+        if (args.tr) {
+            // Warm up
+            for (n = 0; n < (nrtts / 4); n++) {
+                SimpleWrite (&args);
+                usleep (sleep_interval);
+            }
+
+            // Take measurements
+            t0 = When ();
+            for (n = 0; n < nrtts; n++) {
+                TimestampWrite (&args); 
+                fwrite (args.lbuff, strlen (args.lbuff), 1, out);
+                usleep (sleep_interval);
+            }
+
+            args.duration = When () - t0;
+            rtt = args.duration/nrtts;
+
+            // Note these are inflated by the I/O done to record individual
+            // packet RTTs as well as sleep time (if any)
+            printf ("\n");
+            printf ("Average RTT: %f\n", rtt);
+            printf ("Experiment duration: %f for %d packets\n", 
+                    args.duration, nrtts);
+            printf ("Printed results to file %s\n", s);
+
+        } else if (args.rcv) {
+            Echo (&args);
         }
 
-        duration = When () - t0;
-        rtt = duration/nrtts;
-        
-        // Note these are inflated by the I/O done to record individual
-        // packet RTTs
-        printf ("\n");
-        printf ("Average RTT: %f\n", rtt);
-        printf ("Experiment duration: %f\n", duration);
-        printf ("Printed results to file %s\n", s);
+    } else {
+        /* FOR THROUGHPUT */
+        ThroughputSetup (&args);
 
-    } else if (args.rcv) {
-        while (1) {
-            RecvData (&args);
-            SendData (&args);
-            counter++;
+        // Get throughput measurements
+        if (args.tr) {
+            // Send some huge number of packets
+            printf ("Sending a ton of packets to the server...\n");
+            while (1) {
+                SimpleWrite (&args);
+            }
+        } else if (args.rcv) {
+            printf ("Getting ready to receive packets...\n");
+
+            Echo (&args);
+
+            printf ("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+            printf ("Received %" PRIu64 " packets in %f seconds\n", 
+                    args.counter, args.duration);
+            printf ("Throughput is %f pps\n", args.counter/args.duration);
+            printf ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
         }
     }
 
@@ -141,8 +175,9 @@ void
 PrintUsage (void)
 {
     printf ("\n");
-    printf ("To run server, run 'sudo ./NPxyz'\n");
-    printf ("To run client, run 'sudo ./NPxyz -H server-hostname ...'\n\n");
+    printf ("To run server, run '[sudo] ./NPxyz'\n");
+    printf ("To run client, run '[sudo] ./NPxyz -H server-hostname ...'\n");
+    printf ("(mTCP is the only transport that needs sudo [for now])\n\n");
     printf ("Options (client only unless otherwise specified):\n");
     printf ("\t-o\twhere to write latency output; default\n"
             "\t\tresults/timestamp+opts\n");
@@ -152,6 +187,7 @@ PrintUsage (void)
     printf ("\t-P\t(client AND server) port number, default 8000\n");
     printf ("\t-s\tsleeptime for throttling client send rate\n"
             "(default 0)\n");
+    printf ("\t-t\tmeasure throughput (default latency)\n");
     printf ("\t-h\t(client or server) print usage\n");
     printf ("\n");
     exit (0);
@@ -163,7 +199,7 @@ ExitStrategy (void)
 {
     // Clean up the sockets, close open FDs
     if (args.tr) {
-        fclose (out);
+        // TODO fclose (out);
     }
     CleanUp (&args);
 }
@@ -171,7 +207,7 @@ ExitStrategy (void)
 
 void
 SignalHandler (int signum) {
-    printf ("Got signal %d\n...", signum);
+    printf ("Got signal %d\n...\n", signum);
     ExitStrategy ();
     exit (0);
 }
@@ -212,3 +248,4 @@ diff (struct timespec start, struct timespec end)
     }
     return temp;
 }
+
