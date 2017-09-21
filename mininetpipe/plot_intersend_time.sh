@@ -2,7 +2,8 @@
 
 # Delete padding spaces
 file="results/`ls ./results -t | grep "\.out" | head -1`"
-cat $file | tr -d " "
+cat $file | tr -d " " > tmp.txt
+mv tmp.txt $file
 echo $file
 
 # Remove file extension from filename

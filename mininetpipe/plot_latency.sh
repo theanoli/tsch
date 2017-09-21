@@ -1,8 +1,17 @@
 #! /bin/bash
 
+# One and only argument should be the filename relative to the
+# results/ directory.
+
 # Delete padding spaces
-file="results/`ls ./results -t | grep "\.out" | head -1`"
-cat $file | tr -d " "
+if [ -z "$1" ]; then 
+    file="results/`ls ./results -t | grep "\.out" | head -1`"
+else
+    file="results/$1"
+fi
+
+tr -d " " < $file > tmp.txt
+mv tmp.txt $file
 echo $file
 
 # Remove file extension from filename
