@@ -243,7 +243,7 @@ Echo (ArgStruct *p)
 
     // Add a two-second delay to let the clients stabilize
     while ((duration = When () - tnull) < (p->expduration + 2)) {
-        n = epoll_wait (ep, events, MAXEVENTS, p->expduration * 1000);
+        n = epoll_wait (ep, events, MAXEVENTS, 0);
 
         if (n < 0) {
             perror ("epoll_wait");

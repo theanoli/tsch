@@ -223,9 +223,12 @@ Echo (ArgStruct *p)
 
         // Read data from client 
         q = p->r_ptr;
-        n = recvfrom (p->commfd, q, PSIZE - 1, 0, 
+        n = recvfrom (p->commfd, q, PSIZE - 1, MSG_DONTWAIT, 
                 (struct sockaddr *) remote, &len);
         if (n < 0) {
+            if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+                continue;
+            }
             perror ("read");
             exit (1);
         }

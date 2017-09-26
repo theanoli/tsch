@@ -16,8 +16,11 @@ FILE *out;          /* Output data file                          */
 int 
 main (int argc, char **argv)
 {
-    char s[255];        /* Empty string */
-    int default_out;    /* bool; use default outfile? */
+    char s[255];        /* Empty string for filepath */
+    int default_outdir;     /* bool; use default outdir? */
+    char *outdir;
+
+    int default_outfile;    /* bool; use default outfile? */
     int nrtts;
     int sleep_interval; /* How long to sleep b/t latency pings (usec) */
     // double duration;
@@ -25,7 +28,8 @@ main (int argc, char **argv)
     int c;
 
     /* Initialize vars that may change from default due to arguments */
-    default_out = 1;
+    default_outdir = 1;
+    default_outfile = 1;
     sleep_interval = 0;
     nrtts = NRTTS;
     args.latency = 1;  // Default to do latency; this is arbitrary
@@ -41,14 +45,21 @@ main (int argc, char **argv)
     args.rcv = 1;
 
     /* Parse the arguments. See Usage for description */
-    while ((c = getopt (argc, argv, "o:H:r:P:s:th")) != -1)
+    while ((c = getopt (argc, argv, "o:d:H:r:P:s:th")) != -1)
     {
         switch (c)
         {
-            case 'o': default_out = 0;
+            case 'o': default_outfile = 0;
                       memset (s, 0, 255);
                       strcpy (s, optarg);
-                      printf ("Sending output to %s\n", s); fflush(stdout);
+                      printf ("Sending output to %s\n", s); 
+                      fflush(stdout);
+                      break;
+
+            case 'd': default_outdir = 0;
+                      outdir = optarg;
+                      printf ("Sending output to directory %s\n", outdir); 
+                      fflush(stdout);
                       break;
 
             case 'H': args.tr = 1;       /* -H implies transmit node */
@@ -87,11 +98,19 @@ main (int argc, char **argv)
     if (args.latency) {
 
         // Use default filename construction for results
-        if (default_out) {
+        if (default_outfile) {
             int exp_timestamp;
             exp_timestamp = (int) time (0);
-            snprintf (s, 255, "results/%s-%d-r%d-s%d.out", whichproto,
-                    exp_timestamp, nrtts, sleep_interval);
+            if (default_outdir) {
+                snprintf (s, 255, "results/%s-%d-r%d-s%d.out", whichproto,
+                        exp_timestamp, nrtts, sleep_interval);
+            } else {
+                char d[255];
+                snprintf (d, 255, "results/%s", outdir);
+                mkdir (d, 0777);
+                snprintf (s, 255, "results/%s/%s-%d-r%d-s%d.out", outdir, 
+                        whichproto, exp_timestamp, nrtts, sleep_interval);
+            }
         }
 
         Setup (&args);
