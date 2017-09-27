@@ -4,7 +4,7 @@
 #include <mtcp_epoll.h>
 
 #define NEVENTS 10
-#define DEBUG 1
+#define DEBUG 0
 
 int doing_reset = 0;
 mctx_t mctx = NULL;
