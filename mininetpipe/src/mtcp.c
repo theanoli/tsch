@@ -196,7 +196,7 @@ void TimestampWrite (ArgStruct *p)
     snprintf (pbuffer, PSIZE, "%lld,%.9ld%-31s",
             (long long) sendtime.tv_sec, sendtime.tv_nsec, ",");
 
-    n = mtcp_write_helper (mctx, p->commfd, pbuffer, 15);
+    n = mtcp_write_helper (mctx, p->commfd, pbuffer, PSIZE - 1);
     if (n < 0) {
         perror ("write");
         exit (1);
