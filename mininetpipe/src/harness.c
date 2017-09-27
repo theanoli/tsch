@@ -134,8 +134,8 @@ main (int argc, char **argv)
         if (args.tr) {
             // Warm up
             for (n = 0; n < (nrtts / 4); n++) {
-                SimpleWrite (&args);
-                usleep (sleep_interval);
+                //SimpleWrite (&args);
+                //usleep (sleep_interval);
             }
 
             // Take measurements

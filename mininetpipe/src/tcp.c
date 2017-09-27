@@ -121,6 +121,7 @@ Setup (ArgStruct *p)
 
         lsin1->sin_port = htons (p->port);
         p->commfd = sockfd;
+
     } else if (p->rcv) {
         memset ((char *) lsin1, 0, sizeof (*lsin1));
         lsin1->sin_family       = AF_INET;
@@ -215,7 +216,7 @@ Echo (ArgStruct *p)
     // Start counting packets after a few seconds to stabilize connection(s)
     double tnull, t0, duration;
     int j, n, i, done;
-    struct epoll_event events[MAXEVENTS];
+    struct epoll_event events[NEVENTS];
     int countstart = 0;
 
     if (p->latency) {
@@ -243,7 +244,7 @@ Echo (ArgStruct *p)
 
     // Add a two-second delay to let the clients stabilize
     while ((duration = When () - tnull) < (p->expduration + 2)) {
-        n = epoll_wait (ep, events, MAXEVENTS, 0);
+        n = epoll_wait (ep, events, NEVENTS, 0);
 
         if (n < 0) {
             perror ("epoll_wait");
@@ -436,7 +437,7 @@ throughput_establish (ArgStruct *p)
         printf ("\tStarting loop to wait for connections...\n");
 
         while ((duration = (t0 + 10) - When ()) > 0) {
-            nevents = epoll_wait (ep, events, MAXEVENTS, duration); 
+            nevents = epoll_wait (ep, events, NEVENTS, duration); 
             if (nevents < 0) {
                 if (errno != EINTR) {
                     perror ("epoll_wait");

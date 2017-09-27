@@ -10,15 +10,10 @@ else
     file="results/$1"
 fi
 
-tr -d " " < $file > tmp.txt
-mv tmp.txt $file
-echo $file
-
 # Remove file extension from filename
 expname=${file%*.*}
 
-echo "Converting raw data to microseconds..."
-octave convert_raw_to_usec.oct $expname
+sh convert_raw_to_usec.sh $file
 
 echo $expname
 gnuplot -e "expname='$expname'" plot_latency.p
