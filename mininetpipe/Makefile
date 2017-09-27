@@ -10,10 +10,10 @@
 ########################################################################
 
 CC         = gcc
-CFLAGS     = -g -O3 -Wall -Werror
+CFLAGS     = -g -Wall -Werror
 SRC        = ./src
 
-all: tcp 
+all: tcp mtcp udp 
 
 clean:
 	rm -f *.o NP* np.out

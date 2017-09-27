@@ -3,7 +3,7 @@
 #include <mtcp_api.h>
 #include <mtcp_epoll.h>
 
-#define NEVENTS 10
+#define MAXEVENTS 10
 #define DEBUG 0
 
 int doing_reset = 0;
@@ -18,7 +18,7 @@ mtcp_accept_helper (mctx_t mctx, int sockid, struct sockaddr *addr,
                     socklen_t *addrlen)
 {
     int nevents, i;
-    struct mtcp_epoll_event events[NEVENTS];
+    struct mtcp_epoll_event events[MAXEVENTS];
     struct mtcp_epoll_event evctl;
 
     evctl.events = MTCP_EPOLLIN;
@@ -30,7 +30,7 @@ mtcp_accept_helper (mctx_t mctx, int sockid, struct sockaddr *addr,
     }
 
     while (1) {
-        nevents = mtcp_epoll_wait (mctx, ep, events, NEVENTS, -1);
+        nevents = mtcp_epoll_wait (mctx, ep, events, MAXEVENTS, -1);
         if (nevents < 0) {
             if (errno != EINTR) {
                 perror ("mtcp_epoll_wait");
@@ -99,7 +99,7 @@ Setup (ArgStruct *p)
     if (!mctx) {
         mtcp_core_affinitize (0);
         mctx = mtcp_create_context (0);
-        ep = mtcp_epoll_create (mctx, NEVENTS);
+        ep = mtcp_epoll_create (mctx, MAXEVENTS);
     }
 
     if (!mctx) {
@@ -227,7 +227,7 @@ Echo (ArgStruct *p)
     // Start counting packets after a few seconds to stabilize connection(s)
     double tnull, t0, duration;
     int j, n, i, done;
-    struct mtcp_epoll_event events[NEVENTS];
+    struct mtcp_epoll_event events[MAXEVENTS];
     int countstart = 0;
 
     if (p->latency) {
@@ -250,7 +250,7 @@ Echo (ArgStruct *p)
 
     // Add a two-second delay to let the clients stabilize
     while ((duration = When () - tnull) < (p->expduration + 2)) {
-        n = mtcp_epoll_wait (mctx, ep, events, NEVENTS, -1);
+        n = mtcp_epoll_wait (mctx, ep, events, MAXEVENTS, -1);
 
         if (n < 0) {
             perror ("epoll_wait");
@@ -347,7 +347,7 @@ ThroughputSetup (ArgStruct *p)
     memset ((char *) lsin1, 0, sizeof (*lsin1));
     memset ((char *) lsin2, 0, sizeof (*lsin2));
     
-    ep = mtcp_epoll_create (mctx, NEVENTS);
+    ep = mtcp_epoll_create (mctx, MAXEVENTS);
 
     printf ("\tCreating socket...\n");
     if ((sockfd = mtcp_socket (mctx, socket_family, MTCP_SOCK_STREAM, 0)) < 0) {
@@ -405,7 +405,7 @@ throughput_establish (ArgStruct *p)
     socklen_t clen;
     struct protoent *proto;
     int nevents, i;
-    struct mtcp_epoll_event events[NEVENTS];
+    struct mtcp_epoll_event events[MAXEVENTS];
     struct mtcp_epoll_event event;
     double t0, duration;
 
@@ -437,7 +437,7 @@ throughput_establish (ArgStruct *p)
         printf ("\tStarting loop to wait for connections...\n");
 
         while ((duration = (t0 + 10) - When ()) > 0) {
-            nevents = mtcp_epoll_wait (mctx, ep, events, NEVENTS, duration); 
+            nevents = mtcp_epoll_wait (mctx, ep, events, MAXEVENTS, duration); 
             if (nevents < 0) {
                 if (errno != EINTR) {
                     perror ("epoll_wait");
@@ -635,7 +635,7 @@ int
 mtcp_read_helper (mctx_t mctx, int sockid, char *buf, int len)
 {
     int nevents, i;
-    struct mtcp_epoll_event events[NEVENTS];
+    struct mtcp_epoll_event events[MAXEVENTS];
     struct mtcp_epoll_event evctl;
 
     evctl.events = MTCP_EPOLLIN;
@@ -646,7 +646,7 @@ mtcp_read_helper (mctx_t mctx, int sockid, char *buf, int len)
     }
 
     while (1) {
-        nevents = mtcp_epoll_wait (mctx, ep, events, NEVENTS, -1);
+        nevents = mtcp_epoll_wait (mctx, ep, events, MAXEVENTS, -1);
         if (nevents < 0) {
             if (errno != EINTR) {
                 perror ("mtcp_epoll_wait");
@@ -671,7 +671,7 @@ int
 mtcp_write_helper (mctx_t mctx, int sockid, char *buf, int len)
 {
     int nevents, i;
-    struct mtcp_epoll_event events[NEVENTS];
+    struct mtcp_epoll_event events[MAXEVENTS];
     struct mtcp_epoll_event evctl;
 
     evctl.events = MTCP_EPOLLOUT;
@@ -682,7 +682,7 @@ mtcp_write_helper (mctx_t mctx, int sockid, char *buf, int len)
     }
 
     while (1) {
-        nevents = mtcp_epoll_wait (mctx, ep, events, NEVENTS, -1);
+        nevents = mtcp_epoll_wait (mctx, ep, events, MAXEVENTS, -1);
         if (nevents < 0) {
             if (errno != EINTR) {
                 perror ("mtcp_epoll_wait");
