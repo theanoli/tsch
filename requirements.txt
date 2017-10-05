@@ -17,4 +17,3 @@ pandocfilters==1.4.1
 plotly==2.0.15
 psutil==5.0.1
 python-dateutil==2.6.1
-subprocess32==3.2.7
