@@ -10,7 +10,7 @@
 ########################################################################
 
 CC         = gcc
-CFLAGS     = -g -Wall -Werror
+CFLAGS     = -g -O3 -Wall -Werror
 SRC        = ./src
 
 all: tcp mtcp udp 
