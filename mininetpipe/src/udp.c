@@ -207,7 +207,7 @@ Echo (ArgStruct *p)
 
     // Add a two-second delay to let clients stabilize
     tnull = When ();  // Restart timer
-    printf ("Assuming all clients have connected...\n");
+    printf ("Assuming all clients have come online...\n");
     while ((duration = When () - tnull) < (p->expduration + 2)) {
 
         if (!p->latency) {
@@ -225,6 +225,8 @@ Echo (ArgStruct *p)
         q = p->r_ptr;
         n = recvfrom (p->commfd, q, PSIZE - 1, MSG_DONTWAIT, 
                 (struct sockaddr *) remote, &len);
+	
+	// Recvfrom is in nonblocking mode b/c of MSG_DONTWAIT
         if (n < 0) {
             if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
                 continue;

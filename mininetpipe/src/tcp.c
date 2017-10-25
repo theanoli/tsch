@@ -2,7 +2,7 @@
 
 #include <sys/epoll.h>
 
-#define NEVENTS 10
+#define NEVENTS 128
 #define DEBUG 0
 
 int doing_reset = 0;
@@ -257,6 +257,7 @@ Echo (ArgStruct *p)
         // If we've passed the warm-up period, start the counter
         // and the throughput timer
         if ((duration > 2) && (countstart == 0)) {
+	    printf ("Starting to count packets for throughput...\n");
             countstart = 1; 
             t0 = When ();
         }

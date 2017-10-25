@@ -33,7 +33,7 @@ main (int argc, char **argv)
     sleep_interval = 0;
     nrtts = NRTTS;
     args.latency = 1;  // Default to do latency; this is arbitrary
-    args.expduration = 1000;  // Some big number for latency, don't care  
+    args.expduration = 100000;  // Seconds; some big number for latency, don't care  
 
     signal (SIGINT, SignalHandler);
 
@@ -78,7 +78,7 @@ main (int argc, char **argv)
                       break;
 
             case 't': args.latency = 0;
-                      args.expduration = 5;
+                      args.expduration = 20;
                       break;
 
             case 'h': PrintUsage ();
