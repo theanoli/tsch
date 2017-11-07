@@ -3,8 +3,7 @@
 #include <mtcp_api.h>
 #include <mtcp_epoll.h>
 
-#define MAXEVENTS 10
-#define DEBUG 0
+#define DEBUG 1
 
 int doing_reset = 0;
 mctx_t mctx = NULL;
@@ -19,12 +18,12 @@ mtcp_accept_helper (mctx_t mctx, int sockid, struct sockaddr *addr,
 {
     int nevents, i;
     struct mtcp_epoll_event events[MAXEVENTS];
-    struct mtcp_epoll_event evctl;
+    struct mtcp_epoll_event event;
 
-    evctl.events = MTCP_EPOLLIN;
-    evctl.data.sockid = sockid;
+    event.events = MTCP_EPOLLIN;
+    event.data.sockid = sockid;
 
-    if (mtcp_epoll_ctl (mctx, ep, MTCP_EPOLL_CTL_ADD, sockid, &evctl) < 0) {
+    if (mtcp_epoll_ctl (mctx, ep, MTCP_EPOLL_CTL_ADD, sockid, &event) == -1) {
         perror ("epoll_ctl");
         exit (1);
     }
@@ -39,7 +38,7 @@ mtcp_accept_helper (mctx_t mctx, int sockid, struct sockaddr *addr,
         }
 
         // Wait for an incoming connection; return when we get one
-        for (i = 0; i < nevents; ++i) {
+        for (i = 0; i < nevents; i++) {
             if (events[i].data.sockid == sockid) {
                 mtcp_epoll_ctl (mctx, ep, MTCP_EPOLL_CTL_DEL, sockid, NULL);
                 return mtcp_accept (mctx, sockid, addr, addrlen);
@@ -347,7 +346,16 @@ ThroughputSetup (ArgStruct *p)
     memset ((char *) lsin1, 0, sizeof (*lsin1));
     memset ((char *) lsin2, 0, sizeof (*lsin2));
     
-    ep = mtcp_epoll_create (mctx, MAXEVENTS);
+    if (!mctx) {
+	mtcp_core_affinitize (0);
+	mctx = mtcp_create_context (0);
+	ep = mtcp_epoll_create (mctx, MAXEVENTS);
+    }
+
+    if (!mctx) {
+        printf ("tester: can't create mTCP socket!");
+	exit (-4);
+    }
 
     printf ("\tCreating socket...\n");
     if ((sockfd = mtcp_socket (mctx, socket_family, MTCP_SOCK_STREAM, 0)) < 0) {
@@ -355,9 +363,10 @@ ThroughputSetup (ArgStruct *p)
         exit (-4);
     }
 
-    if (p->rcv) {
-        mtcp_setsock_nonblock (mctx, sockfd);
-    } 
+    if (mtcp_setsock_nonblock (mctx, sockfd) < 0) {
+	printf ("tester: couldn't set socket to nonblocking!\n");
+	exit (-6);
+    }
     
     if (!(proto = getprotobyname ("tcp"))) {
         printf ("tester: protocol 'tcp' unknown!\n");
@@ -414,7 +423,7 @@ throughput_establish (ArgStruct *p)
     clen = (socklen_t) sizeof (p->prot.sin2);
     
     if (p->tr) {
-        while ((connect (p->commfd, (struct sockaddr *) &(p->prot.sin1), 
+        while ((mtcp_connect (mctx, p->commfd, (struct sockaddr *) &(p->prot.sin1), 
                         sizeof (p->prot.sin1)) < 0) && (errno != EINPROGRESS)) {
             if (!doing_reset || errno != ECONNREFUSED) {
                 printf ("client: cannot connect to server! errno=%d\n", errno);
@@ -431,7 +440,7 @@ throughput_establish (ArgStruct *p)
             exit (1);
         }
 
-        listen (p->servicefd, 1024);
+        mtcp_listen (mctx, p->servicefd, 1024);
 
         t0 = When ();
         printf ("\tStarting loop to wait for connections...\n");
@@ -446,11 +455,12 @@ throughput_establish (ArgStruct *p)
             }
 
             for (i = 0; i < nevents; i++) {
+		printf ("Got an event...\n");
                 if (events[i].data.sockid == p->servicefd) {
                     while (1) {
                         char hostbuf[NI_MAXHOST], portbuf[NI_MAXSERV];
                         
-                        p->commfd = accept (p->servicefd, 
+                        p->commfd = mtcp_accept (mctx, p->servicefd, 
                                 (struct sockaddr *) &(p->prot.sin2), &clen);
 
                         if (p->commfd == -1) {
@@ -636,11 +646,11 @@ mtcp_read_helper (mctx_t mctx, int sockid, char *buf, int len)
 {
     int nevents, i;
     struct mtcp_epoll_event events[MAXEVENTS];
-    struct mtcp_epoll_event evctl;
+    struct mtcp_epoll_event event;
 
-    evctl.events = MTCP_EPOLLIN;
-    evctl.data.sockid = sockid;
-    if (mtcp_epoll_ctl (mctx, ep, MTCP_EPOLL_CTL_ADD, sockid, &evctl) < 0) {
+    event.events = MTCP_EPOLLIN;
+    event.data.sockid = sockid;
+    if (mtcp_epoll_ctl (mctx, ep, MTCP_EPOLL_CTL_ADD, sockid, &event) < 0) {
         perror ("epoll_ctl");
         exit (1);
     }
@@ -672,11 +682,11 @@ mtcp_write_helper (mctx_t mctx, int sockid, char *buf, int len)
 {
     int nevents, i;
     struct mtcp_epoll_event events[MAXEVENTS];
-    struct mtcp_epoll_event evctl;
+    struct mtcp_epoll_event event;
 
-    evctl.events = MTCP_EPOLLOUT;
-    evctl.data.sockid = sockid;
-    if (mtcp_epoll_ctl (mctx, ep, MTCP_EPOLL_CTL_ADD, sockid, &evctl) < 0) {
+    event.events = MTCP_EPOLLOUT;
+    event.data.sockid = sockid;
+    if (mtcp_epoll_ctl (mctx, ep, MTCP_EPOLL_CTL_ADD, sockid, &event) < 0) {
         perror ("epoll_ctl");
         exit (1);
     }
