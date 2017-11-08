@@ -197,10 +197,10 @@ Echo (ArgStruct *p)
     t0 = 0;  // Silence compiler
     tnull = When ();
 
-    // Wait three seconds to let clients come online
+    // Wait a few seconds to let clients come online
     if (!p->latency) {
         printf ("Waiting for clients to start up...\n");
-        while ((duration = When () - tnull) < (3)) {
+        while ((duration = When () - tnull) < 16) {
 
         }
     }
