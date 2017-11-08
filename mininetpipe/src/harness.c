@@ -22,6 +22,7 @@ main (int argc, char **argv)
 
     int default_outfile;    /* bool; use default outfile? */
     int nrtts;
+    int ncli; 		/* Number of clients in the experiment */
     int sleep_interval; /* How long to sleep b/t latency pings (usec) */
     // double duration;
 
@@ -45,7 +46,7 @@ main (int argc, char **argv)
     args.rcv = 1;
 
     /* Parse the arguments. See Usage for description */
-    while ((c = getopt (argc, argv, "o:d:H:r:P:s:th")) != -1)
+    while ((c = getopt (argc, argv, "o:d:H:r:c:P:s:th")) != -1)
     {
         switch (c)
         {
@@ -71,8 +72,11 @@ main (int argc, char **argv)
             case 'r': nrtts = atoi (optarg);
                       break;
 
-	        case 'P': args.port = atoi (optarg);
-		              break;
+	    case 'c': ncli = atoi (optarg);
+		      break;
+
+	    case 'P': args.port = atoi (optarg);
+		      break;
 
             case 's': sleep_interval = atoi (optarg);
                       break;
@@ -180,7 +184,8 @@ main (int argc, char **argv)
             printf ("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
             printf ("Received %" PRIu64 " packets in %f seconds\n", 
                     args.counter, args.duration);
-            printf ("Throughput is %f pps\n", args.counter/args.duration);
+            fprintf (stderr, "%d,%f\n", ncli, args.counter/args.duration);
+	    printf ("Throughput is %f pps\n", args.counter/args.duration);
             printf ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
         }
     }

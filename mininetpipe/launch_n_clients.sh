@@ -2,6 +2,8 @@
 
 if [ $# -ne 2 ]; then
 	echo "Need to specify command to launch and number of clients!"
+	echo "sh launch_n_clients.sh [command] [nclients]"	
+
 	echo "Exiting..."
 	exit
 fi

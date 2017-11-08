@@ -437,7 +437,7 @@ throughput_establish (ArgStruct *p)
         t0 = When ();
         printf ("\tStarting loop to wait for connections...\n");
 
-        while ((duration = (t0 + 10) - When ()) > 0) {
+        while ((duration = (t0 + 40) - When ()) > 0) {
             nevents = epoll_wait (ep, events, NEVENTS, duration); 
             if (nevents < 0) {
                 if (errno != EINTR) {
