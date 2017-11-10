@@ -16,11 +16,14 @@ FILE *out;          /* Output data file                          */
 int 
 main (int argc, char **argv)
 {
-    char s[255];        /* Empty string for filepath */
+    char s[512];        /* Empty string for filepath */
+    char cpy_s[512];	/* For basename */
     int default_outdir;     /* bool; use default outdir? */
     char *outdir;
 
     int default_outfile;    /* bool; use default outfile? */
+    char *outfile;
+
     int nrtts;
     int ncli; 		/* Number of clients in the experiment */
     int sleep_interval; /* How long to sleep b/t latency pings (usec) */
@@ -51,9 +54,8 @@ main (int argc, char **argv)
         switch (c)
         {
             case 'o': default_outfile = 0;
-                      memset (s, 0, 255);
-                      strcpy (s, optarg);
-                      printf ("Sending output to %s\n", s); 
+		      outfile = optarg;
+                      printf ("Sending output to file %s\n", outfile); 
                       fflush(stdout);
                       break;
 
@@ -102,20 +104,23 @@ main (int argc, char **argv)
     if (args.latency) {
 
         // Use default filename construction for results
-        if (default_outfile) {
-            int exp_timestamp;
+	if (default_outfile) {
+	    int exp_timestamp;
             exp_timestamp = (int) time (0);
-            if (default_outdir) {
-                snprintf (s, 255, "results/%s-%d-r%d-s%d.out", whichproto,
-                        exp_timestamp, nrtts, sleep_interval);
-            } else {
-                char d[255];
-                snprintf (d, 255, "results/%s", outdir);
-                mkdir (d, 0777);
-                snprintf (s, 255, "results/%s/%s-%d-r%d-s%d.out", outdir, 
-                        whichproto, exp_timestamp, nrtts, sleep_interval);
-            }
+	    outfile = (char *) malloc (256);
+	    snprintf (outfile, 256, "%s-%d-r%d-s%d.out", whichproto, 
+			exp_timestamp, nrtts, sleep_interval);
         }
+
+	if (default_outdir) {
+	    outdir = (char *) malloc (256);
+	    snprintf (outdir, 256, "default");
+        }
+
+	snprintf (s, 512, "results/%s/%s", outdir, outfile);
+	memcpy (cpy_s, s, 512);
+	printf ("Results going into %s\n", s); 
+	mkdir (dirname (cpy_s), 0777);
 
         Setup (&args);
 
@@ -167,6 +172,29 @@ main (int argc, char **argv)
 
     } else {
         /* FOR THROUGHPUT */
+
+        // If there's no file specified, do not record results 
+	if (args.rcv) {
+		if (default_outfile) {
+		    printf ("No file specified; not recording results!\n");		
+		} else {
+		    if (default_outdir) {
+			    outdir = (char *) malloc (256);
+			    snprintf (outdir, 256, "default");
+		    }
+		    
+		    snprintf (s, 512, "results/%s/%s", outdir, outfile);
+		    memcpy (cpy_s, s, 512);
+		    printf ("Results going into %s\n", s); 
+		    mkdir (dirname (cpy_s), 0777);
+		}
+
+	        if ((out = fopen (s, "ab")) == NULL) {
+		    fprintf (stderr,"Can't open %s for output\n", s);
+			exit (1);
+		}
+	}
+
         ThroughputSetup (&args);
 
         // Get throughput measurements
@@ -181,10 +209,12 @@ main (int argc, char **argv)
 
             Echo (&args);
 
+	    if (!default_outfile) {
+		    fprintf (out, "%d,%f\n", ncli, args.counter/args.duration);
+	    }
             printf ("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
             printf ("Received %" PRIu64 " packets in %f seconds\n", 
                     args.counter, args.duration);
-            fprintf (stderr, "%d,%f\n", ncli, args.counter/args.duration);
 	    printf ("Throughput is %f pps\n", args.counter/args.duration);
             printf ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
         }

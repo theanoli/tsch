@@ -5,6 +5,7 @@ import re
 import sys
 import argparse
 import subprocess
+import time
 
 # nclient processes TOTAL, list of client IPs, command to run (for each process?)
 
@@ -33,11 +34,21 @@ leftover = nprocs % len(nodes)
 wdir = "/proj/sequencer/tsch/mininetpipe"
 launcher = os.path.join(wdir, "launch_n_clients.sh")
 
-# Launch the server-side program and then wait a second
+# Clean up any potential zombies on the client side(s)
+for ip in nodes: 
+    subprocess.Popen(
+        "ssh theano@%s 'pkill \"NP[a-z]*\" -U theano'" % ip,
+        shell=True)
+time.sleep(3)
+
+# Launch the server-side program and then wait a half-second
 subprocess.Popen(
-    "cd %s; %s" % (wdir, serv_cmd),
+    "cd %s; %s -c %d" % (wdir, serv_cmd, nprocs),
     shell=True)
 
+time.sleep(0.5)
+
+# Launch the client-side programs
 for ip in nodes:
     n = procs_per_client
 
