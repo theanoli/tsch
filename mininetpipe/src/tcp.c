@@ -2,7 +2,7 @@
 
 #include <sys/epoll.h>
 
-#define NEVENTS 128
+#define ONLINE_DELAY 18
 #define DEBUG 0
 
 int doing_reset = 0;
@@ -14,7 +14,7 @@ tcp_accept_helper (int sockid, struct sockaddr *addr, socklen_t *addrlen)
 {
     // Accept incoming connections on the listening socket
     int nevents, i;
-    struct epoll_event events[NEVENTS];
+    struct epoll_event events[MAXEVENTS];
     struct epoll_event event;
 
     event.events = EPOLLIN;
@@ -26,7 +26,7 @@ tcp_accept_helper (int sockid, struct sockaddr *addr, socklen_t *addrlen)
     }
 
     while (1) {
-        nevents = epoll_wait (ep, events, NEVENTS, -1);
+        nevents = epoll_wait (ep, events, MAXEVENTS, -1);
         if (nevents < 0) {
             if (errno != EINTR) {
                 perror ("epoll_wait");
@@ -89,7 +89,7 @@ Setup (ArgStruct *p)
     memset ((char *) lsin1, 0, sizeof (*lsin1));
     memset ((char *) lsin2, 0, sizeof (*lsin2));
 
-    ep = epoll_create (NEVENTS);
+    ep = epoll_create (MAXEVENTS);
 
     flags = SOCK_STREAM;
     if (p->rcv) {
@@ -216,7 +216,7 @@ Echo (ArgStruct *p)
     // Start counting packets after a few seconds to stabilize connection(s)
     double tnull, t0, duration;
     int j, n, i, done;
-    struct epoll_event events[NEVENTS];
+    struct epoll_event events[MAXEVENTS];
     int countstart = 0;
 
     if (p->latency) {
@@ -244,7 +244,7 @@ Echo (ArgStruct *p)
 
     // Add a two-second delay to let the clients stabilize
     while ((duration = When () - tnull) < (p->expduration + 2)) {
-        n = epoll_wait (ep, events, NEVENTS, 0);
+        n = epoll_wait (ep, events, MAXEVENTS, 0);
 
         if (n < 0) {
             perror ("epoll_wait");
@@ -348,7 +348,7 @@ ThroughputSetup (ArgStruct *p)
     memset ((char *) lsin1, 0, sizeof (*lsin1));
     memset ((char *) lsin2, 0, sizeof (*lsin2));
     
-    ep = epoll_create (NEVENTS);
+    ep = epoll_create (MAXEVENTS);
 
     flags = SOCK_STREAM;
     if (p->rcv) {
@@ -406,7 +406,7 @@ throughput_establish (ArgStruct *p)
     socklen_t clen;
     struct protoent *proto;
     int nevents, i;
-    struct epoll_event events[NEVENTS];
+    struct epoll_event events[MAXEVENTS];
     struct epoll_event event;
     double t0, duration;
 
@@ -437,8 +437,8 @@ throughput_establish (ArgStruct *p)
         t0 = When ();
         printf ("\tStarting loop to wait for connections...\n");
 
-        while ((duration = (t0 + 15) - When ()) > 0) {
-            nevents = epoll_wait (ep, events, NEVENTS, duration); 
+        while ((duration = (t0 + ONLINE_DELAY) - When ()) > 0) {
+            nevents = epoll_wait (ep, events, MAXEVENTS, duration); 
             if (nevents < 0) {
                 if (errno != EINTR) {
                     perror ("epoll_wait");
@@ -606,7 +606,7 @@ int
 tcp_read_helper (int sockid, char *buf, int len)
 {
     int nevents, i;
-    struct epoll_event events[NEVENTS];
+    struct epoll_event events[MAXEVENTS];
     struct epoll_event event;
 
     event.events = EPOLLIN;
@@ -617,7 +617,7 @@ tcp_read_helper (int sockid, char *buf, int len)
     }
 
     while (1) {
-        nevents = epoll_wait (ep, events, NEVENTS, -1);
+        nevents = epoll_wait (ep, events, MAXEVENTS, -1);
         if (nevents < 0) {
             if (errno != EINTR) {
                 perror ("epoll_wait");
@@ -642,7 +642,7 @@ int
 tcp_write_helper (int sockid, char *buf, int len)
 {
     int nevents, i;
-    struct epoll_event events[NEVENTS];
+    struct epoll_event events[MAXEVENTS];
     struct epoll_event event;
 
     event.events = EPOLLOUT;
@@ -653,7 +653,7 @@ tcp_write_helper (int sockid, char *buf, int len)
     }
 
     while (1) {
-        nevents = epoll_wait (ep, events, NEVENTS, -1);
+        nevents = epoll_wait (ep, events, MAXEVENTS, -1);
         if (nevents < 0) {
             if (errno != EINTR) {
                 perror ("epoll_wait");
