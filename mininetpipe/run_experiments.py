@@ -17,9 +17,9 @@ def run_experiment(cli_cmd, serv_cmd, nodes, nprocs):
     launcher = os.path.join(wdir, "launch_n_clients.sh")
 
     # Clean up any potential zombies on the client side(s)
-    for ip in nodes: 
+    for node in nodes: 
         subprocess.Popen(
-            "ssh theano@%s 'pkill \"NP[a-z]*\" -U theano'" % ip,
+            "ssh %s 'pkill \"NP[a-z]*\" -U theano'" % node,
             shell=True)
     time.sleep(3)
 
@@ -31,7 +31,7 @@ def run_experiment(cli_cmd, serv_cmd, nodes, nprocs):
     time.sleep(0.5)
 
     # Launch the client-side programs
-    for ip in nodes:
+    for node in nodes:
         n = procs_per_client
 
         if leftover > 0: 
@@ -39,7 +39,8 @@ def run_experiment(cli_cmd, serv_cmd, nodes, nprocs):
             leftover -= 1 
 
         subprocess.Popen(
-            "ssh theano@%s 'cd %s; bash %s \"%s\" %d'" % (ip, wdir, launcher, cli_cmd, n),
+            "ssh %s 'cd %s; bash %s \"%s\" %d'" % (
+                node, wdir, launcher, cli_cmd, n),
             shell=True)
 
     server.wait()

@@ -3,7 +3,7 @@
 #include <mtcp_api.h>
 #include <mtcp_epoll.h>
 
-#define DEBUG 1
+#define DEBUG 0
 
 int doing_reset = 0;
 mctx_t mctx = NULL;
@@ -166,7 +166,7 @@ SimpleWrite (ArgStruct *p)
 
     snprintf (buffer, PSIZE, "%s", "hello, world!");
 
-    n = mtcp_write (mctx, p->commfd, buffer, PSIZE);
+    n = mtcp_write_helper (mctx, p->commfd, buffer, PSIZE);
     if (n < 0) {
         perror ("write to server");
         exit (1);
@@ -174,7 +174,7 @@ SimpleWrite (ArgStruct *p)
 
     memset (buffer, 0, PSIZE);
 
-    n = mtcp_read (mctx, p->commfd, buffer, PSIZE);
+    n = mtcp_read_helper (mctx, p->commfd, buffer, PSIZE);
     if (n < 0) {
         perror ("read from server");
         exit (1);
@@ -455,7 +455,6 @@ throughput_establish (ArgStruct *p)
             }
 
             for (i = 0; i < nevents; i++) {
-		printf ("Got an event...\n");
                 if (events[i].data.sockid == p->servicefd) {
                     while (1) {
                         char hostbuf[NI_MAXHOST], portbuf[NI_MAXSERV];

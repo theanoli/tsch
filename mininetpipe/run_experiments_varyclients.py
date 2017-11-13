@@ -6,7 +6,7 @@ if __name__ == "__main__":
             'and multiple client processes.')
     parser.add_argument('nclients_range',
             type=int,
-            help=('End range of nclients to run (will start at 1,'
+            help=('End range of nclients to run (will start at 1, '
                 'go through powers of two)'))
     parser.add_argument('ntrials',
             type=int,
@@ -26,7 +26,7 @@ if __name__ == "__main__":
     serv_cmd = args.serv_cmd
     nodes = [".".join([x, "drat.sequencer.emulab.net"]) 
             for x in args.nodes.split(",")]
-
+    
     n = 1
     while n <= nclients_range:
         for trial in range(ntrials):
