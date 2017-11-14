@@ -74,11 +74,11 @@ main (int argc, char **argv)
             case 'r': nrtts = atoi (optarg);
                       break;
 
-	    case 'c': ncli = atoi (optarg);
-		      break;
+    	    case 'c': ncli = atoi (optarg);
+		              break;
 
-	    case 'P': args.port = atoi (optarg);
-		      break;
+            case 'P': args.port = atoi (optarg);
+                      break;
 
             case 's': sleep_interval = atoi (optarg);
                       break;
@@ -115,9 +115,9 @@ main (int argc, char **argv)
 	if (default_outdir) {
 	    outdir = (char *) malloc (256);
 	    snprintf (outdir, 256, "default");
-        }
+    }
 
-	snprintf (s, 512, "results/%s/%s", outdir, outfile);
+    snprintf (s, 512, "results/%s/%s", outdir, outfile);
 	memcpy (cpy_s, s, 512);
 	printf ("Results going into %s\n", s); 
 	mkdir (dirname (cpy_s), 0777);
@@ -174,26 +174,26 @@ main (int argc, char **argv)
         /* FOR THROUGHPUT */
 
         // If there's no file specified, do not record results 
-	if (args.rcv) {
-		if (default_outfile) {
-		    printf ("No file specified; not recording results!\n");		
-		} else {
-		    if (default_outdir) {
-			    outdir = (char *) malloc (256);
-			    snprintf (outdir, 256, "default");
-		    }
-		    
-		    snprintf (s, 512, "results/%s/%s", outdir, outfile);
-		    memcpy (cpy_s, s, 512);
-		    printf ("Results going into %s\n", s); 
-		    mkdir (dirname (cpy_s), 0777);
-		}
+        if (args.rcv) {
+            if (default_outfile) {
+                printf ("No file specified; not recording results!\n");		
+            } else {
+                if (default_outdir) {
+                    outdir = (char *) malloc (256);
+                    snprintf (outdir, 256, "default");
+                }
+                
+                snprintf (s, 512, "results/%s/%s", outdir, outfile);
+                memcpy (cpy_s, s, 512);
+                printf ("Results going into %s\n", s); 
+                mkdir (dirname (cpy_s), 0777);
 
-	        if ((out = fopen (s, "ab")) == NULL) {
-		    fprintf (stderr,"Can't open %s for output\n", s);
-			exit (1);
-		}
-	}
+                if ((out = fopen (s, "ab")) == NULL) {
+                    fprintf (stderr,"Can't open %s for output\n", s);
+                    exit (1);
+                }
+            }
+        }
 
         ThroughputSetup (&args);
 
