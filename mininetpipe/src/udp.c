@@ -1,6 +1,6 @@
 #include "harness.h"
 
-#define ONLINE_DELAY 12
+#define ONLINE_DELAY 16 
 #define DEBUG 0
 
 int doing_reset = 0;

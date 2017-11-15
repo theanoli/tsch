@@ -249,7 +249,7 @@ Echo (ArgStruct *p)
 
     // Add a two-second delay to let the clients stabilize
     while ((duration = When () - tnull) < (p->expduration + 2)) {
-        n = mtcp_epoll_wait (mctx, ep, events, MAXEVENTS, -1);
+        n = mtcp_epoll_wait (mctx, ep, events, MAXEVENTS, 1);
 
         if (n < 0) {
             perror ("epoll_wait");

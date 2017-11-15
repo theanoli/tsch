@@ -6,7 +6,7 @@ import sys
 import argparse
 import subprocess
 import time
-
+import shlex
 
 def run_experiment(cli_cmd, serv_cmd, nodes, nprocs):
     # All as in usage, after converting to appropriate type
@@ -17,18 +17,21 @@ def run_experiment(cli_cmd, serv_cmd, nodes, nprocs):
     launcher = os.path.join(wdir, "launch_n_clients.sh")
 
     # Clean up any potential zombies on the client side(s)
+    print "****Killing zombie processes on client...****"
     for node in nodes: 
         subprocess.Popen(
-            "ssh %s 'pkill \"NP[a-z]*\" -U theano'" % node,
-            shell=True)
+            shlex.split("ssh %s 'sudo pkill \"NP[a-z]*\"'" % node))
     time.sleep(3)
 
     # Launch the server-side program and then wait a half-second
-    server = subprocess.Popen(
-        "cd %s; %s -c %d" % (wdir, serv_cmd, nprocs),
-        shell=True)
+    print "****Launching server program:...****"
+    os.chdir(wdir)
+    command = shlex.split("%s -c %d" % (serv_cmd, nprocs))
+    server = subprocess.Popen(command)
 
     time.sleep(0.5)
+
+    print "****Getting ready to launch clients...****"
 
     # Launch the client-side programs
     for node in nodes:
@@ -38,10 +41,9 @@ def run_experiment(cli_cmd, serv_cmd, nodes, nprocs):
             n += 1
             leftover -= 1 
 
-        subprocess.Popen(
-            "ssh %s 'cd %s; bash %s \"%s\" %d'" % (
-                node, wdir, launcher, cli_cmd, n),
-            shell=True)
+        command = shlex.split("ssh %s 'cd %s; bash %s \"%s\" %d'" % (
+                node, wdir, launcher, cli_cmd, n))
+        subprocess.Popen(command)
 
     server.wait()
     
