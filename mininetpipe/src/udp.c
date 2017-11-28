@@ -1,6 +1,5 @@
 #include "harness.h"
 
-#define ONLINE_DELAY 16 
 #define DEBUG 0
 
 int doing_reset = 0;
@@ -201,7 +200,7 @@ Echo (ArgStruct *p)
     // Wait a few seconds to let clients come online
     if (!p->latency) {
         printf ("Waiting for clients to start up...\n");
-        while ((duration = When () - tnull) < ONLINE_DELAY) {
+        while ((duration = When () - tnull) < (0.001 * p->ncli + 2)) {
 
         }
     }

@@ -52,6 +52,7 @@ struct argstruct
     int     servicefd,     /* File descriptor of the network socket         */
             commfd;        /* Communication file descriptor                 */
     short   port;          /* Port used for connection                      */
+    int     ncli;           /* For throughput: number of clients in exp     */
 
     char    *r_ptr;        /* Pointer to current location in receive buffer    */
     char    *s_ptr;        /* Pointer to current location in send buffer    */

@@ -25,7 +25,6 @@ main (int argc, char **argv)
     char *outfile;
 
     int nrtts;
-    int ncli; 		/* Number of clients in the experiment */
     int sleep_interval; /* How long to sleep b/t latency pings (usec) */
     // double duration;
 
@@ -74,7 +73,7 @@ main (int argc, char **argv)
             case 'r': nrtts = atoi (optarg);
                       break;
 
-    	    case 'c': ncli = atoi (optarg);
+    	    case 'c': args.ncli = atoi (optarg);
 		              break;
 
             case 'P': args.port = atoi (optarg);
@@ -210,7 +209,7 @@ main (int argc, char **argv)
             Echo (&args);
 
 	    if (!default_outfile) {
-		    fprintf (out, "%d,%f\n", ncli, args.counter/args.duration);
+		    fprintf (out, "%d,%f\n", args.ncli, args.counter/args.duration);
 	    }
             printf ("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
             printf ("Received %" PRIu64 " packets in %f seconds\n", 

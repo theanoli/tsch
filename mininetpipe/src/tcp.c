@@ -2,7 +2,6 @@
 
 #include <sys/epoll.h>
 
-#define ONLINE_DELAY 18
 #define DEBUG 0
 
 int doing_reset = 0;
@@ -437,7 +436,7 @@ throughput_establish (ArgStruct *p)
         t0 = When ();
         printf ("\tStarting loop to wait for connections...\n");
 
-        while ((duration = (t0 + ONLINE_DELAY) - When ()) > 0) {
+        while ((duration = (t0 + (p->ncli * 0.001 + 2)) - When ()) > 0) {
             nevents = epoll_wait (ep, events, MAXEVENTS, duration); 
             if (nevents < 0) {
                 if (errno != EINTR) {

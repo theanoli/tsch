@@ -8,86 +8,154 @@ import subprocess
 import time
 import shlex
 
-def run_experiment(cli_cmd, serv_cmd, nodes, nprocs, nservers):
-    # All as in usage, after converting to appropriate type
-    procs_per_client = nprocs/len(nodes)
-    leftover = nprocs % len(nodes)
+class ExperimentSet(object):
+    def __init__(self, args):
+        self.printlabel = "[" + os.path.basename(__file__) + "]"
 
-    wdir = "/proj/sequencer/tsch/mininetpipe"
-    launcher = os.path.join(wdir, "launch_n_clients.sh")
+        self.serv_basecmd = args.serv_basecmd
+        self.cli_basecmd = args.cli_basecmd
+        self.nodes = [".".join([x, "drat.sequencer.emulab.net"])
+                if "client" in x else x
+                for x in args.nodes.split(",")]
+        self.ntrials = args.ntrials
+        self.ncli_min = args.ncli_min
+        self.ncli_max = args.ncli_max
+        self.nservers = args.nservers
+        self.start_port = args.start_port
+        self.wdir = args.wdir
+        self.start_port = args.start_port
 
-    # Clean up any potential zombies on the client side(s)
-    print "****Killing zombie processes on client...****"
-    for node in nodes: 
-        subprocess.Popen(
-            shlex.split("ssh %s 'sudo pkill \"NP[a-z]*\"'" % node))
-    time.sleep(3)
+        # If we have more server processes than client procs, override the number of
+        # client procs to ensure each server proc gets at least one client proc
+        if self.ncli_min < self.nservers:
+            self.ncli_min = self.nservers
 
-    # Launch the server-side program and then wait a half-second
-    print "****Launching server program:...****"
-    os.chdir(wdir)
-    command = shlex.split("%s -c %d" % (serv_cmd, nprocs))
+        if self.ncli_max < self.ncli_min:
+            self.ncli_max = self.ncli_min
 
-    servers = []
-    for i in range(nservers): 
-        cmd = command + ["-P %d" % (8000 + i)]
-        print "Sending command to server:"
-        print cmd
-        servers.append(subprocess.Popen(cmd))
-
-    time.sleep(1)
-
-    print "****Getting ready to launch clients...****"
-
-    # Launch the client-side programs
-    for i, node in enumerate(nodes):
-        n = procs_per_client
-
-        if leftover > 0: 
-            n += 1
-            leftover -= 1 
-
-        command = shlex.split("ssh %s 'cd %s; bash %s \"%s\" %d %d'" % (
-                node, wdir, launcher, cli_cmd, n, nservers))
-        print "Sending command to client:\n"
-        print command
-        subprocess.Popen(command)
-
-    for server in servers:
-        server.wait()
+    def printer(self, msg): 
+        print "%s %s" % (self.printlabel, msg)
     
+    def run_experiments(self):
+        # Launch the entire set of experiments for this experiment set
+        n = self.ncli_min
 
-# if __name__ == "__main__":
-#     parser = argparse.ArgumentParser(description='Run a single server process'
-#             'and multiple client processes.')
-#     parser.add_argument('ntrials',
-#             type=int,
-#             help='Number of times to repeat experiment')
-#     parser.add_argument('serv_cmd',
-#             help='Command to run for each server process.')
-#     parser.add_argument('cli_cmd',
-#             help='Command to run for each client process.')
-#     parser.add_argument('nodes', 
-#             help='List of client machine IP addresses or names.')
-#     parser.add_argument('nprocs',
-#             type=int,
-#             help=('Total number of client processes to launch '
-#                 '(will be spread evenly over the client machines).'))
-# 
-#     args = parser.parse_args()
-# 
-#     ntrials = args.ntrials
-#     cli_cmd_arg = args.cli_cmd
-#     serv_cmd_arg = args.serv_cmd
-#     nodes_arg = [".".join([x, "drat.sequencer.emulab.net"]) for x in args.nodes.split(",")]
-#     nprocs_arg = args.nprocs
-#     port_range_arg = args.port_range
-# 
-#     for trial in range(ntrials):
-#         print ""
-#         print "***Running trial %d!***" % (trial + 1)
-#         run_experiment(cli_cmd_arg, serv_cmd_arg, nodes_arg, nprocs_arg)
-#         print "***Completed trial %d!***" % (trial + 1)
-#         print ""
+        while n <= self.ncli_max:
+            for trial in range(self.ntrials):
+                self.printer("Running trial %d for %d clients per node" % 
+                        (trial + 1, n))
+                experiment = Experiment(self, n)
+                self.printer("Completed trial %d!" % (trial + 1))
+            n *= 2
 
+
+class Experiment(object):
+    def __init__(self, experiment_set, nprocs):
+        self.experiment_set = experiment_set
+        self.nprocs_per_client = nprocs
+        self.run_experiment()
+
+    def __getattr__(self, attr):
+        return getattr(self.experiment_set, attr)
+
+    def kill_zombie_processes(self):
+        # Clean up any potential zombies on the client side(s)
+        self.printer("Killing zombie processes on client(s).")
+        killers = []
+        for node in self.nodes: 
+            killers.append(subprocess.Popen(
+                shlex.split("ssh %s 'sudo pkill \"NP[a-z]*\"'" % node)))
+        for killer in killers:
+            killer.wait()
+
+    def launch_servers(self):
+        # Launch the server-side program and then wait a bit 
+        self.printer("Launching servers...")
+        
+        os.chdir(self.wdir)
+
+        servers = []
+        for i in range(self.nservers): 
+            serv_cmd = (self.serv_basecmd +
+                    " -c %d" % self.total_clientprocs + 
+                    " -P %d" % (8000 + i))
+            cmd = shlex.split(serv_cmd)
+            self.printer("Launching server process %d: %s" % (i, serv_cmd))
+            servers.append(subprocess.Popen(cmd))
+
+        time.sleep(0.5)
+        return servers
+
+    def launch_clients(self):
+        # Launch the client-side programs
+        self.printer("Launching clients...")
+
+        for node in self.nodes:
+            # Create a giant list of all the commands to be executed on a
+            # single node; this avoids opening a ton of SSH sessions
+            nodecmds = "cd %s; pwd; " % self.wdir
+            for n in range(self.nprocs_per_client):
+                if n % 100 == 0:
+                    self.printer("Launching client process %d on %s" % 
+                            (n, node))
+                cmd = (self.cli_basecmd + 
+                        " -P %d" % (8000 + (n % self.nservers)))
+                nodecmds += (cmd + " & ")
+            nodecmds = nodecmds[:-2]
+            subprocess.Popen(shlex.split("ssh %s '%s'" % (node, nodecmds)))
+        
+    def run_experiment(self):
+        self.total_clientprocs = self.nprocs_per_client * len(self.nodes)
+
+        self.kill_zombie_processes()
+
+        servers = self.launch_servers()
+        self.launch_clients()
+
+        for server in servers:
+            server.wait()
+
+    
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Run one or more server processes '
+            'and multiple client processes.')
+    parser.add_argument('serv_basecmd',
+            help=('Command to run for each server process. Will be augmented '
+            'with port number and total number of clients.'))
+    parser.add_argument('cli_basecmd',
+            help='Command to run for each client process.')
+    parser.add_argument('nodes', 
+            help='List of client machine IP addresses or names.')
+    parser.add_argument('--ntrials',
+            type=int,
+            help='Number of times to repeat experiment. Default 1.',
+            default=1)
+    parser.add_argument('--ncli_min',
+            type=int,
+            help=('Min number of clients to run. Default 1.'),
+            default=1)
+    parser.add_argument('--ncli_max',
+            type=int,
+            help=('Max number of clients to run (will start at 1, '
+                'go through powers of two until max). Default 1.'),
+            default=1)
+    parser.add_argument('--nservers',
+            type=int,
+            help='Number of server processes to run. Default 1.',
+            default=1)
+    parser.add_argument('--start_port',
+            type=int,
+            help='Base port number. Default 8000.',
+            default=8000)
+    parser.add_argument('--wdir', 
+            help='Working directory. Default /proj/sequencer/tsch/mininetpipe.',
+            default='/proj/sequencer/tsch/mininetpipe')
+
+
+    args = parser.parse_args()
+
+    print "About to start experiment..."
+
+    experiment_set = ExperimentSet(args)
+    experiment_set.run_experiments()
 
