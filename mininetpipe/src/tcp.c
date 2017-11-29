@@ -337,7 +337,9 @@ ThroughputSetup (ArgStruct *p)
     int socket_family = AF_INET;
     int flags;
 
-    printf ("*** Setting up connection(s)... ***\n");
+    if (p->rcv) {
+        printf ("*** Setting up connection(s)... ***\n");
+    }
 
     host = p->host;
 
@@ -353,7 +355,7 @@ ThroughputSetup (ArgStruct *p)
     if (p->rcv) {
         flags |= SOCK_NONBLOCK;
     } 
-    printf ("\tCreating socket...\n");
+
     if ((sockfd = socket (socket_family, flags, 0)) < 0) {
         printf ("tester: can't open stream socket!\n");
         exit (-4);
@@ -409,8 +411,6 @@ throughput_establish (ArgStruct *p)
     struct epoll_event event;
     double t0, duration;
 
-    printf ("*** Establishing connection... ***\n");
-
     clen = (socklen_t) sizeof (p->prot.sin2);
     
     if (p->tr) {
@@ -421,7 +421,6 @@ throughput_establish (ArgStruct *p)
                 exit (-10);
             }
         }
-        printf ("\tConnection successful!\n");
     } else if (p->rcv) {
         event.events = EPOLLIN;
         event.data.fd = p->servicefd;
@@ -436,7 +435,7 @@ throughput_establish (ArgStruct *p)
         t0 = When ();
         printf ("\tStarting loop to wait for connections...\n");
 
-        while ((duration = (t0 + (p->ncli * 0.001 + 2)) - When ()) > 0) {
+        while ((duration = (t0 + (p->ncli * 0.01 + 2)) - When ()) > 0) {
             nevents = epoll_wait (ep, events, MAXEVENTS, duration); 
             if (nevents < 0) {
                 if (errno != EINTR) {

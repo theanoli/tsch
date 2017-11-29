@@ -54,7 +54,9 @@ class ExperimentSet(object):
 class Experiment(object):
     def __init__(self, experiment_set, nprocs):
         self.experiment_set = experiment_set
-        self.nprocs_per_client = nprocs
+        self.nprocs_per_client = nprocs / len(nodes)
+        self.total_clientprocs = nprocs
+
         self.run_experiment()
 
     def __getattr__(self, attr):
@@ -117,9 +119,6 @@ class Experiment(object):
             f.close()
         
     def run_experiment(self):
-        self.total_clientprocs = (self.nprocs_per_client *
-                len(self.nodes)) 
-
         self.kill_zombie_processes()
 
         servers = self.launch_servers()
