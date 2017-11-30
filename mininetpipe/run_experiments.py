@@ -12,8 +12,8 @@ class ExperimentSet(object):
     def __init__(self, args):
         self.printlabel = "[" + os.path.basename(__file__) + "]"
 
-        self.serv_basecmd = args.serv_basecmd
-        self.cli_basecmd = args.cli_basecmd
+        self.basecmd = args.basecmd
+        self.server_ip = args.server_ip
         self.nodes = [".".join([x, "drat.sequencer.emulab.net"])
                 if "client" in x else x
                 for x in args.nodes.split(",")]
@@ -23,7 +23,6 @@ class ExperimentSet(object):
         self.nservers = args.nservers
         self.start_port = args.start_port
         self.wdir = args.wdir
-        self.start_port = args.start_port
         self.results_dir = args.results_dir
         self.results_file = args.results_file
 
@@ -54,7 +53,9 @@ class ExperimentSet(object):
 class Experiment(object):
     def __init__(self, experiment_set, nprocs):
         self.experiment_set = experiment_set
-        self.nprocs_per_client = nprocs
+        self.nprocs_per_client = nprocs / len(self.nodes)
+        self.total_clientprocs = nprocs
+
         self.run_experiment()
 
     def __getattr__(self, attr):
@@ -78,9 +79,9 @@ class Experiment(object):
 
         servers = []
         for i in range(self.nservers): 
-            serv_cmd = (self.serv_basecmd +
+            serv_cmd = (self.basecmd +
                     " -c %d" % self.total_clientprocs + 
-                    " -P %d" % (8000 + i))
+                    " -P %d" % (self.start_port + i))
             if self.results_dir:
                 serv_cmd += " -d %s" % self.results_dir
             if self.results_file:
@@ -104,8 +105,9 @@ class Experiment(object):
                 if n % 100 == 0:
                     self.printer("Launching client process %d on %s" % 
                             (n, node))
-                cmd = (self.cli_basecmd + 
-                        " -P %d" % (8000 + (n % self.nservers)))
+                cmd = (self.basecmd + 
+                        " -H %s" % self.server_ip +
+                        " -P %d" % (self.start_port + (n % self.nservers)))
                 nodecmds += (cmd + " &\n")
 
             # Commands can be really long; dump to file
@@ -117,9 +119,6 @@ class Experiment(object):
             f.close()
         
     def run_experiment(self):
-        self.total_clientprocs = (self.nprocs_per_client *
-                len(self.nodes)) 
-
         self.kill_zombie_processes()
 
         servers = self.launch_servers()
@@ -132,13 +131,15 @@ class Experiment(object):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run one or more server processes '
             'and multiple client processes.')
-    parser.add_argument('serv_basecmd',
-            help=('Command to run for each server process. Will be augmented '
-            'with port number and total number of clients.'))
-    parser.add_argument('cli_basecmd',
-            help='Command to run for each client process.')
+    parser.add_argument('basecmd',
+            help=('Command to run for each process. Will be augmented '
+            'with port number and total number of clients for server, '
+            'server IP and port number for clients.'))
     parser.add_argument('nodes', 
             help='List of client machine IP addresses or names.')
+    parser.add_argument('--server_ip',
+            help=('IP address of the server. Default 10.1.1.3.'),
+            default="10.1.1.3") 
     parser.add_argument('--ntrials',
             type=int,
             help='Number of times to repeat experiment. Default 1.',

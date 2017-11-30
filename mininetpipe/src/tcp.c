@@ -98,11 +98,12 @@ Setup (ArgStruct *p)
         printf ("tester: can't open stream socket!\n");
         exit (-4);
     }
-
+    
     if (!(proto = getprotobyname ("tcp"))) {
         printf ("tester: protocol 'tcp' unknown!\n");
         exit (555);
     }
+
 
     if (p->tr) {
         if (atoi (host) > 0) {
@@ -122,12 +123,23 @@ Setup (ArgStruct *p)
         p->commfd = sockfd;
 
     } else if (p->rcv) {
+        int enable = 1;
+        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
+            printf ("tester: server: SO_REUSEADDR failed! errno=%d\n", errno);
+            exit (-7);
+        }
+        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(int)) < 0) {
+            printf ("tester: server: SO_REUSEPORT failed! errno=%d\n", errno);
+            exit (-7);
+        }
+
         memset ((char *) lsin1, 0, sizeof (*lsin1));
         lsin1->sin_family       = AF_INET;
         lsin1->sin_addr.s_addr  = htonl (INADDR_ANY);
         lsin1->sin_port         = htons (p->port);
 
         if (bind (sockfd, (struct sockaddr *) lsin1, sizeof (*lsin1)) < 0) {
+            printf("%s bind to %s:%d failed: %s", __func__, inet_ntoa(lsin1->sin_addr), ntohs(lsin1->sin_port), strerror(errno));
             printf ("tester: server: bind on local address failed! errno=%d\n", errno);
             exit (-6);
         }
@@ -383,6 +395,16 @@ ThroughputSetup (ArgStruct *p)
         lsin1->sin_port = htons (p->port);
         p->commfd = sockfd;
     } else if (p->rcv) {
+        int enable = 1;
+        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
+            printf ("tester: server: SO_REUSEADDR failed! errno=%d\n", errno);
+            exit (-7);
+        }
+        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(int)) < 0) {
+            printf ("tester: server: SO_REUSEPORT failed! errno=%d\n", errno);
+            exit (-7);
+        }
+
         memset ((char *) lsin1, 0, sizeof (*lsin1));
         lsin1->sin_family       = AF_INET;
         lsin1->sin_addr.s_addr  = htonl (INADDR_ANY);
@@ -410,6 +432,7 @@ throughput_establish (ArgStruct *p)
     struct epoll_event events[MAXEVENTS];
     struct epoll_event event;
     double t0, duration;
+    int connections = 0;
 
     clen = (socklen_t) sizeof (p->prot.sin2);
     
@@ -466,9 +489,9 @@ throughput_establish (ArgStruct *p)
                                 portbuf, sizeof (portbuf),
                                 NI_NUMERICHOST | NI_NUMERICSERV);
                                             
-                        printf ("Accepted connection: descriptor %d, host %s, "
-                                "port %s\n", p->commfd, hostbuf, portbuf);
-
+                        // printf ("Accepted connection: descriptor %d, host %s, "
+                        //        "port %s\n", p->commfd, hostbuf, portbuf);
+                        
                         if (!(proto = getprotobyname ("tcp"))) {
                             printf ("unknown protocol!\n");
                             exit (555);
@@ -487,6 +510,11 @@ throughput_establish (ArgStruct *p)
                             perror ("epoll_ctl");
                             exit (1);
                         }
+
+                        connections++;
+                        if (!(connections % 50)) {
+                            printf ("%d connections so far...\n", connections);
+                        }
                     }
                 } else {
                     if (events[i].events & EPOLLIN) {
@@ -501,6 +529,9 @@ throughput_establish (ArgStruct *p)
                 } 
             }
         }
+
+        // Record the actual number of successful connections
+        p->ncli = connections;
     }
 
     printf ("Setup complete... getting ready to start experiment\n");
