@@ -10,6 +10,9 @@ import shlex
 import subprocess
 import time
 
+wait_multiplier = 0.007
+
+
 class ExperimentSet(object):
     def __init__(self, args):
         self.printlabel = "[" + os.path.basename(__file__) + "]"
@@ -27,6 +30,8 @@ class ExperimentSet(object):
         self.wdir = args.wdir
         self.results_dir = args.results_dir
         self.results_file = args.results_file
+        self.online_wait = args.online_wait
+        self.wait_multiplier = args.wait_multiplier
 
         # If we have more server processes than client procs, override the number of
         # client procs to ensure each server proc gets at least one client proc
@@ -57,7 +62,9 @@ class Experiment(object):
         self.experiment_set = experiment_set
         self.nprocs_per_client = nprocs / len(self.nodes)
         self.total_clientprocs = nprocs
-        self.online_wait = math.ceil(self.total_clientprocs * 0.001)
+        if self.online_wait is None:
+            self.online_wait = math.ceil(self.total_clientprocs * 
+                    wait_multiplier)
 
         self.run_experiment()
 
@@ -100,6 +107,7 @@ class Experiment(object):
     def launch_clients(self):
         # Launch the client-side programs
         self.printer("Launching clients...")
+        i = 0
 
         for node in self.nodes:
             # Create a giant list of all the commands to be executed on a
@@ -107,12 +115,13 @@ class Experiment(object):
             nodecmds = ""
             for n in range(self.nprocs_per_client):
                 if n % 100 == 0:
-                    self.printer("Launching client process %d on %s" % 
-                            (n, node))
+                    self.printer("Launching client process %d on %s, portno %d" % 
+                            (n, node, self.start_port + (i % self.nservers)))
                 cmd = (self.basecmd + 
                         " -H %s" % self.server_ip +
-                        " -P %d" % (self.start_port + (n % self.nservers)))
+                        " -P %d" % (self.start_port + (i % self.nservers)))
                 nodecmds += (cmd + " &\n")
+                i += 1
 
             # Commands can be really long; dump to file
             fname = "cmdfile_%s.sh" % node
@@ -174,6 +183,17 @@ if __name__ == "__main__":
     parser.add_argument('--results_file',
             help='File to put the results',
             default=None)
+    parser.add_argument('--online_wait',
+            help=('Time to wait for clients to come online. Default '
+                'is %f times the total number of clients.' % wait_multiplier),
+            type=int,
+            default=None)
+    parser.add_argument('--wait_multiplier',
+            help=('Multiplier for how long to wait for clients to come '
+                'online. Default is %f.' % wait_multiplier),
+            type=float,
+            default=wait_multiplier)
+
 
     args = parser.parse_args()
 
