@@ -458,7 +458,8 @@ throughput_establish (ArgStruct *p)
         t0 = When ();
         printf ("\tStarting loop to wait for connections...\n");
 
-        while ((duration = (t0 + (p->online_wait + 10)) - When ()) > 0) {
+        while ((duration = (t0 + (p->online_wait + 10)) - When ()) > 0 &&
+                (connections != p->ncli)) {
             nevents = epoll_wait (ep, events, MAXEVENTS, duration); 
             if (nevents < 0) {
                 if (errno != EINTR) {
