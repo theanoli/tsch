@@ -200,15 +200,15 @@ Echo (ArgStruct *p)
     // Wait a few seconds to let clients come online
     if (!p->latency) {
         printf ("Waiting for clients to start up...\n");
-        while ((duration = When () - tnull) < (0.01 * p->ncli + 2)) {
+        while ((duration = When () - tnull) < (p->online_wait + 10)) {
 
         }
     }
 
-    // Add a two-second delay to let clients stabilize
+    // Add a three-second delay to let clients stabilize
     tnull = When ();  // Restart timer
     printf ("Assuming all clients have come online...\n");
-    while ((duration = When () - tnull) < (p->expduration + 2)) {
+    while ((duration = When () - tnull) < (p->expduration + 3)) {
 
         if (!p->latency) {
             if ((duration > 2) && (countstart == 0)) {

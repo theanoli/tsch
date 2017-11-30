@@ -253,8 +253,8 @@ Echo (ArgStruct *p)
     t0 = 0;  // Silence compiler
     tnull = When ();
 
-    // Add a two-second delay to let the clients stabilize
-    while ((duration = When () - tnull) < (p->expduration + 2)) {
+    // Add a few-second delay to let the clients stabilize
+    while ((duration = When () - tnull) < (p->expduration + 3)) {
         n = epoll_wait (ep, events, MAXEVENTS, 0);
 
         if (n < 0) {
@@ -458,7 +458,7 @@ throughput_establish (ArgStruct *p)
         t0 = When ();
         printf ("\tStarting loop to wait for connections...\n");
 
-        while ((duration = (t0 + (p->ncli * 0.01 + 2)) - When ()) > 0) {
+        while ((duration = (t0 + (p->online_wait + 10)) - When ()) > 0) {
             nevents = epoll_wait (ep, events, MAXEVENTS, duration); 
             if (nevents < 0) {
                 if (errno != EINTR) {

@@ -3,10 +3,12 @@
 import os
 import re
 import sys
+
 import argparse
+import math
+import shlex
 import subprocess
 import time
-import shlex
 
 class ExperimentSet(object):
     def __init__(self, args):
@@ -55,6 +57,7 @@ class Experiment(object):
         self.experiment_set = experiment_set
         self.nprocs_per_client = nprocs / len(self.nodes)
         self.total_clientprocs = nprocs
+        self.online_wait = math.ceil(self.total_clientprocs * 0.001)
 
         self.run_experiment()
 
@@ -80,8 +83,9 @@ class Experiment(object):
         servers = []
         for i in range(self.nservers): 
             serv_cmd = (self.basecmd +
-                    " -c %d" % self.total_clientprocs + 
-                    " -P %d" % (self.start_port + i))
+                    " -c %d" % (self.total_clientprocs / self.nservers) + 
+                    " -P %d" % (self.start_port + i) +
+                    " -w %d" % (self.online_wait))
             if self.results_dir:
                 serv_cmd += " -d %s" % self.results_dir
             if self.results_file:

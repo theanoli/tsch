@@ -53,6 +53,7 @@ struct argstruct
             commfd;        /* Communication file descriptor                 */
     short   port;          /* Port used for connection                      */
     int     ncli;           /* For throughput: number of clients in exp     */
+    int     online_wait;    /* Tput: how long to wait for clients to come up */
 
     char    *r_ptr;        /* Pointer to current location in receive buffer    */
     char    *s_ptr;        /* Pointer to current location in send buffer    */

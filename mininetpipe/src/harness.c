@@ -37,6 +37,7 @@ main (int argc, char **argv)
     nrtts = NRTTS;
     args.latency = 1;  // Default to do latency; this is arbitrary
     args.expduration = 100000;  // Seconds; some big number for latency, don't care  
+    args.online_wait = 0;
 
     signal (SIGINT, SignalHandler);
 
@@ -48,7 +49,7 @@ main (int argc, char **argv)
     args.rcv = 1;
 
     /* Parse the arguments. See Usage for description */
-    while ((c = getopt (argc, argv, "o:d:H:r:c:P:s:th")) != -1)
+    while ((c = getopt (argc, argv, "o:d:H:r:c:P:s:tw:h")) != -1)
     {
         switch (c)
         {
@@ -84,6 +85,9 @@ main (int argc, char **argv)
 
             case 't': args.latency = 0;
                       args.expduration = 20;
+                      break;
+
+            case 'w': args.online_wait = atoi (optarg);  // How long to wait for clients to come up
                       break;
 
             case 'h': PrintUsage ();
