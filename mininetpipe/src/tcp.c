@@ -3,6 +3,8 @@
 #include <sys/epoll.h>
 
 #define DEBUG 0
+#define WARMUP 3
+#define COOLDOWN 5
 
 int doing_reset = 0;
 int ep = -1;
@@ -228,7 +230,8 @@ Echo (ArgStruct *p)
     double tnull, t0, duration;
     int j, n, i, done;
     struct epoll_event events[MAXEVENTS];
-    int countstart = 0;
+    int docount = 0;
+    int expstart = 0;
 
     if (p->latency) {
         // We only have one client; add it to the events list
@@ -254,7 +257,7 @@ Echo (ArgStruct *p)
     tnull = When ();
 
     // Add a few-second delay to let the clients stabilize
-    while ((duration = When () - tnull) < (p->expduration + 3)) {
+    while ((duration = When () - tnull) < (p->expduration + WARMUP + COOLDOWN)) {
         n = epoll_wait (ep, events, MAXEVENTS, 0);
 
         if (n < 0) {
@@ -267,11 +270,23 @@ Echo (ArgStruct *p)
 
         // If we've passed the warm-up period, start the counter
         // and the throughput timer
-        if ((duration > 2) && (countstart == 0)) {
-	    printf ("Starting to count packets for throughput...\n");
-            countstart = 1; 
+        if ((duration > WARMUP) && 
+                (expstart == 0) &&
+                (docount == 0)) {
+            printf ("Starting to count packets for throughput...\n");
+            expstart = 1;
+            docount = 1; 
             t0 = When ();
+        } else if ((duration > (p->expduration + WARMUP)) &&
+                (expstart == 1) && 
+                (docount == 1)) {
+            // Experiment has completed; let it keep running without counting packets
+            // to allow other servers to finish up
+            docount = 0;
+            p->duration = When () - t0;
+            printf ("Experiment over, stopping counting packets...\n");
         }
+        
 
         for (i = 0; i < n; i++) {
             // Check for errors
@@ -320,11 +335,9 @@ Echo (ArgStruct *p)
                         printf ("Some echoed bytes didn't make it!\n");
                     }
                    
-                    if (countstart) {
+                    if (docount) {
                         (p->counter)++;
                     } 
-                    // Probably don't need this as timestamps always increase
-                    // memset (p->r_ptr, 0, PSIZE - 1);
                 }
 
                 if (done) {
@@ -333,8 +346,6 @@ Echo (ArgStruct *p)
             }
         }
     }
-
-    p->duration = When () - t0;
 }
 
 
@@ -458,8 +469,9 @@ throughput_establish (ArgStruct *p)
         t0 = When ();
         printf ("\tStarting loop to wait for connections...\n");
 
-        while ((duration = (t0 + (p->online_wait + 10)) - When ()) > 0 &&
-                (connections != p->ncli)) {
+        while ((duration = (t0 + (p->online_wait + 10)) - When ()) > 0 // &&
+                // (connections != p->ncli)
+                ) {
             nevents = epoll_wait (ep, events, MAXEVENTS, duration); 
             if (nevents < 0) {
                 if (errno != EINTR) {

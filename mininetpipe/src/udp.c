@@ -1,6 +1,8 @@
 #include "harness.h"
 
 #define DEBUG 0
+#define WARMUP 3
+#define COOLDOWN 5
 
 int doing_reset = 0;
 
@@ -185,7 +187,9 @@ Echo (ArgStruct *p)
     // Loop through for expduration seconds and count each packet you send out
     // Start counting packets after a few seconds to stabilize connection(s)
     double tnull, t0, duration;
-    int countstart = 0;
+    int docount = 0;
+    int expstart = 0;
+
     struct sockaddr_in *remote = NULL;
     socklen_t len;
 
@@ -205,16 +209,28 @@ Echo (ArgStruct *p)
         }
     }
 
-    // Add a three-second delay to let clients stabilize
+    // Add a WARMUP-seconds delay to let clients stabilize
     tnull = When ();  // Restart timer
     printf ("Assuming all clients have come online...\n");
-    while ((duration = When () - tnull) < (p->expduration + 3)) {
+    while ((duration = When () - tnull) < 
+            (p->expduration + WARMUP + COOLDOWN)) {
 
         if (!p->latency) {
-            if ((duration > 2) && (countstart == 0)) {
+            if ((duration > WARMUP) && 
+                    (expstart == 0) &&
+                    (docount == 0)) {
                 printf ("Starting to count packets for throughput...\n");
-                countstart = 1; 
+                expstart = 1;
+                docount = 1; 
                 t0 = When ();
+            } else if ((duration > (p->expduration + WARMUP)) &&
+                    (expstart == 1) &&
+                    (docount == 1)) {
+                // Experiment has completed; let it keep running without counting packets
+                // to allow other servers to finish up
+                docount = 0;
+                p->duration = When () - t0;
+                printf ("Experiment over, stopping counting packets...\n");
             }
         }
 
@@ -244,13 +260,10 @@ Echo (ArgStruct *p)
         }
 
         // Count successfully echoed packets
-        if (countstart) {
+        if (docount) {
             (p->counter)++;
         }
-                
     }
-
-    p->duration = When () - t0;
 }
 
 
@@ -279,6 +292,10 @@ establish (ArgStruct *p)
         // For UDP, this will let multiple processes to bind to the same port;
         // here we want it so we can immediately reuse the same socket
         if (setsockopt (p->commfd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof (int))) {
+            perror ("tester: server: unable to setsockopt!");
+            exit (557);
+        }
+        if (setsockopt (p->commfd, SOL_SOCKET, SO_REUSEPORT, &one, sizeof (int))) {
             perror ("tester: server: unable to setsockopt!");
             exit (557);
         }

@@ -60,8 +60,10 @@ class ExperimentSet(object):
 class Experiment(object):
     def __init__(self, experiment_set, nprocs):
         self.experiment_set = experiment_set
-        self.nprocs_per_client = nprocs / len(self.nodes)
-        self.total_clientprocs = nprocs
+        self.printer("Number of client nodes: %d\n\tnprocs: %d" % (len(self.nodes), nprocs))
+        self.nprocs_per_client = int(math.ceil(float(nprocs) / len(self.nodes)))
+        self.printer("nprocs per client: %d" % self.nprocs_per_client)
+        self.total_clientprocs = nprocs * len(self.nodes)
         if self.online_wait is None:
             self.online_wait = math.ceil(self.total_clientprocs * 
                     wait_multiplier)
@@ -106,7 +108,8 @@ class Experiment(object):
 
     def launch_clients(self):
         # Launch the client-side programs
-        self.printer("Launching clients...")
+        self.printer("Launching clients, %s processes per client..." % 
+                self.nprocs_per_client)
         i = 0
 
         for node in self.nodes:
@@ -114,7 +117,7 @@ class Experiment(object):
             # single node; this avoids opening a ton of SSH sessions
             nodecmds = ""
             for n in range(self.nprocs_per_client):
-                if n % 100 == 0:
+                if (n % 100) == 0:
                     self.printer("Launching client process %d on %s, portno %d" % 
                             (n, node, self.start_port + (i % self.nservers)))
                 cmd = (self.basecmd + 
