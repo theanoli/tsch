@@ -258,7 +258,7 @@ Echo (ArgStruct *p)
 
     // Add a few-second delay to let the clients stabilize
     while ((duration = When () - tnull) < (p->expduration + WARMUP + COOLDOWN)) {
-        n = epoll_wait (ep, events, MAXEVENTS, 0);
+        n = epoll_wait (ep, events, MAXEVENTS, -1);
 
         if (n < 0) {
             perror ("epoll_wait");
@@ -270,21 +270,23 @@ Echo (ArgStruct *p)
 
         // If we've passed the warm-up period, start the counter
         // and the throughput timer
-        if ((duration > WARMUP) && 
-                (expstart == 0) &&
-                (docount == 0)) {
-            printf ("Starting to count packets for throughput...\n");
-            expstart = 1;
-            docount = 1; 
-            t0 = When ();
-        } else if ((duration > (p->expduration + WARMUP)) &&
-                (expstart == 1) && 
-                (docount == 1)) {
-            // Experiment has completed; let it keep running without counting packets
-            // to allow other servers to finish up
-            docount = 0;
-            p->duration = When () - t0;
-            printf ("Experiment over, stopping counting packets...\n");
+        if (!p->latency) {
+            if ((duration > WARMUP) && 
+                    (expstart == 0) &&
+                    (docount == 0)) {
+                printf ("Starting to count packets for throughput...\n");
+                expstart = 1;
+                docount = 1; 
+                t0 = When ();
+            } else if ((duration > (p->expduration + WARMUP)) &&
+                    (expstart == 1) && 
+                    (docount == 1)) {
+                // Experiment has completed; let it keep running without counting packets
+                // to allow other servers to finish up
+                docount = 0;
+                p->duration = When () - t0;
+                printf ("Experiment over, stopping counting packets...\n");
+            }
         }
         
 

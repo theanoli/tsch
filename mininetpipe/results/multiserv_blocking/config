@@ -1,0 +1,2 @@
+- Set epoll_wait timeout to -1 (blocking) in NPtcp
+- 32 server cores, 64 + 32 client cores
