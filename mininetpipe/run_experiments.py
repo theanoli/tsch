@@ -29,9 +29,10 @@ class ExperimentSet(object):
         self.start_port = args.start_port
         self.wdir = args.wdir
         self.results_dir = args.results_dir
-        self.results_file = args.results_file
+        self.results_filebase = args.results_filebase
         self.online_wait = args.online_wait
         self.wait_multiplier = args.wait_multiplier
+        self.collect_stats = args.collect_stats
 
         # If we have more server processes than client procs, override the number of
         # client procs to ensure each server proc gets at least one client proc
@@ -52,18 +53,37 @@ class ExperimentSet(object):
             for trial in range(self.ntrials):
                 self.printer("Running trial %d for %d clients per node" % 
                         (trial + 1, n))
-                experiment = Experiment(self, n)
+                experiment = Experiment(self, n, trial)
                 self.printer("Completed trial %d!" % (trial + 1))
             n *= 2
 
 
 class Experiment(object):
-    def __init__(self, experiment_set, nprocs):
+    def __init__(self, experiment_set, nprocs, trial_number):
         self.experiment_set = experiment_set
+        self.trial_number = trial_number
         self.printer("Number of client nodes: %d\n\tnprocs: %d" % (len(self.nodes), nprocs))
         self.nprocs_per_client = int(math.ceil(float(nprocs) / len(self.nodes)))
         self.printer("nprocs per client: %d" % self.nprocs_per_client)
-        self.total_clientprocs = nprocs * len(self.nodes)
+        self.total_clientprocs = self.nprocs_per_client * len(self.nodes)
+
+        if self.results_filebase:
+            # Override the trial number to keep going from last trial
+            if self.results_dir is not None:
+                previous_trials = sorted([x for x in 
+                    os.listdir(os.path.join("results", self.results_dir))
+                    if self.results_filebase in x])
+
+                if len(previous_trials) > 0:
+                    last_trial = max([int(re.search(
+                        r"(?<=%s_)(\d+)" % self.results_filebase, x).group(0))
+                        for x in previous_trials if ".tab" not in x])
+
+                    self.trial_number = last_trial + 1
+
+            self.results_file = (self.results_filebase + 
+                    "_%d.dat" % self.trial_number)
+
         if self.online_wait is None:
             self.online_wait = math.ceil(self.total_clientprocs * 
                     wait_multiplier)
@@ -99,6 +119,8 @@ class Experiment(object):
                 serv_cmd += " -d %s" % self.results_dir
             if self.results_file:
                 serv_cmd += " -o %s" % self.results_file
+            if self.collect_stats and (i == 0):
+                serv_cmd += " -l"
             cmd = shlex.split(serv_cmd)
             self.printer("Launching server process %d: %s" % (i, serv_cmd))
             servers.append(subprocess.Popen(cmd))
@@ -183,7 +205,7 @@ if __name__ == "__main__":
     parser.add_argument('--results_dir',
             help='Directory to put the results file',
             default=None)
-    parser.add_argument('--results_file',
+    parser.add_argument('--results_filebase',
             help='File to put the results',
             default=None)
     parser.add_argument('--online_wait',
@@ -196,7 +218,9 @@ if __name__ == "__main__":
                 'online. Default is %f.' % wait_multiplier),
             type=float,
             default=wait_multiplier)
-
+    parser.add_argument('--collect_stats',
+            help=('Collect stats about CPU usage.'),
+            action='store_true')
 
     args = parser.parse_args()
 

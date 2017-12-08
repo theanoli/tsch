@@ -1,3 +1,4 @@
+# Arbitrary number of clients/servers
 source tb_compat.tcl
 set ns [new Simulator]
 

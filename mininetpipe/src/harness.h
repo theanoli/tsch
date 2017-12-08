@@ -54,6 +54,8 @@ struct argstruct
     short   port;          /* Port used for connection                      */
     int     ncli;           /* For throughput: number of clients in exp     */
     int     online_wait;    /* Tput: how long to wait for clients to come up */
+    int     collect_stats;  /* Collect stats on resource usage              */
+    char    *outfile;       /* Where results go to die                      */
 
     char    *r_ptr;        /* Pointer to current location in receive buffer    */
     char    *s_ptr;        /* Pointer to current location in send buffer    */
@@ -135,5 +137,7 @@ void PrintUsage();
 void SignalHandler (int signum);
 
 void ExitStrategy ();
+
+void CollectStats (ArgStruct *p);
 
 int getopt( int argc, char * const argv[], const char *optstring);

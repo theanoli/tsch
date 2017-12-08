@@ -49,7 +49,7 @@ main (int argc, char **argv)
     args.rcv = 1;
 
     /* Parse the arguments. See Usage for description */
-    while ((c = getopt (argc, argv, "o:d:H:r:c:P:s:tw:h")) != -1)
+    while ((c = getopt (argc, argv, "o:d:H:r:c:P:s:tlw:h")) != -1)
     {
         switch (c)
         {
@@ -89,6 +89,9 @@ main (int argc, char **argv)
 
             case 'w': args.online_wait = atoi (optarg);  // How long to wait for clients to come up
                       break;
+
+            case 'l': args.collect_stats = 1;
+                      break; 
 
             case 'h': PrintUsage ();
                       exit (0);
@@ -179,7 +182,8 @@ main (int argc, char **argv)
         // If there's no file specified, do not record results 
         if (args.rcv) {
             if (default_outfile) {
-                printf ("No file specified; not recording results!\n");		
+                printf ("No file specified; not recording results!\n");	
+                args.outfile = NULL;
             } else {
                 if (default_outdir) {
                     outdir = (char *) malloc (256);
@@ -195,6 +199,7 @@ main (int argc, char **argv)
                     fprintf (stderr,"Can't open %s for output\n", s);
                     exit (1);
                 }
+                args.outfile = s;
             }
         }
 
@@ -248,6 +253,46 @@ PrintUsage (void)
     printf ("\t-h\t(client or server) print usage\n");
     printf ("\n");
     exit (0);
+}
+
+
+void
+CollectStats (ArgStruct *p)
+{
+    int pid = fork ();
+
+    if (pid == 0) {
+        printf ("[server] Launching collectl...\n");
+        fflush (stdout);
+        char nsamples[128];
+        
+        snprintf (nsamples, 128, "-c%d", p->expduration);
+
+        if (p->outfile == NULL) {
+            // Nowhere to save results; dump to terminal
+            char *argv[4];
+
+            argv[0] = "collectl";
+            argv[1] = "-sc";
+            argv[2] = nsamples;
+            argv[3] = NULL;
+            execvp ("collectl", argv);
+
+        } else {
+            // else save results to file
+            char *argv[8];
+
+            argv[0] = "collectl";
+            argv[1] = "-P";
+            argv[2] = "-f";
+            argv[3] = p->outfile;
+            argv[4] = "-sc";
+            argv[5] = nsamples;
+            argv[6] = "-oaz";
+            argv[7] = NULL;
+            execvp ("collectl", argv);
+        }
+    }
 }
 
 

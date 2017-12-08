@@ -277,6 +277,9 @@ Echo (ArgStruct *p)
                 printf ("Starting to count packets for throughput...\n");
                 expstart = 1;
                 docount = 1; 
+                if (p->collect_stats) {
+                    CollectStats(p);
+                }
                 t0 = When ();
             } else if ((duration > (p->expduration + WARMUP)) &&
                     (expstart == 1) && 
@@ -309,6 +312,8 @@ Echo (ArgStruct *p)
             } else {
                 // There's data to be read
                 done = 0;
+                int to_write;
+                int written;
                 char *q;
 
                 // This is dangerous because p->r_ptr is only PSIZE bytes long
@@ -326,18 +331,23 @@ Echo (ArgStruct *p)
                     done = 1;  // Close this socket
                 } else {
                     // We've read all the data; echo it back to the client
-                    j = write (events[i].data.fd, p->r_ptr, q - p->r_ptr);
-
-                    if (DEBUG) 
-                        printf ("Wrote %d bytes of %s to the socket...\n", 
-                                j, p->r_ptr);
+                    to_write = q - p->r_ptr;
+                    written = 0;
                     
-                    if (j < sizeof (q - p->r_ptr)) {
-                        // TODO treat this as an error or not?
-                        printf ("Some echoed bytes didn't make it!\n");
+                    while ((j = write (events[i].data.fd, 
+                                    p->r_ptr + written, to_write) + written) < to_write) {
+                        if (j < 0) {
+                            if (errno != EAGAIN) {
+                                perror ("server write");
+                                done = 1;
+                                break;
+                            }
+                        }
+                        written += j;
+                        printf ("Had to loop...\n");
                     }
-                   
-                    if (docount) {
+
+                    if (docount && !done) {
                         (p->counter)++;
                     } 
                 }
@@ -471,9 +481,25 @@ throughput_establish (ArgStruct *p)
         t0 = When ();
         printf ("\tStarting loop to wait for connections...\n");
 
+        int record_connecttime = 1;
+
         while ((duration = (t0 + (p->online_wait + 10)) - When ()) > 0 // &&
                 // (connections != p->ncli)
                 ) {
+            if ((connections == p->ncli) && record_connecttime) {
+                printf ("OMGLSDJF:LDSKJF:LDSKJF:DLSFJ Got all the connections...\n");
+                record_connecttime = 0;
+                FILE *f = fopen ("/proj/sequencer/tsch/mininetpipe/tmp", "a");
+                if (f < 0) {
+                    perror ("error opening file to dump connection setup time!");
+                }
+                int r = fprintf (f, "%d,%f\n", connections, When () - t0);
+                if (r < 0) {
+                    perror ("error writing to connection setup time file!");
+                }
+                fclose (f);
+            }
+
             nevents = epoll_wait (ep, events, MAXEVENTS, duration); 
             if (nevents < 0) {
                 if (errno != EINTR) {

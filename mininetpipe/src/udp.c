@@ -222,6 +222,9 @@ Echo (ArgStruct *p)
                 printf ("Starting to count packets for throughput...\n");
                 expstart = 1;
                 docount = 1; 
+                if (p->collect_stats) {
+                    CollectStats(p);
+                }
                 t0 = When ();
             } else if ((duration > (p->expduration + WARMUP)) &&
                     (expstart == 1) &&
