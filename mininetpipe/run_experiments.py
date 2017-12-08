@@ -10,8 +10,7 @@ import shlex
 import subprocess
 import time
 
-wait_multiplier = 0.007
-
+wait_multiplier = 0.07
 
 class ExperimentSet(object):
     def __init__(self, args):
@@ -85,8 +84,8 @@ class Experiment(object):
                     "_%d.dat" % self.trial_number)
 
         if self.online_wait is None:
-            self.online_wait = math.ceil(self.total_clientprocs * 
-                    wait_multiplier)
+            self.online_wait = math.ceil(self.total_clientprocs / self.nservers * 
+                    self.wait_multiplier)
 
         self.run_experiment()
 
