@@ -36,7 +36,8 @@ main (int argc, char **argv)
     sleep_interval = 0;
     nrtts = NRTTS;
     args.latency = 1;  // Default to do latency; this is arbitrary
-    args.expduration = 100000;  // Seconds; some big number for latency, don't care  
+    args.expduration = 20;  // Seconds; default for throughput, will get
+                            // overridden for latency or by args
     args.online_wait = 0;
 
     signal (SIGINT, SignalHandler);
@@ -84,7 +85,9 @@ main (int argc, char **argv)
                       break;
 
             case 't': args.latency = 0;
-                      args.expduration = 20;
+                      break;
+
+            case 'u': args.expduration = atoi (optarg);
                       break;
 
             case 'w': args.online_wait = atoi (optarg);  // How long to wait for clients to come up
@@ -108,25 +111,27 @@ main (int argc, char **argv)
 
     /* FOR LATENCY */
     if (args.latency) {
+        // Some huge number, don't actually care
+        args.expduration = 1000000;
 
         // Use default filename construction for results
-	if (default_outfile) {
-	    int exp_timestamp;
-            exp_timestamp = (int) time (0);
-	    outfile = (char *) malloc (256);
-	    snprintf (outfile, 256, "%s-%d-r%d-s%d.out", whichproto, 
-			exp_timestamp, nrtts, sleep_interval);
+        if (default_outfile) {
+            int exp_timestamp;
+                exp_timestamp = (int) time (0);
+            outfile = (char *) malloc (256);
+            snprintf (outfile, 256, "%s-%d-r%d-s%d.out", whichproto, 
+                exp_timestamp, nrtts, sleep_interval);
+            }
+
+        if (default_outdir) {
+            outdir = (char *) malloc (256);
+            snprintf (outdir, 256, "default");
         }
 
-	if (default_outdir) {
-	    outdir = (char *) malloc (256);
-	    snprintf (outdir, 256, "default");
-    }
-
-    snprintf (s, 512, "results/%s/%s", outdir, outfile);
-	memcpy (cpy_s, s, 512);
-	printf ("Results going into %s\n", s); 
-	mkdir (dirname (cpy_s), 0777);
+        snprintf (s, 512, "results/%s/%s", outdir, outfile);
+        memcpy (cpy_s, s, 512);
+        printf ("Results going into %s\n", s); 
+        mkdir (dirname (cpy_s), 0777);
 
         Setup (&args);
 

@@ -32,6 +32,7 @@ class ExperimentSet(object):
         self.online_wait = args.online_wait
         self.wait_multiplier = args.wait_multiplier
         self.collect_stats = args.collect_stats
+        self.expduration = args.expduration
 
         # If we have more server processes than client procs, override the number of
         # client procs to ensure each server proc gets at least one client proc
@@ -120,6 +121,8 @@ class Experiment(object):
                 serv_cmd += " -o %s" % self.results_file
             if self.collect_stats and (i == 0):
                 serv_cmd += " -l"
+            if self.expduration:
+                serv_cmd += " -u %d" % self.expduration
             cmd = shlex.split(serv_cmd)
             self.printer("Launching server process %d: %s" % (i, serv_cmd))
             servers.append(subprocess.Popen(cmd))
@@ -220,6 +223,11 @@ if __name__ == "__main__":
     parser.add_argument('--collect_stats',
             help=('Collect stats about CPU usage.'),
             action='store_true')
+    parser.add_argument('--expduration',
+            type=int,
+            help=('Set throughput experiment duration.'),
+            default=None)
+    
 
     args = parser.parse_args()
 
