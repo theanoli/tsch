@@ -28,11 +28,11 @@ class ExperimentSet(object):
         self.start_port = args.start_port
         self.wdir = args.wdir
         self.results_dir = args.results_dir
-        self.results_filebase = args.results_filebase
         self.online_wait = args.online_wait
         self.wait_multiplier = args.wait_multiplier
         self.collect_stats = args.collect_stats
         self.expduration = args.expduration
+        self.results_filebase = args.results_filebase + "_u%d" % self.expduration
 
         # If we have more server processes than client procs, override the number of
         # client procs to ensure each server proc gets at least one client proc
@@ -70,18 +70,20 @@ class Experiment(object):
         if self.results_filebase:
             # Override the trial number to keep going from last trial
             if self.results_dir is not None:
-                previous_trials = sorted([x for x in 
+                previous_trials = [x for x in 
                     os.listdir(os.path.join("results", self.results_dir))
-                    if self.results_filebase in x])
+                    if self.results_filebase in x]
+                print previous_trials
 
                 if len(previous_trials) > 0:
                     last_trial = max([int(re.search(
-                        r"(?<=%s_)(\d+)" % self.results_filebase, x).group(0))
+                        r"(?<=%s_)(\d+)" % (self.results_filebase), x)
+                        .group(0))
                         for x in previous_trials if ".tab" not in x])
 
                     self.trial_number = last_trial + 1
 
-            self.results_file = (self.results_filebase + 
+            self.results_file = (self.results_filebase +
                     "_%d.dat" % self.trial_number)
 
         if self.online_wait is None:
@@ -114,15 +116,14 @@ class Experiment(object):
             serv_cmd = (self.basecmd +
                     " -c %d" % (self.total_clientprocs / self.nservers) + 
                     " -P %d" % (self.start_port + i) +
-                    " -w %d" % (self.online_wait))
+                    " -w %d" % (self.online_wait) +
+                    " -u %d" % self.expduration)
             if self.results_dir:
                 serv_cmd += " -d %s" % self.results_dir
             if self.results_file:
                 serv_cmd += " -o %s" % self.results_file
             if self.collect_stats and (i == 0):
                 serv_cmd += " -l"
-            if self.expduration:
-                serv_cmd += " -u %d" % self.expduration
             cmd = shlex.split(serv_cmd)
             self.printer("Launching server process %d: %s" % (i, serv_cmd))
             servers.append(subprocess.Popen(cmd))
@@ -225,8 +226,8 @@ if __name__ == "__main__":
             action='store_true')
     parser.add_argument('--expduration',
             type=int,
-            help=('Set throughput experiment duration.'),
-            default=None)
+            help=('Set throughput experiment duration. Default 20s.'),
+            default=20)
     
 
     args = parser.parse_args()
