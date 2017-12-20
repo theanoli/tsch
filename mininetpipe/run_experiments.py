@@ -32,7 +32,8 @@ class ExperimentSet(object):
         self.wait_multiplier = args.wait_multiplier
         self.collect_stats = args.collect_stats
         self.expduration = args.expduration
-        self.results_filebase = args.results_filebase + "_u%d" % self.expduration
+        self.results_filebase = (args.results_filebase + 
+                                "_u%d" % self.expduration)
 
         # If we have more server processes than client procs, override the number of
         # client procs to ensure each server proc gets at least one client proc
@@ -76,14 +77,15 @@ class Experiment(object):
                 print previous_trials
 
                 if len(previous_trials) > 0:
-                    last_trial = max([int(re.search(
-                        r"(?<=%s_)(\d+)" % (self.results_filebase), x)
-                        .group(0))
-                        for x in previous_trials if ".tab" not in x])
+                    last_trials = [int(re.search(
+                        r"^[0-9a-z_]+_(\d+)\.dat$", x).group(1))
+                        for x in previous_trials if ".tab" not in x]
+                    last_trial = max(last_trials)
 
                     self.trial_number = last_trial + 1
 
             self.results_file = (self.results_filebase +
+                    "_c%d" % self.total_clientprocs + 
                     "_%d.dat" % self.trial_number)
 
         if self.online_wait is None:
