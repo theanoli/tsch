@@ -32,6 +32,8 @@ class ExperimentSet(object):
         self.wait_multiplier = args.wait_multiplier
         self.collect_stats = args.collect_stats
         self.expduration = args.expduration
+        self.pin_procs = args.pin_procs
+
         self.results_filebase = (args.results_filebase + 
                                 "_u%d" % self.expduration)
 
@@ -120,6 +122,8 @@ class Experiment(object):
                     " -P %d" % (self.start_port + i) +
                     " -w %d" % (self.online_wait) +
                     " -u %d" % self.expduration)
+            if self.pin_procs: 
+                serv_cmd = "taskset -c %d " % i + serv_cmd
             if self.results_dir:
                 serv_cmd += " -d %s" % self.results_dir
             if self.results_file:
@@ -230,6 +234,9 @@ if __name__ == "__main__":
             type=int,
             help=('Set throughput experiment duration. Default 20s.'),
             default=20)
+    parser.add_argument('--pin_procs',
+            help=('Pin each process to a core.'),
+            action='store_true')
     
 
     args = parser.parse_args()

@@ -1,0 +1,15 @@
+# Set up RSS
+# sudo ethtool -K eth5 ntuple on
+
+for x in `seq 0 63`; do
+    if [ $x -gt 10 ]; then
+        port=80$x
+    else
+        port=800$x
+    fi
+    echo "sudo ethtool -N eth5 flow-type tcp4 dst-port $port action $x"
+done
+
+
+
+# Set up RFS
