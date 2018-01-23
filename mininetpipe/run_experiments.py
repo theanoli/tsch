@@ -161,9 +161,12 @@ class Experiment(object):
             fname = "cmdfile_%s.sh" % node
             f = open(fname, "w")
             f.write(nodecmds)
+            f.close()
+
+        for node in self.nodes:
+            fname = "cmdfile_%s.sh" % node
             subprocess.Popen(shlex.split("ssh %s 'cd %s; bash -s' < %s" % 
                 (node, self.wdir, fname)))
-            f.close()
         
     def run_experiment(self):
         self.kill_zombie_processes()
