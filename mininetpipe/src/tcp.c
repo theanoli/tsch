@@ -295,8 +295,10 @@ Echo (ArgStruct *p)
         n = epoll_wait (ep, events, MAXEVENTS, -1);
 
         if (n < 0) {
-            perror ("epoll_wait");
-            exit (1);
+            if (n != EINTR) {
+                perror ("epoll_wait");
+                exit (1);
+            }
         }
         
         if (DEBUG)
