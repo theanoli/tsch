@@ -228,10 +228,13 @@ Echo (ArgStruct *p)
     int j, n, i, done;
     struct mtcp_epoll_event events[MAXEVENTS];
     int countstart = 0;
+    // CCH int docount = 0; // ???
 
     if (p->latency) {
         // We only have one client; add it to the events list
         struct mtcp_epoll_event event;
+
+        // CCH check for nonblocking socket?
 
         event.events = MTCP_EPOLLIN | MTCP_EPOLLET;
         event.data.sockid = p->commfd;
