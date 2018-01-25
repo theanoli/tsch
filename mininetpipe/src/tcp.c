@@ -10,6 +10,38 @@ int doing_reset = 0;
 int ep = -1;
 
 
+void sig_handler (int signo)
+{
+    if (signo == SIGALRM) {
+        // We only need to set a new alarm if this is a throughput experiment
+        // Otherwise just let the clock run; latency duration is measured by 
+        // number of packets (-r option).
+        if (!p->latency) {
+            if ((p->expstart == 0) && (p->docount == 0)) {
+                printf ("Starting to count packets for throughput...\n");
+                p->expstart = 1;
+                p->docount = 1; 
+                if (p->collect_stats) {
+                    CollectStats(p);
+                }
+                p->t0 = When ();
+                alarm (p->expduration);
+            } else if ((expstart == 1) && (p->docount == 1)) {
+                // Experiment has completed; let it keep running without counting
+                // packets to allow other servers to finish up
+                p->docount = 0;
+                p->duration = When () - p->t0;
+                printf ("Experiment over, stopping counting packets...\n");
+                alarm (COOLDOWN);
+            } else if ((p->expstart == 1) && (p->docount == 0)) {
+                // The last signal; end the experiment by setting p->tput_done
+                p->tput_done = 1;
+            }
+        }
+    }
+}
+
+
 int
 tcp_accept_helper (int sockid, struct sockaddr *addr, socklen_t *addrlen)
 {
@@ -257,7 +289,9 @@ Echo (ArgStruct *p)
     tnull = When ();
 
     // Add a few-second delay to let the clients stabilize
-    while ((duration = When () - tnull) < (p->expduration + WARMUP + COOLDOWN)) {
+    // while ((duration = When () - tnull) < (p->expduration + WARMUP + COOLDOWN)) {
+    alarm (WARMUP);
+    while (p->tput_done == 0) {
         n = epoll_wait (ep, events, MAXEVENTS, -1);
 
         if (n < 0) {
@@ -267,31 +301,6 @@ Echo (ArgStruct *p)
         
         if (DEBUG)
             printf ("Got %d events\n", n);
-
-        // If we've passed the warm-up period, start the counter
-        // and the throughput timer
-        if (!p->latency) {
-            if ((duration > WARMUP) && 
-                    (expstart == 0) &&
-                    (docount == 0)) {
-                printf ("Starting to count packets for throughput...\n");
-                expstart = 1;
-                docount = 1; 
-                if (p->collect_stats) {
-                    CollectStats(p);
-                }
-                t0 = When ();
-            } else if ((duration > (p->expduration + WARMUP)) &&
-                    (expstart == 1) && 
-                    (docount == 1)) {
-                // Experiment has completed; let it keep running without counting packets
-                // to allow other servers to finish up
-                docount = 0;
-                p->duration = When () - t0;
-                printf ("Experiment over, stopping counting packets...\n");
-            }
-        }
-        
 
         for (i = 0; i < n; i++) {
             // Check for errors
