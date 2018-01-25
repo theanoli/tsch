@@ -222,15 +222,15 @@ main (int argc, char **argv)
 
             Echo (&args);
 
-	    if (!default_outfile) {
-		    fprintf (out, "%d,%f\n", args.ncli, args.counter/args.duration);
-	    }
-            printf ("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
-            printf ("Received %" PRIu64 " packets in %f seconds\n", 
-                    args.counter, args.duration);
-	    printf ("Throughput is %f pps\n", args.counter/args.duration);
-            printf ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
-        }
+            if (!default_outfile) {
+                fprintf (out, "%d,%f\n", args.ncli, args.counter/args.duration);
+            }
+                printf ("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+                printf ("Received %" PRIu64 " packets in %f seconds\n", 
+                        args.counter, args.duration);
+            printf ("Throughput is %f pps\n", args.counter/args.duration);
+                printf ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+            }
     }
 
     ExitStrategy ();

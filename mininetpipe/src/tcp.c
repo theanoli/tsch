@@ -483,7 +483,7 @@ throughput_establish (ArgStruct *p)
 
         int record_connecttime = 1;
 
-        while ((duration = (t0 + (p->online_wait + 10)) - When ()) > 0 // &&
+        while ((duration = (t0 + (p->online_wait + 5)) - When ()) > 0 // &&
                 // (connections != p->ncli)
                 ) {
             if ((connections == p->ncli) && record_connecttime) {
@@ -546,7 +546,7 @@ throughput_establish (ArgStruct *p)
 
                         // Add descriptor to epoll instance
                         event.data.fd = p->commfd;
-                        event.events = EPOLLIN | EPOLLET;  // TODO check this
+                        event.events = EPOLLIN;  // TODO check this
                         if (epoll_ctl (ep, EPOLL_CTL_ADD, p->commfd, &event) < 0) {
                             perror ("epoll_ctl");
                             exit (1);
@@ -557,19 +557,11 @@ throughput_establish (ArgStruct *p)
                             printf ("%d connections so far...\n", connections);
                         }
                     }
-                } else {
-                    if (events[i].events & EPOLLIN) {
-                        int nread;
-                        char buf[128];
-
-                        nread = read (events[i].data.fd, buf, PSIZE);
-                        nread = write (events[i].data.fd, buf, PSIZE);
-                        if (nread) {
-                        }
-                    }
                 } 
             }
         }
+
+
 
         // Record the actual number of successful connections
         p->ncli = connections;

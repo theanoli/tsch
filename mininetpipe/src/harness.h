@@ -16,7 +16,7 @@
 #define PSIZE   32
 #define DEFPORT 8000
 #define EXPDURATION 10
-#define MAXEVENTS 16
+#define MAXEVENTS 4096
 
 // TCP-specific
 #if defined(TCP)

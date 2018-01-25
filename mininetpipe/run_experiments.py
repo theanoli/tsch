@@ -58,7 +58,9 @@ class ExperimentSet(object):
                         (trial + 1, n))
                 experiment = Experiment(self, n, trial)
                 self.printer("Completed trial %d!" % (trial + 1))
-            n *= 2
+                time.sleep(2)
+            n *= len(self.nodes)
+            self.printer("Moving on to %d clients per node." % n)
 
 
 class Experiment(object):
