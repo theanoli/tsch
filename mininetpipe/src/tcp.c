@@ -10,38 +10,6 @@ int doing_reset = 0;
 int ep = -1;
 
 
-void sig_handler (int signo)
-{
-    if (signo == SIGALRM) {
-        // We only need to set a new alarm if this is a throughput experiment
-        // Otherwise just let the clock run; latency duration is measured by 
-        // number of packets (-r option).
-        if (!p->latency) {
-            if ((p->expstart == 0) && (p->docount == 0)) {
-                printf ("Starting to count packets for throughput...\n");
-                p->expstart = 1;
-                p->docount = 1; 
-                if (p->collect_stats) {
-                    CollectStats(p);
-                }
-                p->t0 = When ();
-                alarm (p->expduration);
-            } else if ((expstart == 1) && (p->docount == 1)) {
-                // Experiment has completed; let it keep running without counting
-                // packets to allow other servers to finish up
-                p->docount = 0;
-                p->duration = When () - p->t0;
-                printf ("Experiment over, stopping counting packets...\n");
-                alarm (COOLDOWN);
-            } else if ((p->expstart == 1) && (p->docount == 0)) {
-                // The last signal; end the experiment by setting p->tput_done
-                p->tput_done = 1;
-            }
-        }
-    }
-}
-
-
 int
 tcp_accept_helper (int sockid, struct sockaddr *addr, socklen_t *addrlen)
 {
@@ -259,11 +227,8 @@ Echo (ArgStruct *p)
     // Server-side only!
     // Loop through for expduration seconds and count each packet you send out
     // Start counting packets after a few seconds to stabilize connection(s)
-    double tnull, t0, duration;
     int j, n, i, done;
     struct epoll_event events[MAXEVENTS];
-    int docount = 0;
-    int expstart = 0;
 
     if (p->latency) {
         // We only have one client; add it to the events list
@@ -274,7 +239,7 @@ Echo (ArgStruct *p)
             exit (1);
         }
         
-        event.events = EPOLLIN | EPOLLET;
+        event.events = EPOLLIN;
         event.data.fd = p->commfd;
 
         if (epoll_ctl (ep, EPOLL_CTL_ADD, p->commfd, &event) == -1) {
@@ -285,20 +250,17 @@ Echo (ArgStruct *p)
 
     p->counter = 0;
 
-    t0 = 0;  // Silence compiler
-    tnull = When ();
-
     // Add a few-second delay to let the clients stabilize
-    // while ((duration = When () - tnull) < (p->expduration + WARMUP + COOLDOWN)) {
+    printf ("Setting the alarm...\n");
     alarm (WARMUP);
     while (p->tput_done == 0) {
         n = epoll_wait (ep, events, MAXEVENTS, -1);
 
         if (n < 0) {
-            if (n != EINTR) {
-                perror ("epoll_wait");
-                exit (1);
+            if (n == EINTR) {
+                perror ("epoll_wait: echo intr:");
             }
+            // exit (1);
         }
         
         if (DEBUG)
@@ -358,12 +320,13 @@ Echo (ArgStruct *p)
                         printf ("Had to loop...\n");
                     }
 
-                    if (docount && !done) {
+                    if (p->docount && !done) {
                         (p->counter)++;
                     } 
                 }
 
                 if (done) {
+                    printf ("Got an error!\n");
                     close (events[i].data.fd);
                 }
             }

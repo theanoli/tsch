@@ -41,6 +41,7 @@ main (int argc, char **argv)
     args.online_wait = 0;
 
     signal (SIGINT, SignalHandler);
+    signal (SIGALRM, SignalHandler);
 
     args.host = NULL;
     args.port = DEFPORT; /* just in case the user doesn't set this. */
@@ -314,9 +315,37 @@ ExitStrategy (void)
 
 void
 SignalHandler (int signum) {
-    printf ("Got signal %d\n...\n", signum);
-    ExitStrategy ();
-    exit (0);
+    if (signum == SIGINT) {
+        printf ("Got a SIGINT...\n");
+        ExitStrategy ();
+        exit (0);
+    } else if (signum == SIGALRM) {
+        // We only need to set a new alarm if this is a throughput experiment
+        // Otherwise just let the clock run; latency duration is measured by 
+        // number of packets (-r option).
+        if (!args.latency) {
+            if ((args.expstart == 0) && (args.docount == 0)) {
+                printf ("Starting to count packets for throughput...\n");
+                args.expstart = 1;
+                args.docount = 1; 
+                if (args.collect_stats) {
+                    CollectStats(&args);
+                }
+                args.t0 = When ();
+                alarm (args.expduration);
+            } else if ((args.expstart == 1) && (args.docount == 1)) {
+                // Experiment has completed; let it keep running without counting
+                // packets to allow other servers to finish up
+                args.docount = 0;
+                args.duration = When () - args.t0;
+                printf ("Experiment over, stopping counting packets...\n");
+                alarm (COOLDOWN);
+            } else if ((args.expstart == 1) && (args.docount == 0)) {
+                // The last signal; end the experiment by setting p->tput_done
+                args.tput_done = 1;
+            }
+        }
+    }
 }
 
 
