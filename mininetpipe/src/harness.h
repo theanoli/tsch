@@ -16,7 +16,12 @@
 #define PSIZE   32
 #define DEFPORT 8000
 #define EXPDURATION 10
-#define MAXEVENTS 16
+#define MAXEVENTS 4096
+
+// For throughput experiments: time to wait before
+// starting measurements
+#define WARMUP 3
+#define COOLDOWN 5
 
 // TCP-specific
 #if defined(TCP)
@@ -73,6 +78,11 @@ struct argstruct
     int     expduration;    /* How long to count packets                    */
     uint64_t counter;       /* For counting packets!                        */
     double  duration;       /* Measured time over which packets are blasted */
+    // timer stuff
+    int expstart;
+    int docount;
+    double t0;
+    int tput_done;
 
     /* Now we work with a union of information for protocol dependent stuff  */
     ProtocolStruct prot;

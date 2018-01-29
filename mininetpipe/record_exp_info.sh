@@ -31,3 +31,9 @@ echo "BEGIN CLIENT-1 INFO" | tee -a $configpath
 ssh client-1.drat.sequencer.emulab.net bash -c "'$cpuinfo'"
 echo "END CLIENT-1 INFO" | tee -a $configpath
 echo $linebreak >> $configpath
+
+echo $linebreak >> $configpath
+echo "BEGIN CLIENT-2 INFO" | tee -a $configpath
+ssh client-2.drat.sequencer.emulab.net bash -c "'$cpuinfo'"
+echo "END CLIENT-2 INFO" | tee -a $configpath
+echo $linebreak >> $configpath

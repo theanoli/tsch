@@ -18,9 +18,7 @@ class ExperimentSet(object):
 
         self.basecmd = args.basecmd
         self.server_ip = args.server_ip
-        self.nodes = [".".join([x, "drat.sequencer.emulab.net"])
-                if "client" in x else x
-                for x in args.nodes.split(",")]
+        self.nodes = args.nodes.split(",")
         self.ntrials = args.ntrials
         self.ncli_min = args.ncli_min
         self.ncli_max = args.ncli_max
@@ -58,7 +56,9 @@ class ExperimentSet(object):
                         (trial + 1, n))
                 experiment = Experiment(self, n, trial)
                 self.printer("Completed trial %d!" % (trial + 1))
-            n *= 2
+                time.sleep(2)
+            n *= len(self.nodes)
+            self.printer("Moving on to %d clients per node." % n)
 
 
 class Experiment(object):
@@ -149,7 +149,7 @@ class Experiment(object):
             nodecmds = ""
             for n in range(self.nprocs_per_client):
                 if (n % 100) == 0:
-                    self.printer("Launching client process %d on %s, portno %d" % 
+                    self.printer("Recording client process %d on %s, portno %d" % 
                             (n, node, self.start_port + (i % self.nservers)))
                 cmd = (self.basecmd + 
                         " -H %s" % self.server_ip +
@@ -164,6 +164,7 @@ class Experiment(object):
             f.close()
 
         for node in self.nodes:
+            self.printer("Contacting client %s to launch client processes..." % node) 
             fname = "cmdfile_%s.sh" % node
             subprocess.Popen(shlex.split("ssh %s 'cd %s; bash -s' < %s" % 
                 (node, self.wdir, fname)))

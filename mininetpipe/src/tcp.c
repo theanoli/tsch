@@ -227,11 +227,8 @@ Echo (ArgStruct *p)
     // Server-side only!
     // Loop through for expduration seconds and count each packet you send out
     // Start counting packets after a few seconds to stabilize connection(s)
-    double tnull, t0, duration;
     int j, n, i, done;
     struct epoll_event events[MAXEVENTS];
-    int docount = 0;
-    int expstart = 0;
 
     if (p->latency) {
         // We only have one client; add it to the events list
@@ -242,7 +239,7 @@ Echo (ArgStruct *p)
             exit (1);
         }
         
-        event.events = EPOLLIN | EPOLLET;
+        event.events = EPOLLIN;
         event.data.fd = p->commfd;
 
         if (epoll_ctl (ep, EPOLL_CTL_ADD, p->commfd, &event) == -1) {
@@ -253,45 +250,21 @@ Echo (ArgStruct *p)
 
     p->counter = 0;
 
-    t0 = 0;  // Silence compiler
-    tnull = When ();
-
     // Add a few-second delay to let the clients stabilize
-    while ((duration = When () - tnull) < (p->expduration + WARMUP + COOLDOWN)) {
+    printf ("Setting the alarm...\n");
+    alarm (WARMUP);
+    while (p->tput_done == 0) {
         n = epoll_wait (ep, events, MAXEVENTS, -1);
 
         if (n < 0) {
-            perror ("epoll_wait");
-            exit (1);
+            if (n == EINTR) {
+                perror ("epoll_wait: echo intr:");
+            }
+            // exit (1);
         }
         
         if (DEBUG)
             printf ("Got %d events\n", n);
-
-        // If we've passed the warm-up period, start the counter
-        // and the throughput timer
-        if (!p->latency) {
-            if ((duration > WARMUP) && 
-                    (expstart == 0) &&
-                    (docount == 0)) {
-                printf ("Starting to count packets for throughput...\n");
-                expstart = 1;
-                docount = 1; 
-                if (p->collect_stats) {
-                    CollectStats(p);
-                }
-                t0 = When ();
-            } else if ((duration > (p->expduration + WARMUP)) &&
-                    (expstart == 1) && 
-                    (docount == 1)) {
-                // Experiment has completed; let it keep running without counting packets
-                // to allow other servers to finish up
-                docount = 0;
-                p->duration = When () - t0;
-                printf ("Experiment over, stopping counting packets...\n");
-            }
-        }
-        
 
         for (i = 0; i < n; i++) {
             // Check for errors
@@ -347,12 +320,13 @@ Echo (ArgStruct *p)
                         printf ("Had to loop...\n");
                     }
 
-                    if (docount && !done) {
+                    if (p->docount && !done) {
                         (p->counter)++;
                     } 
                 }
 
                 if (done) {
+                    printf ("Got an error!\n");
                     close (events[i].data.fd);
                 }
             }
@@ -483,7 +457,7 @@ throughput_establish (ArgStruct *p)
 
         int record_connecttime = 1;
 
-        while ((duration = (t0 + (p->online_wait + 10)) - When ()) > 0 // &&
+        while ((duration = (t0 + (p->online_wait + 5)) - When ()) > 0 // &&
                 // (connections != p->ncli)
                 ) {
             if ((connections == p->ncli) && record_connecttime) {
@@ -546,7 +520,7 @@ throughput_establish (ArgStruct *p)
 
                         // Add descriptor to epoll instance
                         event.data.fd = p->commfd;
-                        event.events = EPOLLIN | EPOLLET;  // TODO check this
+                        event.events = EPOLLIN;  // TODO check this
                         if (epoll_ctl (ep, EPOLL_CTL_ADD, p->commfd, &event) < 0) {
                             perror ("epoll_ctl");
                             exit (1);
@@ -555,16 +529,6 @@ throughput_establish (ArgStruct *p)
                         connections++;
                         if (!(connections % 50)) {
                             printf ("%d connections so far...\n", connections);
-                        }
-                    }
-                } else {
-                    if (events[i].events & EPOLLIN) {
-                        int nread;
-                        char buf[128];
-
-                        nread = read (events[i].data.fd, buf, PSIZE);
-                        nread = write (events[i].data.fd, buf, PSIZE);
-                        if (nread) {
                         }
                     }
                 } 
