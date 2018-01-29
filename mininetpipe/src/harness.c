@@ -324,25 +324,24 @@ SignalHandler (int signum) {
         // Otherwise just let the clock run; latency duration is measured by 
         // number of packets (-r option).
         if (!args.latency) {
-            if ((args.expstart == 0) && (args.docount == 0)) {
+            if (args.program_state == warmup) {
                 printf ("Starting to count packets for throughput...\n");
-                args.expstart = 1;
-                args.docount = 1; 
+                args.program_state = experiment; 
                 if (args.collect_stats) {
                     CollectStats(&args);
                 }
                 args.t0 = When ();
                 alarm (args.expduration);
-            } else if ((args.expstart == 1) && (args.docount == 1)) {
+            } else if (args.program_state == experiment) {
                 // Experiment has completed; let it keep running without counting
                 // packets to allow other servers to finish up
-                args.docount = 0;
+                args.program_state = cooldown;
                 args.duration = When () - args.t0;
                 printf ("Experiment over, stopping counting packets...\n");
                 alarm (COOLDOWN);
-            } else if ((args.expstart == 1) && (args.docount == 0)) {
+            } else if (args.program_state == cooldown) {
                 // The last signal; end the experiment by setting p->tput_done
-                args.tput_done = 1;
+                args.program_state = end;
             }
         }
     }

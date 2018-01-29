@@ -242,8 +242,6 @@ Echo (ArgStruct *p)
         end
     };
     Program_State program_state = warmup; 
-    int countstart = 0;
-    int expstart = 0;
 
     if (p->latency) {
         // We only have one client; add it to the events list
@@ -279,11 +277,6 @@ Echo (ArgStruct *p)
         
         // If we've passed the warm-up period, start the counter
         // and the throughput timer
-        // if ((duration > 2) && (countstart == 0)) {
-        //     countstart = 1; 
-        //     t0 = When ();
-        // }
-
         if (!p->latency) {
             if ((duration > WARMUP) && (program_state == warmup)) {
                 printf ("Starting to count packets for throughput...\n");

@@ -252,9 +252,10 @@ Echo (ArgStruct *p)
     p->counter = 0;
 
     // Add a few-second delay to let the clients stabilize
+    p->program_state = warmup;
     printf ("Setting the alarm...\n");
     alarm (WARMUP);
-    while (p->tput_done == 0) {
+    while (p->program_state != end) {
         n = epoll_wait (ep, events, MAXEVENTS, -1);
 
         if (n < 0) {
@@ -321,7 +322,7 @@ Echo (ArgStruct *p)
                         printf ("Had to loop...\n");
                     }
 
-                    if (p->docount && !done) {
+                    if ((p->program_state == experiment) && !done) {
                         (p->counter)++;
                     } 
                 }

@@ -47,6 +47,12 @@
   #error "TCP must be defined during compilation!"
 #endif
 
+typedef enum program_state {
+    warmup,
+    experiment,
+    cooldown,
+    end
+} ProgramState;
 
 typedef struct argstruct ArgStruct;
 struct argstruct 
@@ -79,8 +85,7 @@ struct argstruct
     uint64_t counter;       /* For counting packets!                        */
     double  duration;       /* Measured time over which packets are blasted */
     // timer stuff
-    int expstart;
-    int docount;
+    ProgramState program_state;
     double t0;
     int tput_done;
 
