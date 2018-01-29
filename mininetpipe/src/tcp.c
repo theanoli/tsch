@@ -182,7 +182,8 @@ SimpleWrite (ArgStruct *p)
 }
 
 
-void TimestampWrite (ArgStruct *p)
+void 
+TimestampWrite (ArgStruct *p)
 {
     // Send and then receive an echoed timestamp.
     // Return a pointer to the stored timestamp. 
@@ -213,11 +214,11 @@ void TimestampWrite (ArgStruct *p)
     }
     recvtime = When2 ();        
 
-    if (DEBUG)
-        printf ("Got timestamp: %s, %d bytes read\n", pbuffer, n);
     snprintf (p->lbuff, PSIZE, "%s", pbuffer);
     snprintf (p->lbuff + PSIZE - 1, PSIZE, "%lld,%.9ld\n", 
             (long long) recvtime.tv_sec, recvtime.tv_nsec);
+    if (DEBUG)
+        printf ("Got timestamp: %s, %d bytes read\n", pbuffer, n);
 }
 
 
@@ -455,23 +456,9 @@ throughput_establish (ArgStruct *p)
         t0 = When ();
         printf ("\tStarting loop to wait for connections...\n");
 
-        int record_connecttime = 1;
-
-        while ((duration = (t0 + (p->online_wait + 5)) - When ()) > 0 // &&
-                // (connections != p->ncli)
-                ) {
-            if ((connections == p->ncli) && record_connecttime) {
+        while ((duration = (t0 + (p->online_wait + 10)) - When ()) > 0) {
+            if (connections == p->ncli)  {
                 printf ("OMGLSDJF:LDSKJF:LDSKJF:DLSFJ Got all the connections...\n");
-                record_connecttime = 0;
-                FILE *f = fopen ("/proj/sequencer/tsch/mininetpipe/tmp", "a");
-                if (f < 0) {
-                    perror ("error opening file to dump connection setup time!");
-                }
-                int r = fprintf (f, "%d,%f\n", connections, When () - t0);
-                if (r < 0) {
-                    perror ("error writing to connection setup time file!");
-                }
-                fclose (f);
             }
 
             nevents = epoll_wait (ep, events, MAXEVENTS, duration); 
@@ -504,9 +491,6 @@ throughput_establish (ArgStruct *p)
                                 portbuf, sizeof (portbuf),
                                 NI_NUMERICHOST | NI_NUMERICSERV);
                                             
-                        // printf ("Accepted connection: descriptor %d, host %s, "
-                        //        "port %s\n", p->commfd, hostbuf, portbuf);
-                        
                         if (!(proto = getprotobyname ("tcp"))) {
                             printf ("unknown protocol!\n");
                             exit (555);
@@ -521,6 +505,7 @@ throughput_establish (ArgStruct *p)
                         // Add descriptor to epoll instance
                         event.data.fd = p->commfd;
                         event.events = EPOLLIN;  // TODO check this
+
                         if (epoll_ctl (ep, EPOLL_CTL_ADD, p->commfd, &event) < 0) {
                             perror ("epoll_ctl");
                             exit (1);

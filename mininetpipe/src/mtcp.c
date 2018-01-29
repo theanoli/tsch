@@ -4,10 +4,13 @@
 #include <mtcp_epoll.h>
 
 #define DEBUG 0
+#define WARMUP 3
+#define COOLDOWN 5
 
 int doing_reset = 0;
-mctx_t mctx = NULL;
 int ep = -1;
+
+mctx_t mctx = NULL;
 
 int mtcp_write_helper (mctx_t, int, char *, int);
 int mtcp_read_helper (mctx_t, int, char *, int);
@@ -40,6 +43,7 @@ mtcp_accept_helper (mctx_t mctx, int sockid, struct sockaddr *addr,
         // Wait for an incoming connection; return when we get one
         for (i = 0; i < nevents; i++) {
             if (events[i].data.sockid == sockid) {
+                // New connection incoming...
                 mtcp_epoll_ctl (mctx, ep, MTCP_EPOLL_CTL_DEL, sockid, NULL);
                 return mtcp_accept (mctx, sockid, addr, addrlen);
             } else {
@@ -79,7 +83,7 @@ void
 Setup (ArgStruct *p)
 {
     // Initialize connections: create socket, bind, listen (in establish)
-    // Also creates epoll instance
+    // Also creates mtcp_epoll instance
     int sockfd;
     struct sockaddr_in *lsin1, *lsin2;
     char *host;
@@ -136,6 +140,7 @@ Setup (ArgStruct *p)
         p->commfd = sockfd;
 
     } else if (p->rcv) {
+        // TODO REUSEADDR/REUSEPORT stuff needs to get done here? 
         memset ((char *) lsin1, 0, sizeof (*lsin1));
         lsin1->sin_family       = AF_INET;
         lsin1->sin_addr.s_addr  = htonl (INADDR_ANY);
@@ -166,7 +171,7 @@ SimpleWrite (ArgStruct *p)
 
     snprintf (buffer, PSIZE, "%s", "hello, world!");
 
-    n = mtcp_write_helper (mctx, p->commfd, buffer, PSIZE);
+    n = mtcp_write (mctx, p->commfd, buffer, PSIZE);
     if (n < 0) {
         perror ("write to server");
         exit (1);
@@ -174,7 +179,7 @@ SimpleWrite (ArgStruct *p)
 
     memset (buffer, 0, PSIZE);
 
-    n = mtcp_read_helper (mctx, p->commfd, buffer, PSIZE);
+    n = mtcp_read (mctx, p->commfd, buffer, PSIZE);
     if (n < 0) {
         perror ("read from server");
         exit (1);
@@ -182,7 +187,8 @@ SimpleWrite (ArgStruct *p)
 }
 
 
-void TimestampWrite (ArgStruct *p)
+void 
+TimestampWrite (ArgStruct *p)
 {
     // Send and then receive an echoed timestamp.
     // Return a pointer to the stored timestamp. 
@@ -195,7 +201,7 @@ void TimestampWrite (ArgStruct *p)
     snprintf (pbuffer, PSIZE, "%lld,%.9ld%-31s",
             (long long) sendtime.tv_sec, sendtime.tv_nsec, ",");
 
-    n = mtcp_write_helper (mctx, p->commfd, pbuffer, PSIZE - 1);
+    n = mtcp_write (mctx, p->commfd, pbuffer, PSIZE - 1);
     if (n < 0) {
         perror ("write");
         exit (1);
@@ -203,7 +209,7 @@ void TimestampWrite (ArgStruct *p)
 
     memset (pbuffer, 0, PSIZE);
 
-    n = mtcp_read_helper (mctx, p->commfd, pbuffer, PSIZE);
+    n = mtcp_read (mctx, p->commfd, pbuffer, PSIZE);
     if (n < 0) {
         perror ("read");
         exit (1);
@@ -227,7 +233,17 @@ Echo (ArgStruct *p)
     double tnull, t0, duration;
     int j, n, i, done;
     struct mtcp_epoll_event events[MAXEVENTS];
+
+    // States of the program are warmup, experiment (counting packets), cooldown.
+    enum Program_State {
+        warmup,
+        experiment,
+        cooldown,
+        end
+    };
+    Program_State program_state = warmup; 
     int countstart = 0;
+    int expstart = 0;
 
     if (p->latency) {
         // We only have one client; add it to the events list
@@ -240,6 +256,11 @@ Echo (ArgStruct *p)
             perror ("epoll_ctl");
             exit (1);
         }
+
+        if (mtcp_setsock_nonblock (mctx, sockfd) < 0) {
+            printf ("tester: couldn't set socket to nonblocking!\n");
+            exit (-6);
+        }
     }
 
     p->counter = 0;
@@ -248,8 +269,8 @@ Echo (ArgStruct *p)
     tnull = When ();
 
     // Add a two-second delay to let the clients stabilize
-    while ((duration = When () - tnull) < (p->expduration + 2)) {
-        n = mtcp_epoll_wait (mctx, ep, events, MAXEVENTS, 1);
+    while ((duration = When () - tnull) < (p->expduration + WARMUP + COOLDOWN)) {
+        n = mtcp_epoll_wait (mctx, ep, events, MAXEVENTS, -1);
 
         if (n < 0) {
             perror ("epoll_wait");
@@ -258,9 +279,27 @@ Echo (ArgStruct *p)
         
         // If we've passed the warm-up period, start the counter
         // and the throughput timer
-        if ((duration > 2) && (countstart == 0)) {
-            countstart = 1; 
-            t0 = When ();
+        // if ((duration > 2) && (countstart == 0)) {
+        //     countstart = 1; 
+        //     t0 = When ();
+        // }
+
+        if (!p->latency) {
+            if ((duration > WARMUP) && (program_state == warmup)) {
+                printf ("Starting to count packets for throughput...\n");
+                program_state = experiment;
+                if (p->collect_stats) {
+                    CollectStats (p);
+                }
+                t0 = When ();
+            } else if ((duration > (p->expduration + WARMUP)) &&
+                    (program_state == experiment)) {
+                // Experiment is over; let it keep running without counting packets
+                // to allow other clients/servers to finish up
+                p->duration = When () - t0;
+                program_state = cooldown;
+                printf ("Experiment over, stopping counting packets...\n");
+            }
         }
 
         for (i = 0; i < n; i++) {
@@ -283,12 +322,16 @@ Echo (ArgStruct *p)
                 // There's data to be read
                 done = 0;
                 char *q;
+                int to_write;
+                int written;
+                char *q;
 
                 // This is dangerous because p->r_ptr is only PSIZE bytes long
                 // TODO figure this out
                 q = p->r_ptr;
 
-                while ((j = mtcp_read (mctx, events[i].data.sockid, q, PSIZE - 1)) > 0) {
+                while ((j = mtcp_read (mctx, events[i].data.sockid,
+                               q, PSIZE - 1)) > 0) {
                     q += j;
                 }
                 
@@ -299,18 +342,25 @@ Echo (ArgStruct *p)
                     done = 1;  // Close this socket
                 } else {
                     // We've read all the data; echo it back to the client
-                    j = mtcp_write (mctx, events[i].data.sockid, p->r_ptr, q - p->r_ptr);
-
-                    if (DEBUG) 
-                        printf ("Wrote %d bytes of %s to the socket...\n", 
-                                j, p->r_ptr);
+                    to_write = q - p->r_ptr;
+                    written = 0; 
                     
-                    if (j < sizeof (q - p->r_ptr)) {
-                        // TODO treat this as an error or not?
-                        printf ("Some echoed bytes didn't make it!\n");
+                    while ((j = mtcp_write (mctx, events[i].data.sockid, 
+                                    p->r_ptr, q - p->r_ptr) + written) < to_write) {
+                        if (j < 0) {
+                            if (errno != EAGAIN) {
+                                perror ("server write"); 
+                                done = 1;
+                                break;
+                            }
+                        }
+                        written += j; 
+                        
+                        // This should happen only extremely rarely
+                        printf ("Had to loop...\n");
                     }
-                   
-                    if (countstart) {
+
+                    if (program_state == experiment) {
                         (p->counter)++;
                     } 
                 }
@@ -321,8 +371,6 @@ Echo (ArgStruct *p)
             }
         }
     }
-
-    p->duration = When () - t0;
 }
 
 
@@ -336,7 +384,9 @@ ThroughputSetup (ArgStruct *p)
     struct protoent *proto;
     int socket_family = AF_INET;
 
-    printf ("*** Setting up connection(s)... ***\n");
+    if (p->rcv) {
+        printf ("*** Setting up connection(s)... ***\n");
+    }
 
     host = p->host;
 
@@ -347,14 +397,14 @@ ThroughputSetup (ArgStruct *p)
     memset ((char *) lsin2, 0, sizeof (*lsin2));
     
     if (!mctx) {
-	mtcp_core_affinitize (0);
-	mctx = mtcp_create_context (0);
-	ep = mtcp_epoll_create (mctx, MAXEVENTS);
+        mtcp_core_affinitize (0);
+        mctx = mtcp_create_context (0);
+        ep = mtcp_epoll_create (mctx, MAXEVENTS);
     }
 
     if (!mctx) {
         printf ("tester: can't create mTCP socket!");
-	exit (-4);
+        exit (-4);
     }
 
     printf ("\tCreating socket...\n");
@@ -364,8 +414,8 @@ ThroughputSetup (ArgStruct *p)
     }
 
     if (mtcp_setsock_nonblock (mctx, sockfd) < 0) {
-	printf ("tester: couldn't set socket to nonblocking!\n");
-	exit (-6);
+        printf ("tester: couldn't set socket to nonblocking!\n");
+        exit (-6);
     }
     
     if (!(proto = getprotobyname ("tcp"))) {
@@ -417,8 +467,7 @@ throughput_establish (ArgStruct *p)
     struct mtcp_epoll_event events[MAXEVENTS];
     struct mtcp_epoll_event event;
     double t0, duration;
-
-    printf ("*** Establishing connection... ***\n");
+    int connections = 0;
 
     clen = (socklen_t) sizeof (p->prot.sin2);
     
@@ -430,7 +479,6 @@ throughput_establish (ArgStruct *p)
                 exit (-10);
             }
         }
-        printf ("\tConnection successful!\n");
     } else if (p->rcv) {
         event.events = MTCP_EPOLLIN;
         event.data.sockid = p->servicefd;
@@ -446,6 +494,10 @@ throughput_establish (ArgStruct *p)
         printf ("\tStarting loop to wait for connections...\n");
 
         while ((duration = (t0 + 10) - When ()) > 0) {
+            if (connections == p->ncli)  {
+                printf ("OMGLSDJF:LDSKJF:LDSKJF:DLSFJ Got all the connections...\n");
+            }
+
             nevents = mtcp_epoll_wait (mctx, ep, events, MAXEVENTS, duration); 
             if (nevents < 0) {
                 if (errno != EINTR) {
@@ -476,9 +528,6 @@ throughput_establish (ArgStruct *p)
                                 portbuf, sizeof (portbuf),
                                 NI_NUMERICHOST | NI_NUMERICSERV);
                                             
-                        printf ("Accepted connection: descriptor %d, host %s, "
-                                "port %s\n", p->commfd, hostbuf, portbuf);
-
                         if (!(proto = getprotobyname ("tcp"))) {
                             printf ("unknown protocol!\n");
                             exit (555);
@@ -492,10 +541,15 @@ throughput_establish (ArgStruct *p)
 
                         // Add descriptor to epoll instance
                         event.data.sockid = p->commfd;
-                        event.events = MTCP_EPOLLIN | MTCP_EPOLLET;  // TODO check this
+                        event.events = MTCP_EPOLLIN | MTCP_EPOLLET;  
                         if (mtcp_epoll_ctl (mctx, ep, MTCP_EPOLL_CTL_ADD, p->commfd, &event) < 0) {
                             perror ("epoll_ctl");
                             exit (1);
+                        }
+
+                        connections++;
+                        if (!(connections % 50)) {
+                            printf ("%d connections so far...\n", connections);
                         }
                     }
                 } else {
