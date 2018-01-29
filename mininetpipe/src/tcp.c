@@ -535,8 +535,6 @@ throughput_establish (ArgStruct *p)
             }
         }
 
-
-
         // Record the actual number of successful connections
         p->ncli = connections;
     }
