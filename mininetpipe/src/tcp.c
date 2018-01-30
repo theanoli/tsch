@@ -432,6 +432,7 @@ throughput_establish (ArgStruct *p)
     struct epoll_event event;
     double t0, duration;
     int connections = 0;
+    int report_connections = 1; 
 
     clen = (socklen_t) sizeof (p->prot.sin2);
     
@@ -458,8 +459,9 @@ throughput_establish (ArgStruct *p)
         printf ("\tStarting loop to wait for connections...\n");
 
         while ((duration = (t0 + (p->online_wait + 10)) - When ()) > 0) {
-            if (connections == p->ncli)  {
+            if ((connections == p->ncli) && report_connections)  {
                 printf ("OMGLSDJF:LDSKJF:LDSKJF:DLSFJ Got all the connections...\n");
+                report_connections = 0;
             }
 
             nevents = epoll_wait (ep, events, MAXEVENTS, duration); 

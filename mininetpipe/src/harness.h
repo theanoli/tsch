@@ -16,7 +16,7 @@
 #define PSIZE   32
 #define DEFPORT 8000
 #define EXPDURATION 10
-#define MAXEVENTS 4096
+#define MAXEVENTS 8192
 
 // For throughput experiments: time to wait before
 // starting measurements
