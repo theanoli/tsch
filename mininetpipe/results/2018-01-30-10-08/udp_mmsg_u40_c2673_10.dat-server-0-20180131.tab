@@ -1,0 +1,26 @@
+################################################################################
+# Collectl:   V3.6.9-1  HiRes: 1  Options: -P -f results/2018-01-30-10-08/udp_mmsg_u40_c2673_10.dat -sc -c40 -oaz 
+# Host:       server-0  DaemonOpts: 
+# Booted:     1517410719.14 [20180131-07:58:39]
+# Distro:     debian jessie/sid, Ubuntu 14.04.1 LTS  Platform: 
+# Date:       20180131-092514  Secs: 1517415914 TZ: -0700
+# SubSys:     c Options: az Interval: 1 NumCPUs: 64  CPUsDis: 1 NumBud: 0 Flags: iD
+# Filters:    NfsFilt:  EnvFilt:  TcpFilt: ituc
+# HZ:         100  Arch: x86_64-linux-gnu-thread-multi PageSize: 4096
+# Cpu:        GenuineIntel Speed(MHz): 2199.972 Cores: 8  Siblings: 8 Nodes: 4
+# Kernel:     3.13.0-100-generic  Memory: 131822812 kB  Swap: 3145724 kB
+# NumDisks:   7 DiskNames: sdc sdb sdd sde sdf sdg sda
+# NumNets:    9 NetNames: eth0:1000 eth1:?? eth2:?? eth3:?? eth4:10000 eth5:10000 eth6:10000 eth7:10000 lo:??
+# SCSI:       DA:0:00:00:00 DA:0:00:01:00 DA:0:00:02:00 DA:0:00:03:00 DA:0:00:04:00 DA:0:00:05:00 DA:0:00:06:00 ??:0:00:32:00
+################################################################################
+#Date Time [CPU]User% [CPU]Nice% [CPU]Sys% [CPU]Wait% [CPU]Irq% [CPU]Soft% [CPU]Steal% [CPU]Idle% [CPU]Totl% [CPU]Intrpt/sec [CPU]Ctx/sec [CPU]Proc/sec [CPU]ProcQue [CPU]ProcRun [CPU]L-Avg1 [CPU]L-Avg5 [CPU]L-Avg15 [CPU]RunTot [CPU]BlkTot
+20180131 09:25:17 0 0 57 0 0 38 0 5 95 1559185 184388 0 691 31 10.84 18.23 13.59 34 0
+20180131 09:25:18 0 0 57 0 0 38 0 5 95 1558308 176902 0 691 30 10.84 18.23 13.59 34 0
+20180131 09:25:19 0 0 57 0 0 37 0 5 95 1560089 187315 0 691 34 12.62 18.48 13.70 33 0
+20180131 09:25:20 0 0 56 0 0 39 0 5 95 1556558 185359 0 691 33 12.62 18.48 13.70 31 0
+20180131 09:25:21 0 0 57 0 0 38 0 5 95 1560031 180254 0 691 36 12.62 18.48 13.70 35 0
+20180131 09:25:22 0 0 57 0 0 38 0 5 95 1557072 186878 0 691 33 12.62 18.48 13.70 32 0
+20180131 09:25:24 0 0 56 0 0 38 0 5 95 1555985 174310 0 691 33 12.62 18.48 13.70 35 0
+20180131 09:25:25 0 0 57 0 0 38 0 5 95 1557531 176951 0 691 33 14.17 18.70 13.80 34 0
+20180131 09:25:26 0 0 57 0 0 37 0 5 95 1556769 179681 0 691 32 14.17 18.70 13.80 34 0
+20180131 09:25:27 0 0 57 0 0 38 0 5 95 1557055 176384 0 691 34 14.17 18.70 13.80 29 0

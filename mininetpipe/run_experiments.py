@@ -17,7 +17,7 @@ class ExperimentSet(object):
         self.printlabel = "[" + os.path.basename(__file__) + "]"
 
         self.basecmd = args.basecmd
-        self.server_ip = args.server_ip
+        self.server_addr = args.server_addr
         self.nodes = args.nodes.split(",")
         self.ntrials = args.ntrials
         self.ncli_min = args.ncli_min
@@ -32,8 +32,11 @@ class ExperimentSet(object):
         self.expduration = args.expduration
         self.pin_procs = args.pin_procs
 
-        self.results_filebase = (args.results_filebase + 
-                                "_u%d" % self.expduration)
+        try:
+            self.results_filebase = (args.results_filebase + 
+                                    "_u%d" % self.expduration)
+        except:
+            self.results_filebase = None 
 
         # If we have more server processes than client procs, override the number of
         # client procs to ensure each server proc gets at least one client proc
@@ -57,7 +60,7 @@ class ExperimentSet(object):
                 experiment = Experiment(self, n, trial)
                 self.printer("Completed trial %d!" % (trial + 1))
                 time.sleep(2)
-            n *= len(self.nodes)
+            n *= len(self.nodes) 
             self.printer("Moving on to %d clients per node." % n)
 
 
@@ -86,9 +89,11 @@ class Experiment(object):
 
                     self.trial_number = last_trial + 1
 
-            self.results_file = (self.results_filebase +
-                    "_c%d" % self.total_clientprocs + 
-                    "_%d.dat" % self.trial_number)
+                self.results_file = (self.results_filebase +
+                        "_c%d" % self.total_clientprocs + 
+                        "_%d.dat" % self.trial_number)
+        else: 
+            self.results_file = "temp"
 
         if self.online_wait is None:
             self.online_wait = math.ceil(self.total_clientprocs / self.nservers * 
@@ -152,7 +157,7 @@ class Experiment(object):
                     self.printer("Recording client process %d on %s, portno %d" % 
                             (n, node, self.start_port + (i % self.nservers)))
                 cmd = (self.basecmd + 
-                        " -H %s" % self.server_ip +
+                        " -H %s" % self.server_addr +
                         " -P %d" % (self.start_port + (i % self.nservers)))
                 nodecmds += (cmd + " &\n")
                 i += 1
@@ -188,9 +193,9 @@ if __name__ == "__main__":
             'server IP and port number for clients.'))
     parser.add_argument('nodes', 
             help='List of client machine IP addresses or names.')
-    parser.add_argument('--server_ip',
-            help=('IP address of the server. Default 10.1.1.3.'),
-            default="10.1.1.3") 
+    parser.add_argument('--server_addr',
+            help=('Address of the server. Default server-0'),
+            default="server-0") 
     parser.add_argument('--ntrials',
             type=int,
             help='Number of times to repeat experiment. Default 1.',

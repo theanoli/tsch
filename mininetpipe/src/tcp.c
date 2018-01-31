@@ -74,57 +74,87 @@ Setup (ArgStruct *p)
 {
     // Initialize connections: create socket, bind, listen (in establish)
     // Also creates epoll instance
-    int sockfd;
+    int sockfd; 
     struct sockaddr_in *lsin1, *lsin2;
     char *host;
-    struct hostent *addr;
-    struct protoent *proto;
+    
+    struct addrinfo hints;
+    struct addrinfo *result, *rp;
     int socket_family = AF_INET;
+    int s;
+    char portno[7]; 
+
+    struct protoent *proto;
     int flags;
 
+    if (p->rcv) {
+        printf ("*** Setting up connection(s)... ***\n");
+    }
+
     host = p->host;
+    sprintf (portno, "%d", p->port);
+    flags = SOCK_STREAM;
+
+    // To resolve a hostname
+    memset (&hints, 0, sizeof (struct addrinfo));
+    hints.ai_family     = socket_family;
+    hints.ai_socktype   = flags;
 
     lsin1 = &(p->prot.sin1);
     lsin2 = &(p->prot.sin2);
-
+    
     memset ((char *) lsin1, 0, sizeof (*lsin1));
     memset ((char *) lsin2, 0, sizeof (*lsin2));
-
+    
     ep = epoll_create (MAXEVENTS);
 
-    flags = SOCK_STREAM;
     if (p->rcv) {
         flags |= SOCK_NONBLOCK;
-    }
-    if ((sockfd = socket (socket_family, flags, 0)) < 0) {
-        printf ("tester: can't open stream socket!\n");
-        exit (-4);
-    }
-    
+    } 
+
     if (!(proto = getprotobyname ("tcp"))) {
         printf ("tester: protocol 'tcp' unknown!\n");
         exit (555);
     }
 
-
     if (p->tr) {
-        if (atoi (host) > 0) {
-            lsin1->sin_family = AF_INET;
-            lsin1->sin_addr.s_addr = inet_addr (host);
-        } else {
-            if ((addr = gethostbyname (host)) == NULL) {
-                printf ("tester: invalid hostname '%s'\n", host);
-                exit (-5);
-            }
-
-            lsin1->sin_family = addr->h_addrtype;
-            memcpy (addr->h_addr, (char *) &(lsin1->sin_addr.s_addr), addr->h_length);
+        s = getaddrinfo (host, portno, &hints, &result);
+        if (s != 0) {
+            perror ("getaddrinfo");
+            exit (-10);
         }
 
+        for (rp = result; rp != NULL; rp = rp->ai_next) {
+            sockfd = socket (rp->ai_family, rp->ai_socktype,
+                    rp->ai_protocol);
+            if (sockfd == -1) {
+                continue;
+            }
+
+            if (connect (sockfd, rp->ai_addr, rp->ai_addrlen) == -1) {
+                perror ("connect");
+                close (sockfd);
+                continue;
+            }
+            
+            break;
+        }
+
+        if (rp == NULL) {
+            printf ("Invalid address %s and/or portno %s! Exiting...\n", host, portno);
+            exit (-10);
+        }
+
+        freeaddrinfo (result);
         lsin1->sin_port = htons (p->port);
         p->commfd = sockfd;
 
     } else if (p->rcv) {
+        if ((sockfd = socket (socket_family, flags, 0)) < 0) {
+            printf ("tester: can't open stream socket!\n");
+            exit (-4);
+        }
+
         int enable = 1;
         if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
             printf ("tester: server: SO_REUSEADDR failed! errno=%d\n", errno);
@@ -343,7 +373,12 @@ ThroughputSetup (ArgStruct *p)
     int sockfd; 
     struct sockaddr_in *lsin1, *lsin2;
     char *host;
-    struct hostent *addr;
+    
+    struct addrinfo hints;
+    struct addrinfo *result, *rp;
+    int s;
+    char portno[7]; 
+
     struct protoent *proto;
     int socket_family = AF_INET;
     int flags;
@@ -354,11 +389,17 @@ ThroughputSetup (ArgStruct *p)
 
     host = p->host;
 
+    // To resolve a hostname
+    memset (&hints, 0, sizeof (struct addrinfo));
+    hints.ai_family     = socket_family;
+    hints.ai_socktype   = SOCK_STREAM;
+
     lsin1 = &(p->prot.sin1);
     lsin2 = &(p->prot.sin2);
     
     memset ((char *) lsin1, 0, sizeof (*lsin1));
     memset ((char *) lsin2, 0, sizeof (*lsin2));
+    sprintf (portno, "%d", p->port);
     
     ep = epoll_create (MAXEVENTS);
 
@@ -367,33 +408,49 @@ ThroughputSetup (ArgStruct *p)
         flags |= SOCK_NONBLOCK;
     } 
 
-    if ((sockfd = socket (socket_family, flags, 0)) < 0) {
-        printf ("tester: can't open stream socket!\n");
-        exit (-4);
-    }
-
     if (!(proto = getprotobyname ("tcp"))) {
         printf ("tester: protocol 'tcp' unknown!\n");
         exit (555);
     }
 
     if (p->tr) {
-        if (atoi (host) > 0) {
-            lsin1->sin_family = AF_INET;
-            lsin1->sin_addr.s_addr = inet_addr (host);
-        } else {
-            if ((addr = gethostbyname (host)) == NULL) {
-                printf ("tester: invalid hostname '%s'\n", host);
-                exit (-5);
-            }
-
-            lsin1->sin_family = addr->h_addrtype;
-            memcpy (addr->h_addr, (char *) &(lsin1->sin_addr.s_addr), addr->h_length);
+        s = getaddrinfo (host, portno, &hints, &result);
+        if (s != 0) {
+            perror ("getaddrinfo");
+            exit (-10);
         }
 
+        for (rp = result; rp != NULL; rp = rp->ai_next) {
+            sockfd = socket (rp->ai_family, rp->ai_socktype,
+                    rp->ai_protocol);
+            if (sockfd == -1) {
+                continue;
+            }
+
+            if (connect (sockfd, rp->ai_addr, rp->ai_addrlen) == -1) {
+                perror ("connect");
+                close (sockfd);
+                continue;
+            }
+            
+            break;
+        }
+
+        if (rp == NULL) {
+            printf ("Invalid address %s and/or portno %s! Exiting...\n", host, portno);
+            exit (-10);
+        }
+
+        freeaddrinfo (result);
         lsin1->sin_port = htons (p->port);
         p->commfd = sockfd;
+
     } else if (p->rcv) {
+        if ((sockfd = socket (socket_family, flags, 0)) < 0) {
+            printf ("tester: can't open stream socket!\n");
+            exit (-4);
+        }
+
         int enable = 1;
         if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
             printf ("tester: server: SO_REUSEADDR failed! errno=%d\n", errno);
@@ -436,15 +493,7 @@ throughput_establish (ArgStruct *p)
 
     clen = (socklen_t) sizeof (p->prot.sin2);
     
-    if (p->tr) {
-        while ((connect (p->commfd, (struct sockaddr *) &(p->prot.sin1), 
-                        sizeof (p->prot.sin1)) < 0) && (errno != EINPROGRESS)) {
-            if (!doing_reset || errno != ECONNREFUSED) {
-                printf ("client: cannot connect to server! errno=%d\n", errno);
-                exit (-10);
-            }
-        }
-    } else if (p->rcv) {
+    if (p->rcv) {
         event.events = EPOLLIN;
         event.data.fd = p->servicefd;
 
@@ -539,15 +588,7 @@ establish (ArgStruct *p)
 
     clen = (socklen_t) sizeof (p->prot.sin2);
 
-    if (p->tr) {
-        while ((connect (p->commfd, (struct sockaddr *) &(p->prot.sin1), 
-                        sizeof (p->prot.sin1)) < 0) && (errno != EINPROGRESS)) {
-            if (!doing_reset || errno != ECONNREFUSED) {
-                printf ("client: cannot connect to server! errno=%d\n", errno);
-                exit (-10);
-            }
-        }
-    } else if (p->rcv) {
+    if (p->rcv) {
         listen (p->servicefd, 1024);
         p->commfd = tcp_accept_helper (p->servicefd,     
                                 (struct sockaddr *) &(p->prot.sin2), &clen);

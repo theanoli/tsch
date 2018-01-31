@@ -1,6 +1,6 @@
 #include "harness.h"
 
-#define DEBUG 0
+#define DEBUG 1
 #define WARMUP 3
 #define COOLDOWN 5
 
@@ -32,52 +32,74 @@ Setup (ArgStruct *p)
     int sockfd;
     struct sockaddr_in *lsin1, *lsin2;
     char *host;
-    struct hostent *addr;
-    struct protoent *proto;
+
+    struct addrinfo hints;
+    struct addrinfo *result, *rp;
     int socket_family = AF_INET;
+    int s;
+    char portno[7];
+
+    struct protoent *proto;
+    int flags; 
 
     host = p->host;
+    sprintf (portno, "%d", p->port);
+    flags = SOCK_DGRAM;
+
+    // To resolve a hostname
+    memset (&hints, 0, sizeof (struct addrinfo));
+    hints.ai_family     = socket_family;
+    hints.ai_socktype   = flags;
+
     lsin1 = &(p->prot.sin1);
     lsin2 = &(p->prot.sin2);
 
     memset ((char *) lsin1, 0, sizeof (*lsin1));
     memset ((char *) lsin2, 0, sizeof (*lsin2));
 
-    if ((sockfd = socket (socket_family, SOCK_DGRAM, 0)) < 0) {
-        perror ("tester: can't open stream socket!");
-        exit (-4);
-    }
-
     if (!(proto = getprotobyname ("udp"))) {
         printf ("tester: protocol 'udp' unknown!\n");
         exit (555);
     }
 
-    // Don't need to set NODELAY; no such thing in UDP
-    
     if (p->tr) {
-        // Sender side: get info about the server
-        if (atoi (host) > 0) {
-            lsin1->sin_family = AF_INET;
-            lsin1->sin_addr.s_addr = inet_addr (host);
+        s = getaddrinfo (host, portno, &hints, &result);
+        if (s != 0) {
+            perror ("getaddrinfo");
+            exit (-10);
+        }
 
-        } else {
-            if ((addr = gethostbyname (host)) == NULL) {
-                printf ("tester: invalid hostname '%s'\n", host);
-                exit (-5);
+        for (rp = result; rp != NULL; rp = rp->ai_next) {
+            sockfd = socket (rp->ai_family, rp->ai_socktype, 
+                    rp->ai_protocol);
+            if (sockfd == -1) {
+                continue;
             }
 
-            lsin1->sin_family = addr->h_addrtype;
-            memmove (addr->h_addr, (char *) &(lsin1->sin_addr.s_addr), 
-                    addr->h_length);
+            if (connect (sockfd, rp->ai_addr, rp->ai_addrlen) != -1) {
+                break;
+            }
+            
+            close (sockfd);
+        }
 
+        if (rp == NULL) {
+            printf ("Invalid address %s and/or portno %s! Exiting...\n", 
+                    host, portno);
+            exit (-10);
         }
 
         lsin1->sin_port = htons (p->port);
         p->commfd = sockfd;
+        freeaddrinfo (result);
 
     } else if (p->rcv) {
         // Receiver side
+        if ((sockfd = socket (socket_family, flags, 0)) < 0) {
+            printf ("tester: can't open stream socket!\n");
+            exit (-4);
+        }
+
         memset ((char *) lsin1, 0, sizeof (*lsin1));
         lsin1->sin_family       = AF_INET;
         lsin1->sin_addr.s_addr  = htonl (INADDR_ANY);
@@ -110,25 +132,18 @@ SimpleWrite (ArgStruct *p)
     char buffer[PSIZE];
     int n;
 
-    struct sockaddr_in *remote = NULL;
-    socklen_t len;
-
-    remote = &(p->prot.sin1);
-    len = sizeof (*remote); 
-
     snprintf (buffer, PSIZE, "%s", "hello, world!");
 
-    n = sendto (p->commfd, buffer, PSIZE, 0, 
-            (struct sockaddr *) remote, len);
+    n = write (p->commfd, buffer, PSIZE);
+    if (DEBUG)
+        printf ("Sending %d bytes to server\n", n);
+
     if (n < 0) {
         perror ("write to server");
         exit (1);
     }
 
-    memset (buffer, 0, PSIZE);
-
-    n = recvfrom (p->commfd, buffer, PSIZE, 0,
-            (struct sockaddr *) remote, &len);
+    n = read (p->commfd, buffer, PSIZE);
     if (n < 0) {
         perror ("read from server");
         exit (1);
@@ -186,85 +201,69 @@ Echo (ArgStruct *p)
     // Server-side only!
     // Loop through for expduration seconds and count each packet you send out
     // Start counting packets after a few seconds to stabilize connection(s)
-    double tnull, t0, duration;
-    int docount = 0;
-    int expstart = 0;
+    int i, m, n; 
 
-    struct sockaddr_in *remote = NULL;
-    socklen_t len;
+    struct mmsghdr msgs[MAXEVENTS];      // headers
+    struct iovec iovecs[MAXEVENTS];        // packet info
+    char bufs[MAXEVENTS][PSIZE + 1];            // packet buffers
+    struct sockaddr_in addrs[MAXEVENTS];    // return addresses
 
-    remote = &(p->prot.sin2);
-    len = sizeof (*remote);
-
-    p->counter = 0;
-
-    t0 = 0;  // Silence compiler
-    tnull = When ();
+    double tnull, duration;
 
     // Wait a few seconds to let clients come online
+    tnull = When ();
     if (!p->latency) {
         printf ("Waiting for clients to start up...\n");
-        while ((duration = When () - tnull) < (p->online_wait + 10)) {
+        while ((duration = When () - tnull) < (p->online_wait + 5)) {
 
         }
     }
 
-    // Add a WARMUP-seconds delay to let clients stabilize
-    tnull = When ();  // Restart timer
-    printf ("Assuming all clients have come online...\n");
-    while ((duration = When () - tnull) < 
-            (p->expduration + WARMUP + COOLDOWN)) {
+    for (i = 0; i < MAXEVENTS; i++) {
+        iovecs[i].iov_base          = bufs[i];
+        iovecs[i].iov_len           = PSIZE + 1;
+        msgs[i].msg_hdr.msg_iov     = &iovecs[i];
+        msgs[i].msg_hdr.msg_iovlen  = 1;
+        msgs[i].msg_hdr.msg_name    = &addrs[i];
+        msgs[i].msg_hdr.msg_namelen = sizeof (addrs[i]);
+    }
+    
+    p->counter = 0;
 
-        if (!p->latency) {
-            if ((duration > WARMUP) && 
-                    (expstart == 0) &&
-                    (docount == 0)) {
-                printf ("Starting to count packets for throughput...\n");
-                expstart = 1;
-                docount = 1; 
-                if (p->collect_stats) {
-                    CollectStats(p);
-                }
-                t0 = When ();
-            } else if ((duration > (p->expduration + WARMUP)) &&
-                    (expstart == 1) &&
-                    (docount == 1)) {
-                // Experiment has completed; let it keep running without counting packets
-                // to allow other servers to finish up
-                docount = 0;
-                p->duration = When () - t0;
-                printf ("Experiment over, stopping counting packets...\n");
-            }
-        }
+    p->program_state = warmup;
+    printf ("Assuming all clients have come online! Setting alarm...\n");
+    alarm (WARMUP);
 
-        int n; 
-        char *q;
+    // struct timespec timeout = { .tv_nsec = 10 * 1000UL, };
+    while (p->program_state != end) { 
+        if (DEBUG)
+            printf ("waiting for messages...\n");
+        // Read data from client; m is number of messages received 
+        m = recvmmsg (p->commfd, msgs, MAXEVENTS, MSG_WAITFORONE, NULL); // &timeout);
+        if (DEBUG)
+            printf ("Got %d messages.\n", m);
 
-        // Read data from client 
-        q = p->r_ptr;
-        n = recvfrom (p->commfd, q, PSIZE - 1, MSG_DONTWAIT, 
-                (struct sockaddr *) remote, &len);
-	
-	// Recvfrom is in nonblocking mode b/c of MSG_DONTWAIT
-        if (n < 0) {
-            if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-                continue;
-            }
+        if (m < 0) {
             perror ("read");
             exit (1);
         }
 
-        // Echo data back to client
-        n = sendto (p->commfd, p->r_ptr, PSIZE - 1, 0, 
-                (struct sockaddr *) remote, len);
-        if (n < 0) {
-            perror ("write");
-            exit (1);
+        // Process each of the messages in msgvec
+        for (i = 0; i < m; i++) {
+            // Echo data back to client
+            if (DEBUG)
+                printf ("Got a packet! %s\n", bufs[i]);
+            n = sendto (p->commfd, bufs[i], PSIZE, 0, 
+                    (struct sockaddr *) &addrs[i], msgs[i].msg_hdr.msg_namelen);
+            if (n < 0) {
+                perror ("write");
+                exit (1);
+            }
         }
 
         // Count successfully echoed packets
-        if (docount) {
-            (p->counter)++;
+        if (p->program_state == experiment) {
+            p->counter += m;
         }
     }
 }
@@ -276,10 +275,7 @@ establish (ArgStruct *p)
     struct protoent *proto;
     int one = 1;
 
-
-    if (p->tr) {
-        // Don't need to do anything for UDP
-    } else if (p->rcv) {
+    if (p->rcv) {
         p->commfd = p->servicefd;
         
         if (p->commfd < 0) {

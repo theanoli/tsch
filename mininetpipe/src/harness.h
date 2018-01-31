@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -7,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h> 
 #include <string.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/time.h> 
@@ -26,7 +28,6 @@
 // TCP-specific
 #if defined(TCP)
   #include <netdb.h>
-  #include <sys/socket.h>
   #include <netinet/in.h>
   #include <netinet/tcp.h>
   #include <arpa/inet.h>
