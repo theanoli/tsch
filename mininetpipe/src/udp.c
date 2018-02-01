@@ -1,6 +1,6 @@
 #include "harness.h"
 
-#define DEBUG 1
+#define DEBUG 0
 #define WARMUP 3
 #define COOLDOWN 5
 
@@ -76,6 +76,8 @@ Setup (ArgStruct *p)
                 continue;
             }
 
+            // This means we can use read/write or send/recv instead of
+            // sendto/recvfrom
             if (connect (sockfd, rp->ai_addr, rp->ai_addrlen) != -1) {
                 break;
             }
@@ -129,12 +131,9 @@ SimpleWrite (ArgStruct *p)
     // we don't really need to worry too much about client performance.
     // TODO any reason to use a random string? Any reason to force
     // a string of length PSIZE?
-    char buffer[PSIZE];
     int n;
 
-    snprintf (buffer, PSIZE, "%s", "hello, world!");
-
-    n = write (p->commfd, buffer, PSIZE);
+    n = write (p->commfd, p->rbuff, PSIZE);
     if (DEBUG)
         printf ("Sending %d bytes to server\n", n);
 
@@ -143,7 +142,7 @@ SimpleWrite (ArgStruct *p)
         exit (1);
     }
 
-    n = read (p->commfd, buffer, PSIZE);
+    n = read (p->commfd, p->lbuff, PSIZE);
     if (n < 0) {
         perror ("read from server");
         exit (1);
@@ -155,7 +154,7 @@ void TimestampWrite (ArgStruct *p)
 {
     // Send and then receive an echoed timestamp.
     // Return a pointer to the stored timestamp. 
-
+    // TODO this might be broken b/c of addressing
     int n;
     struct timespec sendtime, recvtime;
     struct sockaddr_in *remote = NULL;

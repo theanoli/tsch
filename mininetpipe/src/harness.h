@@ -69,8 +69,10 @@ struct argstruct
     int     collect_stats;  /* Collect stats on resource usage              */
     char    *outfile;       /* Where results go to die                      */
 
-    char    *r_ptr;        /* Pointer to current location in receive buffer    */
+    char    *r_ptr;        /* Pointer to current location in receive buffer */
     char    *s_ptr;        /* Pointer to current location in send buffer    */
+    char    rbuff[PSIZE + 1];  /* Receive buffer                                */
+    char    sbuff[PSIZE + 1];  /* Send buffer                                   */
 
     int     bufflen,       /* Length of transmitted buffer                  */
             tr,rcv;        /* Transmit and Recv flags, or maybe neither     */

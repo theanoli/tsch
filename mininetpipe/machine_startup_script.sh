@@ -6,4 +6,5 @@ sudo bash turn_off_some_cores.sh 32 63
 if [ $# -gt 0 ]; then 
     sudo bash set_smp_affinity.sh $1
     sudo bash initialize_rss_and_rfs.sh $1
+    sudo ethtool -N $1 rx-flow-hash udp4 sdfn
 fi 

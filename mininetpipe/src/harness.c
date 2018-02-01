@@ -28,7 +28,7 @@ main (int argc, char **argv)
     int sleep_interval; /* How long to sleep b/t latency pings (usec) */
     // double duration;
 
-    int c;
+    int c, i;
 
     /* Initialize vars that may change from default due to arguments */
     default_outdir = 1;
@@ -208,6 +208,13 @@ main (int argc, char **argv)
                 args.outfile = s;
             }
         }
+
+        // Create the string that will be echoed
+        char *abcs = "abcdefghijklmnopqrstuvwxyz";
+        for (i = 0; i < PSIZE; i++) {
+            args.rbuff[i] = abcs[i % strlen (abcs)];
+        }
+        args.rbuff[PSIZE] = '\0';
 
         ThroughputSetup (&args);
 
