@@ -212,9 +212,10 @@ main (int argc, char **argv)
         // Create the string that will be echoed
         char *abcs = "abcdefghijklmnopqrstuvwxyz";
         for (i = 0; i < PSIZE; i++) {
-            args.rbuff[i] = abcs[i % strlen (abcs)];
+            args.sbuff[i] = abcs[i % strlen (abcs)];
         }
-        args.rbuff[PSIZE] = '\0';
+        args.sbuff[PSIZE] = '\0';
+        printf ("Garbage string: %s\n", args.sbuff);
 
         ThroughputSetup (&args);
 

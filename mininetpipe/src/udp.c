@@ -135,7 +135,7 @@ SimpleWrite (ArgStruct *p)
 
     n = write (p->commfd, p->sbuff, PSIZE);
     if (DEBUG)
-        printf ("Sending %d bytes to server\n", n);
+        printf ("Sent msg %s in %d bytes to server\n", p->sbuff, n);
 
     if (n < 0) {
         perror ("write to server");
@@ -220,7 +220,7 @@ Echo (ArgStruct *p)
 
     for (i = 0; i < MAXEVENTS; i++) {
         iovecs[i].iov_base          = bufs[i];
-        iovecs[i].iov_len           = PSIZE + 1;
+        iovecs[i].iov_len           = PSIZE;
         msgs[i].msg_hdr.msg_iov     = &iovecs[i];
         msgs[i].msg_hdr.msg_iovlen  = 1;
         msgs[i].msg_hdr.msg_name    = &addrs[i];
@@ -250,8 +250,9 @@ Echo (ArgStruct *p)
         // Process each of the messages in msgvec
         for (i = 0; i < m; i++) {
             // Echo data back to client
+            bufs[i][msgs[i].msg_len] = 0;
             if (DEBUG)
-                printf ("Got a packet! %s\n", bufs[i]);
+                printf ("Got a packet! Contents: %s, len %d\n", bufs[i], msgs[i].msg_len);
             n = sendto (p->commfd, bufs[i], PSIZE, 0, 
                     (struct sockaddr *) &addrs[i], msgs[i].msg_hdr.msg_namelen);
             if (n < 0) {
