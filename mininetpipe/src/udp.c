@@ -251,7 +251,7 @@ Echo (ArgStruct *p)
         for (i = 0; i < m; i++) {
             // Echo data back to client
             if (DEBUG)
-                printf ("Got a packet! %s\n", bufs[i]);
+                //printf ("Got a packet! %s\n", bufs[i]);
             n = sendto (p->commfd, bufs[i], PSIZE, 0, 
                     (struct sockaddr *) &addrs[i], msgs[i].msg_hdr.msg_namelen);
             if (n < 0) {
