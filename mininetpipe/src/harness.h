@@ -19,6 +19,7 @@
 #define DEFPORT 8000
 #define EXPDURATION 10
 #define MAXEVENTS 8192
+#define MAX_CPUS 64
 
 // For throughput experiments: time to wait before
 // starting measurements
@@ -42,9 +43,16 @@
       int                     sndbufsz, /* Size of TCP send buffer        */
                               rcvbufsz; /* Size of TCP receive buffer     */
   };
+#elif defined(MTCP) 
+    #include <mtcp_api.h>
+    #include <mtcp_epoll.h>
+
+    struct thread_context {
+        mctx_t mctx;
+        int ep;
+    } tctx_t;
+
 #else 
-  // For now, we only have one option; will have more when we define our own
-  // protocol TODO
   #error "TCP must be defined during compilation!"
 #endif
 
@@ -92,8 +100,15 @@ struct argstruct
     double t0;
     int tput_done;
 
-    /* Now we work with a union of information for protocol dependent stuff  */
     ProtocolStruct prot;
+
+    // mTCP stuff
+#if defined(MTCP)
+    mctx_t mctx;
+    int ncores;
+    pthread_t app_thread[MAX_CPUS];
+    int done[MAX_CPUS];
+#endif
 };
 
 typedef struct data Data;

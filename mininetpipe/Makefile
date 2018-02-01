@@ -53,5 +53,5 @@ udp: $(SRC)/udp.c $(SRC)/harness.c $(SRC)/harness.h
 	$(CC) $(CFLAGS) $(SRC)/harness.c $(SRC)/udp.c -DTCP -Dwhichproto=\"UDP\" -o NPudp -I$(SRC)
 
 mtcp: $(SRC)/mtcp.c $(SRC)/harness.c $(SRC)/harness.h 
-	$(CC) $(CFLAGS) $(SRC)/harness.c $(SRC)/mtcp.c -DTCP -Dwhichproto=\"mTCP\" -o NPmtcp -I$(SRC) ${INC} ${LIBS} -lmtcp -lnuma -pthread -lrt
+	$(CC) $(CFLAGS) $(SRC)/harness.c $(SRC)/mtcp.c -DMTCP -Dwhichproto=\"mTCP\" -o NPmtcp -I$(SRC) ${INC} ${LIBS} -lmtcp -lnuma -pthread -lrt
 

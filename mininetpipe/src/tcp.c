@@ -66,6 +66,9 @@ Init (ArgStruct *p, int *pargc, char ***pargv)
     memset (p->s_ptr, 0, PSIZE);
     memset (p->r_ptr, 0, PSIZE);
     memset (p->lbuff, 0, PSIZE * 2);
+
+    signal (SIGINT, SignalHandler);
+    signal (SIGALRM, SignalHandler);
 }
 
 

@@ -1,16 +1,13 @@
 #include "harness.h"
 
-#include <mtcp_api.h>
-#include <mtcp_epoll.h>
-
 #define DEBUG 0
-#define WARMUP 3
-#define COOLDOWN 5
+#define MAX_CPUS 64
+#define BACKLOG 4096
 
 int doing_reset = 0;
 int ep = -1;
 
-mctx_t mctx = NULL;
+p->ncores = sysconf (_SC_NPROCESSORS_ONLN);
 
 int mtcp_write_helper (mctx_t, int, char *, int);
 int mtcp_read_helper (mctx_t, int, char *, int);
@@ -58,6 +55,10 @@ mtcp_accept_helper (mctx_t mctx, int sockid, struct sockaddr *addr,
 void
 Init (ArgStruct *p, int *pargc, char ***pargv)
 {
+    // Set up mTCP configs and launch threads
+    int i, ret, ncores;
+    int cores[MAX_CPUS];
+
     p->s_ptr = (char *) malloc (PSIZE);
     p->r_ptr = (char *) malloc (PSIZE);
     p->lbuff = (char *) malloc (PSIZE * 2);
@@ -73,11 +74,53 @@ Init (ArgStruct *p, int *pargc, char ***pargv)
 
     struct mtcp_conf mcfg;
     mtcp_getconf (&mcfg);
-    mcfg.num_cores = 1;
+    mcfg.num_cores = p->ncores;
     mtcp_setconf (&mcfg);
-	mtcp_init ("mtcp.conf");
+
+    if ((ret = mtcp_init ("mtcp.conf")) > 0) {
+        printf ("mTCP error!\n");
+        exit (-128);
+    }
+
+    mtcp_register_signal (SIGINT, SignalHandler);
+    mtcp_register_signal (SIGALRM, SignalHandler);
+
+    for (i = 0; i < p->ncores; i++) {
+        cores[i] = i;
+        done[i] = 0; 
+
+        // RunServerThread will affinitize the thread to a CPU, create
+        // an mTCP context, 
+        if (pthread_create (&p->app_thread[i], NULL,
+                    RunServerThread, (void *)&p->cores[i])) {
+            perror ("pthread_create");
+            exit (-103);
+    }
+
+    /*
+    for (i = 0; i < ncores; i++) {
+        pthread_join (app_thread[i], NULL);
+    }
+    */
 }
 
+
+void *
+RunServerThread (void *arg)
+{
+    int core = *(int *)arg;
+    tctx_t *ctx;
+    int i, ret;
+
+    ctx = InitializeServerThread (core);
+    if (!ctx) {
+        printf ("Failed to initialize server thread! Exiting...\n");
+        exit (-118);
+    }
+    mctx = ctx->mctx;
+    ep = ctx->ep;
+
+}
 
 void
 Setup (ArgStruct *p)
@@ -99,9 +142,9 @@ Setup (ArgStruct *p)
     memset ((char *) lsin1, 0, sizeof (*lsin1));
     memset ((char *) lsin2, 0, sizeof (*lsin2));
 
-    if (!mctx) {
-        mtcp_core_affinitize (0);
-        mctx = mtcp_create_context (0);
+    if (!p->mctx) {
+        mtcp_core_affinitize (p->mtcp_coreno);
+        p->mctx = mtcp_create_context (p->mtcp_coreno);
         ep = mtcp_epoll_create (mctx, MAXEVENTS);
     }
 

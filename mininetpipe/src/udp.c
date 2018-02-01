@@ -20,6 +20,9 @@ Init (ArgStruct *p, int *pargc, char ***pargv)
         printf ("Malloc error!\n");
         exit (1);
     }
+    
+    signal (SIGINT, SignalHandler);
+    signal (SIGALRM, SignalHandler);
 
     memset (p->s_ptr, 0, PSIZE);
     memset (p->r_ptr, 0, PSIZE);

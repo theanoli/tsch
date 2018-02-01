@@ -194,7 +194,8 @@ if __name__ == "__main__":
     parser.add_argument('nodes', 
             help='List of client machine IP addresses or names.')
     parser.add_argument('--server_addr',
-            help=('Address of the server. Default server-0'),
+            help=('Address of the server; can either be an IP address or a hostname. '
+            'Default server-0'),
             default="server-0") 
     parser.add_argument('--ntrials',
             type=int,
