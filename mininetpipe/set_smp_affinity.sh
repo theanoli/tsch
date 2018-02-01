@@ -3,6 +3,6 @@ smp_start=`cat /proc/interrupts | grep $iface-TxRx-0 | awk '{ print $1 }' | sed 
 
 echo $smp_start
 
-for i in {0..31}; do
+for i in {0..15}; do
     sudo echo $i > /proc/irq/$(($smp_start + $i))/smp_affinity_list
 done
