@@ -242,6 +242,10 @@ Echo (ArgStruct *p)
         if (DEBUG)
             printf ("Got %d messages.\n", m);
 
+        m = recvmmsg (p->commfd, msgs, MAXEVENTS, MSG_WAITFORONE, NULL); // &timeout);
+        if (DEBUG)
+            printf ("Got %d messages.\n", m);
+
         if (m < 0) {
             perror ("read");
             exit (1);
