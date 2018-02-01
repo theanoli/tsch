@@ -50,7 +50,7 @@
     struct thread_context {
         mctx_t mctx;
         int ep;
-    } tctx_t;
+    } thread_context_t;
 
 #else 
   #error "TCP must be defined during compilation!"

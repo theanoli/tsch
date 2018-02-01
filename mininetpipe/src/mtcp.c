@@ -122,6 +122,42 @@ RunServerThread (void *arg)
 
 }
 
+
+thread_context_t *
+InitializeServerThread (int core)
+{
+    thread_context_t *ctx;
+    mtcp_core_affinitize (core);
+
+    // Create thread context
+    ctx = (thread_context_t) calloc (1, sizeof (thread_context_t));
+    if (!ctx) {
+        printf ("Failed to create thread context!\n");
+        return NULL;
+    }
+
+    // Create mtcp context
+    ctx->mctx = mtcp_create_context (core);
+    if (!ctx->mctx) {
+        printf ("Failed to create an mtcp context!\n");
+        free (ctx);
+        return NULL;
+    }
+
+    // Create epoll descriptor
+    ctx->ep = mtcp_epoll_create (ctx->mctx, MAX_EVENTS);
+    if (ctx->ep < 0) {
+        mtcp_destroy_context (ctx->mctx);
+        free (ctx);
+        printf ("Couldn't create epoll descriptor!\n");
+        return NULL;
+    }
+
+    return ctx;
+}
+
+
+
 void
 Setup (ArgStruct *p)
 {
