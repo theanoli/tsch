@@ -142,7 +142,7 @@ SimpleWrite (ArgStruct *p)
         exit (1);
     }
 
-    n = read (p->commfd, p->rbuff, PSIZE);
+    // n = read (p->commfd, p->rbuff, PSIZE);
     if (n < 0) {
         perror ("read from server");
         exit (1);
@@ -238,10 +238,6 @@ Echo (ArgStruct *p)
         if (DEBUG)
             printf ("waiting for messages...\n");
         // Read data from client; m is number of messages received 
-        m = recvmmsg (p->commfd, msgs, MAXEVENTS, MSG_WAITFORONE, NULL); // &timeout);
-        if (DEBUG)
-            printf ("Got %d messages.\n", m);
-
         m = recvmmsg (p->commfd, msgs, MAXEVENTS, MSG_WAITFORONE, NULL); // &timeout);
         if (DEBUG)
             printf ("Got %d messages.\n", m);
