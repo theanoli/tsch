@@ -190,21 +190,15 @@ SimpleWrite (ArgStruct *p)
     // then receive data (and throw it away on function exit).
     // We shouldn't do epoll on the client side, since we only
     // want one connection to the server per client program
-    
-    char buffer[PSIZE];
     int n;
 
-    snprintf (buffer, PSIZE, "%s", "hello, world!");
-
-    n = write (p->commfd, buffer, PSIZE);
+    n = write (p->commfd, p->sbuff, PSIZE);
     if (n < 0) {
         perror ("write to server");
         exit (1);
     }
 
-    memset (buffer, 0, PSIZE);
-
-    n = read (p->commfd, buffer, PSIZE);
+    n = read (p->commfd, p->rbuff, PSIZE);
     if (n < 0) {
         perror ("read from server");
         exit (1);

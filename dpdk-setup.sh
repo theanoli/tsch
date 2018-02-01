@@ -42,8 +42,7 @@ cd "/proj/sequencer/mtcp/dpdk-16.11"
 export RTE_SDK=$PWD
 
 # Find the DPDK-compatible interface and take it down
-iface=`ifconfig | awk '!/10\.1\.1\..*/ {iface=$1}
-			/10\.1\.1\..*/ {print iface}'`
+iface=$1
 if [ "$iface" == "" ]; then
 	echo "Error getting interface name! Exiting..."
 	exit 1

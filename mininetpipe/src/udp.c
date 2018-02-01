@@ -133,7 +133,7 @@ SimpleWrite (ArgStruct *p)
     // a string of length PSIZE?
     int n;
 
-    n = write (p->commfd, p->rbuff, PSIZE);
+    n = write (p->commfd, p->sbuff, PSIZE);
     if (DEBUG)
         printf ("Sending %d bytes to server\n", n);
 
@@ -142,7 +142,7 @@ SimpleWrite (ArgStruct *p)
         exit (1);
     }
 
-    n = read (p->commfd, p->lbuff, PSIZE);
+    n = read (p->commfd, p->rbuff, PSIZE);
     if (n < 0) {
         perror ("read from server");
         exit (1);

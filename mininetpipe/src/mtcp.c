@@ -230,18 +230,8 @@ Echo (ArgStruct *p)
     // Server-side only!
     // Loop through for expduration seconds and count each packet you send out
     // Start counting packets after a few seconds to stabilize connection(s)
-    double tnull, t0, duration;
     int j, n, i, done;
     struct mtcp_epoll_event events[MAXEVENTS];
-
-    // States of the program are warmup, experiment (counting packets), cooldown.
-    enum Program_State {
-        warmup,
-        experiment,
-        cooldown,
-        end
-    };
-    Program_State program_state = warmup; 
 
     if (p->latency) {
         // We only have one client; add it to the events list
@@ -255,7 +245,7 @@ Echo (ArgStruct *p)
             exit (1);
         }
 
-        if (mtcp_setsock_nonblock (mctx, sockfd) < 0) {
+        if (mtcp_setsock_nonblock (mctx, p->commfd) < 0) {
             printf ("tester: couldn't set socket to nonblocking!\n");
             exit (-6);
         }
@@ -263,11 +253,11 @@ Echo (ArgStruct *p)
 
     p->counter = 0;
 
-    t0 = 0;  // Silence compiler
-    tnull = When ();
-
     // Add a two-second delay to let the clients stabilize
-    while ((duration = When () - tnull) < (p->expduration + WARMUP + COOLDOWN)) {
+    p->program_state = warmup; 
+    printf ("Setting the alarm...\n");
+    alarm (WARMUP);
+    while (p->program_state != end) {
         n = mtcp_epoll_wait (mctx, ep, events, MAXEVENTS, -1);
 
         if (n < 0) {
@@ -275,26 +265,6 @@ Echo (ArgStruct *p)
             exit (1);
         }
         
-        // If we've passed the warm-up period, start the counter
-        // and the throughput timer
-        if (!p->latency) {
-            if ((duration > WARMUP) && (program_state == warmup)) {
-                printf ("Starting to count packets for throughput...\n");
-                program_state = experiment;
-                if (p->collect_stats) {
-                    CollectStats (p);
-                }
-                t0 = When ();
-            } else if ((duration > (p->expduration + WARMUP)) &&
-                    (program_state == experiment)) {
-                // Experiment is over; let it keep running without counting packets
-                // to allow other clients/servers to finish up
-                p->duration = When () - t0;
-                program_state = cooldown;
-                printf ("Experiment over, stopping counting packets...\n");
-            }
-        }
-
         for (i = 0; i < n; i++) {
             // Check for errors
             if ((events[i].events & MTCP_EPOLLERR) ||
@@ -317,7 +287,6 @@ Echo (ArgStruct *p)
                 char *q;
                 int to_write;
                 int written;
-                char *q;
 
                 // This is dangerous because p->r_ptr is only PSIZE bytes long
                 // TODO figure this out
@@ -353,7 +322,7 @@ Echo (ArgStruct *p)
                         printf ("Had to loop...\n");
                     }
 
-                    if (program_state == experiment) {
+                    if ((p->program_state == experiment) && !done) {
                         (p->counter)++;
                     } 
                 }
