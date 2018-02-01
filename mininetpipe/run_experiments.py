@@ -10,7 +10,7 @@ import shlex
 import subprocess
 import time
 
-wait_multiplier = 0.07
+wait_multiplier = 0
 
 class ExperimentSet(object):
     def __init__(self, args):
