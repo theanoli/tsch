@@ -142,11 +142,11 @@ SimpleWrite (ArgStruct *p)
         exit (1);
     }
 
-    n = read (p->commfd, p->rbuff, PSIZE);
-    if (n < 0) {
-        perror ("read from server");
-        exit (1);
-    }
+    // n = read (p->commfd, p->rbuff, PSIZE);
+    // if (n < 0) {
+    //    perror ("read from server");
+    //    exit (1);
+    // }
 }
 
 

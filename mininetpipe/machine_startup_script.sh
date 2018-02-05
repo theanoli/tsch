@@ -1,10 +1,13 @@
 # Turn off hyperthreading, turn off irqbalance, turn off collectl
+# For each interface, set up RSS/RFS, affinitize rx/tx queue IRQs to cores,
+# and use the SDFN hash for UDP
+
 sudo pkill collectl
 sudo service irqbalance stop
 sudo bash turn_off_some_cores.sh 32 63
 
-if [ $# -gt 0 ]; then 
-    sudo bash set_smp_affinity.sh $1
-    sudo bash initialize_rss_and_rfs.sh $1
-    sudo ethtool -N $1 rx-flow-hash udp4 sdfn
-fi 
+for var in "$@"; do
+    sudo bash set_smp_affinity.sh $var 
+    sudo bash initialize_rss_and_rfs.sh $var
+    sudo ethtool -N $var rx-flow-hash udp4 sdfn
+done
