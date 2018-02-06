@@ -1,6 +1,7 @@
 # Turn off hyperthreading, turn off irqbalance, turn off collectl
 # For each interface, set up RSS/RFS, affinitize rx/tx queue IRQs to cores,
 # and use the SDFN hash for UDP
+cd /proj/sequencer/tsch/mininetpipe
 
 sudo pkill collectl
 sudo service irqbalance stop

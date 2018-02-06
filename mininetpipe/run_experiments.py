@@ -138,6 +138,7 @@ class Experiment(object):
             cmd = shlex.split(serv_cmd)
             self.printer("Launching server process %d: %s" % (i, serv_cmd))
             servers.append(subprocess.Popen(cmd))
+            time.sleep(0.1)
 
         time.sleep(0.5)
         return servers
