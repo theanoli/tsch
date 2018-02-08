@@ -118,6 +118,8 @@ Setup (ArgStruct *p)
 
     }
 
+    printf("CCH: p->packets: %d\n", p->packet_rate);
+
     establish (p);
 }
 
