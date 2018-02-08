@@ -154,13 +154,13 @@ TxThread (void *vargp)
 
 
 
-    FILE *f = fopen("temp", "w");
+    //FILE *f = fopen("temp", "w");
 
     struct timespec ts1 =  When2();
 
     int i = 0;
-    for (; i < 10000; i++) {// 1) {
-
+    //for (; i < 10000; i++) {// 1) {
+    while(1) {
         n = write (p->commfd, p->sbuff, PSIZE);
         if (DEBUG)
             printf ("Sent msg %s in %d bytes to server\n", p->sbuff, n);
