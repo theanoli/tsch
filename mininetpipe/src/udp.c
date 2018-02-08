@@ -196,11 +196,20 @@ SimpleWrite (ArgStruct *p)
 
     // Start send/receive threads
     printf ("Getting ready to start the threading...\n");
-    pthread_t tid[2];
+    int total_threads = 9;
+    pthread_t tid[total_threads];
     pthread_create (&tid[0], NULL, RxThread, (void *)p);
-    pthread_create (&tid[1], NULL, TxThread, (void *)p);
+
+    int i = 1;
+    for (; i < total_threads; i++) {
+        pthread_create(&tid[i], NULL, TxThread, (void *) p);
+    }
+
     pthread_join (tid[0], NULL);
-    pthread_join (tid[1], NULL);
+
+    for (i = 1; i < total_threads; i++) {
+        pthread_join(tid[i], NULL);
+    }
 
     printf ("Threading returned! What happened?\n");
 
