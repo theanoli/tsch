@@ -152,6 +152,8 @@ TxThread (void *vargp)
     //if (DEBUG)
         printf ("Sleep time is: %d\n", sleepTime);
 
+    exit(0);
+
     while (1) {
         n = write (p->commfd, p->sbuff, PSIZE);
         if (DEBUG)
