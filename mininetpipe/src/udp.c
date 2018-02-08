@@ -238,7 +238,7 @@ Echo (ArgStruct *p)
         if (DEBUG)
             printf ("waiting for messages...\n");
         // Read data from client; m is number of messages received 
-        m = recvmmsg (p->commfd, msgs, MAXEVENTS, MSG_WAITFORONE, NULL); // &timeout);
+        m = recvmmsg (p->commfd, msgs, 2048, MSG_WAITFORONE, NULL); // &timeout);
         if (DEBUG)
             printf ("Got %d messages.\n", m);
 
