@@ -147,7 +147,7 @@ TxThread (void *vargp)
     ArgStruct *p = (ArgStruct *)vargp;
     int n;
 
-    useconds_t sleepTime = (useconds_t) ((1.0 / p->packet_rate) * 1000000); // does this work?
+//    useconds_t sleepTime = (useconds_t) ((1.0 / p->packet_rate) * 1000000); // does this work?
 
     //if (DEBUG)
 
@@ -156,7 +156,7 @@ TxThread (void *vargp)
 
     //FILE *f = fopen("temp", "w");
 
-    struct timespec ts1 =  When2();
+//    struct timespec ts1 =  When2();
 
     //int i = 0;
     //for (; i < 10000; i++) {// 1) {
@@ -173,14 +173,14 @@ TxThread (void *vargp)
 //        usleep (sleepTime);
     }
 
-    struct timespec ts2 = When2();
-
-    long nsecs = ts2.tv_nsec - ts1.tv_nsec;
-    fprintf(f, "time is: %ld\n", nsecs);
-    fprintf (f, "Sleep time is: %d\n", sleepTime);
-    fclose(f);
-
-    exit(0);
+//    struct timespec ts2 = When2();
+//
+//    long nsecs = ts2.tv_nsec - ts1.tv_nsec;
+//    fprintf(f, "time is: %ld\n", nsecs);
+//    fprintf (f, "Sleep time is: %d\n", sleepTime);
+//    fclose(f);
+//
+//    exit(0);
 
 }
 
