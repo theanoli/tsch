@@ -150,7 +150,7 @@ TxThread (void *vargp)
     useconds_t sleepTime = (useconds_t) ((1.0 / p->packet_rate) * 1000000); // does this work?
 
     //if (DEBUG)
-        printf ("Sleep time is: %d\n", sleepTime);
+    printf ("Sleep time is: %d\n", sleepTime);
 
     while (1) {
         n = write (p->commfd, p->sbuff, PSIZE);
@@ -162,7 +162,7 @@ TxThread (void *vargp)
             exit (1);
         }
 
-//        usleep (sleepTime);
+        usleep (sleepTime);
     }
 }
 
