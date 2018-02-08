@@ -150,9 +150,16 @@ TxThread (void *vargp)
     useconds_t sleepTime = (useconds_t) ((1.0 / p->packet_rate) * 1000000); // does this work?
 
     //if (DEBUG)
-    printf ("Sleep time is: %d\n", sleepTime);
 
-    while (1) {
+
+
+
+    FILE *f = fopen("temp", "w");
+
+    struct timespec ts =  When2();
+
+    for (int i = 0; i < 10000; i++) {// 1) {
+
         n = write (p->commfd, p->sbuff, PSIZE);
         if (DEBUG)
             printf ("Sent msg %s in %d bytes to server\n", p->sbuff, n);
@@ -164,6 +171,11 @@ TxThread (void *vargp)
 
 //        usleep (sleepTime);
     }
+
+    fprintf(f, "time is: %d\n", (int) ts.tv_nsec);
+    fprintf (f, "Sleep time is: %d\n", sleepTime);
+    fclose(f);
+
 }
 
 
