@@ -1,7 +1,7 @@
 # Turn off hyperthreading, turn off irqbalance, turn off collectl
 # For each interface, set up RSS/RFS, affinitize rx/tx queue IRQs to cores,
 # and use the SDFN hash for UDP
-# run with sudo and network iface for arg
+# run with sudo and all network ifaces other than eth0 and lo as arg
 cd /proj/sequencer/tsch/mininetpipe
 
 sudo pkill collectl
