@@ -155,7 +155,7 @@ TxThread (void *vargp)
             exit (1);
         }
 
-        
+
         usleep (1);
     }
 }
@@ -295,6 +295,8 @@ Echo (ArgStruct *p)
             p->counter += m;
         }
     }
+
+    printf("Ending echo service...\n");
 }
 
 
