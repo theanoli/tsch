@@ -31,7 +31,7 @@ class ExperimentSet(object):
         self.collect_stats = args.collect_stats
         self.expduration = args.expduration
         self.pin_procs = args.pin_procs
-        self.pps = args.packets_per_second
+        self.packets_per_second = args.packets_per_second
 
         try:
             self.results_filebase = (args.results_filebase + 
