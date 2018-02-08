@@ -158,7 +158,8 @@ TxThread (void *vargp)
 
     struct timespec ts =  When2();
 
-    for (int i = 0; i < 10000; i++) {// 1) {
+    int i = 0;
+    for (; i < 10000; i++) {// 1) {
 
         n = write (p->commfd, p->sbuff, PSIZE);
         if (DEBUG)
