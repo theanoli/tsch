@@ -165,7 +165,6 @@ class Experiment(object):
                         " -H %s" % self.server_addr +
                         " -P %d" % (self.start_port + (i % self.nservers)) +
                         " -R %d" % self.packets_per_second)
-                #self.printer("Client Command is: " + cmd) # cch
                 nodecmds += (cmd + " &\n")
                 i += 1
 
