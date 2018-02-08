@@ -1,6 +1,6 @@
 #include "harness.h"
 
-#define DEBUG 1
+#define DEBUG 0
 #define WARMUP 3
 #define COOLDOWN 5
 
@@ -142,11 +142,11 @@ SimpleWrite (ArgStruct *p)
         exit (1);
     }
 
-    // n = read (p->commfd, p->rbuff, PSIZE);
-    // if (n < 0) {
-    //    perror ("read from server");
-    //    exit (1);
-    // }
+    n = read (p->commfd, p->rbuff, PSIZE);
+    if (n < 0) {
+       perror ("read from server");
+       exit (1);
+    }
 }
 
 

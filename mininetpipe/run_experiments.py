@@ -60,7 +60,10 @@ class ExperimentSet(object):
                 experiment = Experiment(self, n, trial)
                 self.printer("Completed trial %d!" % (trial + 1))
                 time.sleep(2)
-            n *= len(self.nodes) 
+            if len(self.nodes) > 1:
+                n *= len(self.nodes) 
+            else:
+                n *= 2
             self.printer("Moving on to %d clients per node." % n)
 
 
@@ -138,7 +141,7 @@ class Experiment(object):
             cmd = shlex.split(serv_cmd)
             self.printer("Launching server process %d: %s" % (i, serv_cmd))
             servers.append(subprocess.Popen(cmd))
-            time.sleep(0.1)
+            time.sleep(0.01)
 
         time.sleep(0.5)
         return servers
