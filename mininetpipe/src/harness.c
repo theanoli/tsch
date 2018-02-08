@@ -226,6 +226,7 @@ main (int argc, char **argv)
         if (args.tr) {
             // Send some huge number of packets
             printf ("Sending a ton of packets to the server...\n");
+            printf("CCH: args.packet_rate: %d\n", args.packet_rate);
             while (1) {
                 SimpleWrite (&args);
             }
