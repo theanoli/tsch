@@ -162,7 +162,7 @@ TxThread (void *vargp)
             exit (1);
         }
 
-        usleep (sleepTime);
+//        usleep (sleepTime);
     }
 }
 
