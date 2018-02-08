@@ -156,7 +156,7 @@ TxThread (void *vargp)
 
     FILE *f = fopen("temp", "w");
 
-    struct timespec ts =  When2();
+    struct timespec ts1 =  When2();
 
     int i = 0;
     for (; i < 10000; i++) {// 1) {
@@ -173,7 +173,10 @@ TxThread (void *vargp)
 //        usleep (sleepTime);
     }
 
-    fprintf(f, "time is: %d\n", (int) ts.tv_nsec);
+    struct timespec ts2 = When2();
+
+    long nsecs = ts2.tv_nsec - ts1.tv_nsec;
+    fprintf(f, "time is: %d\n", (int) nsecs);
     fprintf (f, "Sleep time is: %d\n", sleepTime);
     fclose(f);
 
