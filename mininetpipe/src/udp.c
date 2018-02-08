@@ -177,6 +177,8 @@ TxThread (void *vargp)
     fprintf (f, "Sleep time is: %d\n", sleepTime);
     fclose(f);
 
+    exit(0);
+
 }
 
 
