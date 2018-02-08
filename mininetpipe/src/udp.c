@@ -1,6 +1,6 @@
 #include "harness.h"
 
-#define DEBUG 0
+#define DEBUG 1
 #define WARMUP 3
 #define COOLDOWN 5
 
