@@ -1,6 +1,6 @@
 #include "harness.h"
 
-#define DEBUG 1
+#define DEBUG 0
 #define WARMUP 3
 #define COOLDOWN 5
 
@@ -122,6 +122,44 @@ Setup (ArgStruct *p)
 }
 
 
+void *
+RxThread (void *vargp)
+{
+    ArgStruct *p = (ArgStruct *)vargp;
+    int n;
+
+    while (1) {
+        n = read (p->commfd, p->rbuff, PSIZE);
+
+        if (n < 0) {
+           perror ("read from server");
+           exit (1);
+        }
+    }
+}
+
+
+void *
+TxThread (void *vargp)
+{
+    ArgStruct *p = (ArgStruct *)vargp;
+    int n; 
+
+    while (1) {
+        n = write (p->commfd, p->sbuff, PSIZE);
+        if (DEBUG)
+            printf ("Sent msg %s in %d bytes to server\n", p->sbuff, n);
+
+        if (n < 0) {
+            perror ("write to server");
+            exit (1);
+        }
+
+        usleep (1);
+    }
+}
+
+
 void
 SimpleWrite (ArgStruct *p)
 {
@@ -129,24 +167,19 @@ SimpleWrite (ArgStruct *p)
     // receive some data and get rid of it at function exit.
     // OK to reallocate a buffer every time we call this because
     // we don't really need to worry too much about client performance.
-    // TODO any reason to use a random string? Any reason to force
     // a string of length PSIZE?
-    int n;
 
-    n = write (p->commfd, p->sbuff, PSIZE);
-    if (DEBUG)
-        printf ("Sent msg %s in %d bytes to server\n", p->sbuff, n);
+    // Start send/receive threads
+    printf ("Getting ready to start the threading...\n");
+    pthread_t tid[2];
+    pthread_create (&tid[0], NULL, RxThread, (void *)p);
+    pthread_create (&tid[1], NULL, TxThread, (void *)p);
+    pthread_join (tid[0], NULL);
+    pthread_join (tid[1], NULL);
 
-    if (n < 0) {
-        perror ("write to server");
-        exit (1);
-    }
+    printf ("Threading returned! What happened?\n");
 
-    // n = read (p->commfd, p->rbuff, PSIZE);
-    // if (n < 0) {
-    //    perror ("read from server");
-    //    exit (1);
-    // }
+    // I think this will never return unless the threads die?
 }
 
 
@@ -207,15 +240,10 @@ Echo (ArgStruct *p)
     char bufs[MAXEVENTS][PSIZE + 1];            // packet buffers
     struct sockaddr_in addrs[MAXEVENTS];    // return addresses
 
-    double tnull, duration;
-
     // Wait a few seconds to let clients come online
-    tnull = When ();
     if (!p->latency) {
         printf ("Waiting for clients to start up...\n");
-        while ((duration = When () - tnull) < (p->online_wait + 5)) {
-
-        }
+        sleep (p->online_wait + 5);
     }
 
     for (i = 0; i < MAXEVENTS; i++) {
