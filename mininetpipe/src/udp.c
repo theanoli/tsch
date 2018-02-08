@@ -145,7 +145,7 @@ TxThread (void *vargp)
     ArgStruct *p = (ArgStruct *)vargp;
     int n;
 
-    useconds_t sleepTime = (1.0 / p->packet_rate) * 1000000; // does this work?
+    useconds_t sleepTime = (useconds_t) ((1.0 / p->packet_rate) * 1000000); // does this work?
 
     if (DEBUG)
         printf ("Sleep time is: %d\n", sleepTime);
