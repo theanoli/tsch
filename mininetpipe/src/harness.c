@@ -51,7 +51,7 @@ main (int argc, char **argv)
     args.rcv = 1;
 
     /* Parse the arguments. See Usage for description */
-    while ((c = getopt (argc, argv, "o:d:H:r:c:P:s:tu:lw:h:R")) != -1)
+    while ((c = getopt (argc, argv, "o:d:H:r:c:P:s:tu:lw:hR:")) != -1)
     {
         switch (c)
         {
