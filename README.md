@@ -20,23 +20,23 @@ Available options as of now:
 * tcp (TCP)
 
 ### Setting up the machines
-To disable irqbalance and collectl, and to enable RSS/RFS, run `sudo bash machine_setup_script.sh iface`. This will steer flows bound for particular ports to particular CPUs (e.g., packets destined for port 8000 will go to receive queue 0, which will be pinned to core 0), as well as killing collectl and irqbalance and turning off hyperthreading on 32-core machines. You will need to modify this script if you are on a machine with a different core count. For best results, run for every interface and on all machines involved in your experiment. 
+To disable irqbalance and collectl, and to enable RSS/RFS, run `sudo bash machine_setup_script.sh iface1 iface2 ...` for all interfaces you plan to use. This will steer flows bound for particular ports to particular CPUs (e.g., packets destined for port 8000 will go to receive queue 0, which will be pinned to core 0), as well as killing collectl and irqbalance and turning off hyperthreading on 32-core machines. You will need to modify this script if you are on a machine with a different core count. For best results, run for every interface and on all machines involved in your experiment. 
 
 ## Running experiments
-NOTE this is out of date---this will work for debugging, but using the python script `run_experiments.py` as a wrapper is much more convenient. More on this later.
+The script `run_experiments.py` will launch the specified number of server and client processes when launched from the server machine. A basic call for throughput would be: 
 
-### Server
-From the mininetpipe/ directory, run ./NPxyz. You will need sudo for mTCP. 
+`python run_experiments.py "./NPudp -t" client-0,client-1,client-2`
 
-### Client: Latency
-Latency is the default experiment type. Run `./NPxyz -H [hostname/IP address]`.
+Other options (number of server processes, etc.) can be found by calling the program with `--help`. 
 
-For additional options, the -h option will print help. 
+### Lower-level experiments
+Launching client and server processes manually may be helpful for debugging. Note that the usage (can get by running `./NPxyz -h`) is probably incomplete.
 
-The measurements will dump to a file that, by default, will go into the mininetpipe/results/ directory. The name will include the timestamp and relevant parameters you used to run the experiment.
+#### Server
+From the mininetpipe/ directory, run `./NPxyz` for latency, `./NPxyz -t` for throughput. You will need sudo for mTCP. 
 
-### Client(s): Throughput
-Use the -t flag to switch to throughput measurements. 
+#### Client(s)
+Run `./NPxyz -H [hostname/IP address]`. Use the -t flag to switch to throughput measurements. 
 
 ## Branches
 
