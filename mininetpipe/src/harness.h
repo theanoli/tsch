@@ -88,6 +88,8 @@ struct argstruct
     int     expduration;    /* How long to count packets                    */
     uint64_t counter;       /* For counting packets!                        */
     double  duration;       /* Measured time over which packets are blasted */
+    int     packet_rate;    /* The rate of sending packets in pkts/sec      */
+
     // timer stuff
     ProgramState program_state;
     double t0;

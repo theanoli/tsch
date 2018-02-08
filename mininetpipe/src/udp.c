@@ -143,7 +143,12 @@ void *
 TxThread (void *vargp)
 {
     ArgStruct *p = (ArgStruct *)vargp;
-    int n; 
+    int n;
+
+    useconds_t sleepTime = (1.0 / p->packet_rate) * 1000000; // does this work?
+
+    if (DEBUG)
+        printf ("Sleep time is: %d\n", sleepTime);
 
     while (1) {
         n = write (p->commfd, p->sbuff, PSIZE);
@@ -156,7 +161,7 @@ TxThread (void *vargp)
         }
 
 
-        usleep (1);
+        usleep (sleepTime);
     }
 }
 

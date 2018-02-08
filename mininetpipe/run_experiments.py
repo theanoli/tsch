@@ -31,6 +31,7 @@ class ExperimentSet(object):
         self.collect_stats = args.collect_stats
         self.expduration = args.expduration
         self.pin_procs = args.pin_procs
+        self.pps = args.packets_per_second
 
         try:
             self.results_filebase = (args.results_filebase + 
@@ -162,7 +163,8 @@ class Experiment(object):
                             (n, node, self.start_port + (i % self.nservers)))
                 cmd = (self.basecmd + 
                         " -H %s" % self.server_addr +
-                        " -P %d" % (self.start_port + (i % self.nservers)))
+                        " -P %d" % (self.start_port + (i % self.nservers)) +
+                        " -R %d" % self.packets_per_second)
                 nodecmds += (cmd + " &\n")
                 i += 1
 
@@ -250,6 +252,10 @@ if __name__ == "__main__":
     parser.add_argument('--pin_procs',
             help=('Pin each process to a core.'),
             action='store_true')
+    parser.add_argument('--packets_per_second',
+            type=int,
+            help=('Per-client thread packet sending rate.'),
+            default=1)
     
 
     args = parser.parse_args()

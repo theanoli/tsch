@@ -51,7 +51,7 @@ main (int argc, char **argv)
     args.rcv = 1;
 
     /* Parse the arguments. See Usage for description */
-    while ((c = getopt (argc, argv, "o:d:H:r:c:P:s:tu:lw:h")) != -1)
+    while ((c = getopt (argc, argv, "o:d:H:r:c:P:s:tu:lw:h:R")) != -1)
     {
         switch (c)
         {
@@ -99,6 +99,9 @@ main (int argc, char **argv)
 
             case 'h': PrintUsage ();
                       exit (0);
+
+            case 'R': args.packet_rate = atoi(optarg);
+                      break;
 
             default: 
                      PrintUsage (); 
@@ -265,6 +268,7 @@ PrintUsage (void)
             "(default 0)\n");
     printf ("\t-t\tmeasure throughput (default latency)\n");
     printf ("\t-h\t(client or server) print usage\n");
+    printf ("\t-R\t Packet sending rate in pkts/sec\n");
     printf ("\n");
     exit (0);
 }
