@@ -176,7 +176,7 @@ TxThread (void *vargp)
     struct timespec ts2 = When2();
 
     long nsecs = ts2.tv_nsec - ts1.tv_nsec;
-    fprintf(f, "time is: %d\n", (int) nsecs);
+    fprintf(f, "time is: %ld\n", nsecs);
     fprintf (f, "Sleep time is: %d\n", sleepTime);
     fclose(f);
 
