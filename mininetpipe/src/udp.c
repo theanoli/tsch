@@ -155,6 +155,7 @@ TxThread (void *vargp)
             exit (1);
         }
 
+        
         usleep (1);
     }
 }
