@@ -10,7 +10,7 @@
 extern char *optarg;
 
 // Initialize these here so they are accessible to signal handler
-ArgStruct args;     /* Arguments to be passed to protocol modules */
+ProgramArgs args;
 FILE *out;          /* Output data file                          */
 
 int 
@@ -24,9 +24,8 @@ main (int argc, char **argv)
     int default_outfile;    /* bool; use default outfile? */
     char *outfile;
 
-    int nrtts;
-    int sleep_interval; /* How long to sleep b/t latency pings (usec) */
-    // double duration;
+    int nrtts __attribute__((__unused__));
+    int sleep_interval __attribute__((__unused__)); /* How long to sleep b/t latency pings (usec) */
 
     int c, i;
 
@@ -40,18 +39,20 @@ main (int argc, char **argv)
                             // overridden for latency or by args
     args.online_wait = 0;
 
-    signal (SIGINT, SignalHandler);
-    signal (SIGALRM, SignalHandler);
-
-    args.host = NULL;
-    args.port = DEFPORT; /* just in case the user doesn't set this. */
-
     // This gets swapped for instances that specify a host (-H opt)
     args.tr = 0;
     args.rcv = 1;
 
+    signal (SIGINT, SignalHandler);
+    signal (SIGALRM, SignalHandler);
+
+    // Thread-specific arguments
+    args.host = NULL;
+    args.port = DEFPORT;  // The first port; if more than one server thread, 
+                          // will need to open DEFPORT + 1, ... 
+
     /* Parse the arguments. See Usage for description */
-    while ((c = getopt (argc, argv, "o:d:H:r:c:P:s:tu:lw:h")) != -1)
+    while ((c = getopt (argc, argv, "o:d:H:T:r:c:P:s:tu:lw:h")) != -1)
     {
         switch (c)
         {
@@ -71,6 +72,10 @@ main (int argc, char **argv)
                       args.rcv = 0;
                       args.host = (char *) malloc (strlen (optarg) + 1);
                       strcpy (args.host, optarg);
+                      break;
+
+            // How many threads to spin up
+            case 'T': args.nthreads = atoi (optarg);
                       break;
 
             case 'r': nrtts = atoi (optarg);
@@ -112,6 +117,10 @@ main (int argc, char **argv)
 
     /* FOR LATENCY */
     if (args.latency) {
+        printf ("Sorry, not implemented yet");
+        exit (1);
+        
+        /* 
         // Some huge number, don't actually care
         args.expduration = 1000000;
 
@@ -181,7 +190,7 @@ main (int argc, char **argv)
         } else if (args.rcv) {
             Echo (&args);
         }
-
+        */
     } else {
         /* FOR THROUGHPUT */
 
@@ -201,10 +210,6 @@ main (int argc, char **argv)
                 printf ("Results going into %s\n", s); 
                 mkdir (dirname (cpy_s), 0777);
 
-                if ((out = fopen (s, "ab")) == NULL) {
-                    fprintf (stderr,"Can't open %s for output\n", s);
-                    exit (1);
-                }
                 args.outfile = s;
             }
         }
@@ -217,32 +222,20 @@ main (int argc, char **argv)
         args.sbuff[PSIZE] = '\0';
         printf ("Garbage string: %s\n", args.sbuff);
 
-        ThroughputSetup (&args);
+        /* Spin up the specified number of threads, set up network connections */
+        LaunchThreads (&args);
 
         // Get throughput measurements
         if (args.tr) {
-            // Send some huge number of packets
-            printf ("Sending a ton of packets to the server...\n");
-            while (1) {
-                SimpleWrite (&args);
-            }
+            // Set program state to "experiment" so threads can start sending
+            args.program_state = experiment;
+
         } else if (args.rcv) {
             printf ("Getting ready to receive packets...\n");
-
-            Echo (&args);
-
-            if (!default_outfile) {
-                fprintf (out, "%d,%f\n", args.ncli, args.counter/args.duration);
-            }
-                printf ("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
-                printf ("Received %" PRIu64 " packets in %f seconds\n", 
-                        args.counter, args.duration);
-            printf ("Throughput is %f pps\n", args.counter/args.duration);
-                printf ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
-            }
+            alarm (warmup);
+        }
     }
 
-    ExitStrategy ();
     return 0;
 }
 
@@ -271,7 +264,7 @@ PrintUsage (void)
 
 
 void
-CollectStats (ArgStruct *p)
+CollectStats (ProgramArgs *p)
 {
     int pid = fork ();
 
@@ -311,26 +304,15 @@ CollectStats (ArgStruct *p)
 
 
 void
-ExitStrategy (void)
-{
-    // Clean up the sockets, close open FDs
-    if (args.tr) {
-        // TODO fclose (out);
-    }
-    CleanUp (&args);
-}
-
-
-void
 SignalHandler (int signum) {
     if (signum == SIGINT) {
         printf ("Got a SIGINT...\n");
-        ExitStrategy ();
         exit (0);
     } else if (signum == SIGALRM) {
         // We only need to set a new alarm if this is a throughput experiment
         // Otherwise just let the clock run; latency duration is measured by 
         // number of packets (-r option).
+        int i; 
         if (!args.latency) {
             if (args.program_state == warmup) {
                 printf ("Starting to count packets for throughput...\n");
@@ -338,13 +320,19 @@ SignalHandler (int signum) {
                 if (args.collect_stats) {
                     CollectStats(&args);
                 }
-                args.t0 = When ();
+
+                for (i = 0; i < args.nthreads; i++) {
+                    args.thread_data[i].t0 = When();
+                }
+
                 alarm (args.expduration);
             } else if (args.program_state == experiment) {
                 // Experiment has completed; let it keep running without counting
                 // packets to allow other servers to finish up
                 args.program_state = cooldown;
-                args.duration = When () - args.t0;
+                for (i = 0; i < args.nthreads; i++) {
+                    args.thread_data[i].duration = When () - args.thread_data[i].t0;
+                }
                 printf ("Experiment over, stopping counting packets...\n");
                 alarm (COOLDOWN);
             } else if (args.program_state == cooldown) {

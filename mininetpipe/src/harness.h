@@ -16,6 +16,7 @@
 #include <unistd.h> 
 
 #define PSIZE   32
+#define NTHREADS 32
 #define DEFPORT 8000
 #define EXPDURATION 10
 #define MAXEVENTS 8192
@@ -48,6 +49,7 @@
   #error "TCP must be defined during compilation!"
 #endif
 
+// Global data structures
 typedef enum program_state {
     warmup,
     experiment,
@@ -55,45 +57,62 @@ typedef enum program_state {
     end
 } ProgramState;
 
-typedef struct argstruct ArgStruct;
-struct argstruct 
+// Thread-specific data structures
+typedef struct threadargs ThreadArgs;
+struct threadargs 
 {
     /* This is the common information that is needed for all tests           */
-    char    *host;         /* Name of receiving host                        */
-
+    int     threadid;       /* The thread number                            */
     int     servicefd,     /* File descriptor of the network socket         */
             commfd;        /* Communication file descriptor                 */
     short   port;          /* Port used for connection                      */
-    int     ncli;           /* For throughput: number of clients in exp     */
-    int     online_wait;    /* Tput: how long to wait for clients to come up */
-    int     collect_stats;  /* Collect stats on resource usage              */
+    ProtocolStruct prot;   /* Protocol-depended stuff                       */
+
+    char    *host;          /* Name of receiving host                       */
     char    *outfile;       /* Where results go to die                      */
+    int     tr, rcv;
+    int     latency;        /* 1 if this is a latency experiment            */
 
     char    *r_ptr;        /* Pointer to current location in receive buffer */
     char    *s_ptr;        /* Pointer to current location in send buffer    */
     char    rbuff[PSIZE + 1];  /* Receive buffer                                */
     char    sbuff[PSIZE + 1];  /* Send buffer                                   */
 
-    int     bufflen,       /* Length of transmitted buffer                  */
-            tr,rcv;        /* Transmit and Recv flags, or maybe neither     */
+    int     bufflen;       /* Length of transmitted buffer                  */
 
-    int     source_node;   /* Set to -1 (MPI_ANY_SOURCE) if -z specified    */
-    int     reset_conn;    /* Reset connection flag                         */
-
-    int     latency;        /* Measure latency (1) or throughput (0)        */
     char    *lbuff;          /* For saving latency measurements */
 
     // for throughput measurements
-    int     expduration;    /* How long to count packets                    */
     uint64_t counter;       /* For counting packets!                        */
     double  duration;       /* Measured time over which packets are blasted */
-    // timer stuff
-    ProgramState program_state;
+
+    // timer data 
+    ProgramState *program_state;
     double t0;
     int tput_done;
+};
 
-    /* Now we work with a union of information for protocol dependent stuff  */
-    ProtocolStruct prot;
+typedef struct programargs ProgramArgs;
+struct programargs
+{
+    ProgramState    program_state;
+    int     latency;        /* Measure latency (1) or throughput (0)        */
+    int     expduration;    /* How long to count packets                    */
+    int     online_wait;    /* Tput: how long to wait for clients to come up */
+    char    *host;          /* Name of receiving host                       */
+    short   port;
+    int     collect_stats;  /* Collect stats on resource usage              */
+    int     tr,rcv;         /* Transmit and Recv flags, or maybe neither    */
+    int     nthreads;       /* How many threads to launch                   */
+    char    *outfile;       /* Where results go to die                      */
+
+    char    sbuff[PSIZE + 1];   /* Tput: the string that will be sent       */
+
+    pthread_t *tids;        /* Thread handles                               */
+    ThreadArgs *thread_data;    /* Array of per-thread data structures      */
+
+    // Possibly obsolete
+    int     ncli;           /* For throughput: number of clients in exp     */
 };
 
 typedef struct data Data;
@@ -106,56 +125,47 @@ struct data
     int    repeat;
 };
 
+
 double When ();
 
 struct timespec When2 ();
 
-void Init(ArgStruct *p, int* argc, char*** argv);
+void Init (ProgramArgs *p, int* argc, char*** argv);
 
-void Setup(ArgStruct *p);
+void Setup (ThreadArgs *p);
 
-void ThroughputSetup (ArgStruct *p);
+void ThroughputSetup (ThreadArgs *p);
 
-void establish(ArgStruct *p);
+void establish (ThreadArgs *p);
 
-void throughput_establish (ArgStruct *p);
+void throughput_establish (ThreadArgs *p);
 
 int setsock_nonblock (int fd);
 
-void Sync(ArgStruct *p);
+void SendData (ThreadArgs *p);
 
-void PrepareToReceive(ArgStruct *p);
+char *RecvData (ThreadArgs *p);
 
-void SendData(ArgStruct *p);
+void SimpleWrite (ThreadArgs *p);
 
-char *RecvData(ArgStruct *p);
+void LaunchThreads (ProgramArgs *p);
 
-void SimpleWrite (ArgStruct *p);
+void *ThreadEntry (void *vargp);
 
-void TimestampWrite (ArgStruct *p);
+void SimpleTx (ThreadArgs *p);
 
-void Echo (ArgStruct *p);
+void *SimpleRx (void *vargp);
 
-void SendTime(ArgStruct *p, double *t);
+void TimestampWrite (ThreadArgs *p);
 
-void RecvTime(ArgStruct *p, double *t);
+void Echo (ThreadArgs *p);
 
-void SendRepeat(ArgStruct *p, int rpt);
-
-void RecvRepeat(ArgStruct *p, int *rpt);
-
-void FreeBuff(char *buff1, char *buff2);
-
-void CleanUp(ArgStruct *p);
-
-void Reset(ArgStruct *p);
+void CleanUp(ThreadArgs *p);
 
 void PrintUsage();
 
 void SignalHandler (int signum);
 
-void ExitStrategy ();
-
-void CollectStats (ArgStruct *p);
+void CollectStats (ProgramArgs *p);
 
 int getopt( int argc, char * const argv[], const char *optstring);

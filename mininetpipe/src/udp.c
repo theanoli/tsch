@@ -1,33 +1,90 @@
 #include "harness.h"
 
 #define DEBUG 0
-#define WARMUP 3
-#define COOLDOWN 5
 
 int doing_reset = 0;
 
 void
-Init (ArgStruct *p, int *pargc, char ***pargv)
+Init (ProgramArgs *p, int *pargc, char ***pargv)
 {
-    p->reset_conn = 0;
-    
-    p->s_ptr = (char *) malloc (PSIZE);
-    p->r_ptr = (char *) malloc (PSIZE);
-    p->lbuff = (char *) malloc (PSIZE * 2);
-
-    if ((p->s_ptr == NULL) || (p->r_ptr == NULL) 
-            || (p->lbuff == NULL)) {
-        printf ("Malloc error!\n");
-        exit (1);
+    ThreadArgs *t_args = calloc (p->nthreads, sizeof (ThreadArgs));
+    if (t_args == NULL) {
+        printf ("Error malloc'ing space for thread args!\n");
+        exit (-10);
     }
-
-    memset (p->s_ptr, 0, PSIZE);
-    memset (p->r_ptr, 0, PSIZE);
-    memset (p->lbuff, 0, PSIZE * 2);
+    p->thread_data = t_args;
 }
 
+
+void 
+LaunchThreads (ProgramArgs *p)
+{
+    int i;
+
+    p->tids = (pthread_t *)malloc (p->nthreads * sizeof (pthread_t))
+    if (p->tids == NULL) {
+        printf ("Failed to malloc space for tids!\n");
+        exit (-82);
+    }
+
+    // This is not going to work TODO
+    ThreadArgs *targs = p->thread_data;
+
+    for (i = 0; i < p->nthreads; i++) {
+        targs[i].program_data = &p; 
+        targs[i].threadid = i;
+        targs[i].port = p->port + i;
+        targs[i].program_state = &p->program_state;
+        targs[i].host = p->host;
+        targs[i].outfile = p->outfile;
+        targs[i].tr = p->tr;
+        targs[i].rcv = p->rcv;
+        memcpy (targs[i]->sbuff, p->sbuff, PSIZE + 1);
+
+        pthread_create (&p->tids[i], NULL, ThreadEntry, (void *)&targs[i]);
+    }
+}
+
+
+// Entry point for new threads
+void *
+ThreadEntry (void *vargp)
+{
+    ThreadArgs *t_args = (ThreadArgs *)vargp; 
+    Setup (t_args);
+    
+    if (t_args->tr) {
+        thread_t tid;
+        pthread_create (&tid, NULL, SimpleRx, (void *)t_args);
+        
+        SimpleTx (t_args);
+
+    } else if (t_args->rcv) {
+        Echo (t_args);
+        
+        printf ("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+        printf ("Thread %d: Received %" PRIu64 " packets in %f seconds\n", 
+                    t_args->threadid, t_args->counter, t_args->duration);
+        printf ("Throughput is %f pps\n", args->counter/t_args->duration);
+        printf ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+
+        if (args.outfile != NULL) {
+            if ((out = fopen (s, "ab")) == NULL) {
+                fprintf (stderr,"Can't open %s for output\n", s);
+                exit (1);
+            }
+
+            fprintf (out, "%f\n", t_args->counter/t_args->duration);
+            fclose (out);
+        }
+
+        CleanUp (t_args);
+    }
+}
+
+
 void
-Setup (ArgStruct *p)
+Setup (ThreadArgs *p)
 {
     int sockfd;
     struct sockaddr_in *lsin1, *lsin2;
@@ -123,7 +180,43 @@ Setup (ArgStruct *p)
 
 
 void
-SimpleWrite (ArgStruct *p)
+SimpleTx (ThreadArgs *p)
+{
+    int n; 
+
+    while (p->program_state == experiment) {
+        n = write (p->commfd, p->sbuff, PSIZE);
+
+        if (n < 0) {
+            perror ("write to server");
+            exit (1);
+        }
+
+        // usleep (p->sleeptime);
+    }
+}
+
+
+// This will be spawned in a different thread
+void 
+*SimpleRx (void *vargp)
+{
+    ThreadArgs *p = (ThreadArgs *)vargp;
+    int n;
+
+    while (p->program_state == experiment) {
+        n = read (p->commfd, p->rbuff, PSIZE);
+
+        if (n < 0) {
+            perror ("read from server");
+            exit (1);
+        }
+    }
+}
+
+
+void
+SimpleWrite (ThreadArgs *p)
 {
     // This will run only on the client side. Send some data, 
     // receive some data and get rid of it at function exit.
@@ -150,7 +243,7 @@ SimpleWrite (ArgStruct *p)
 }
 
 
-void TimestampWrite (ArgStruct *p)
+void TimestampWrite (ThreadArgs *p)
 {
     // Send and then receive an echoed timestamp.
     // Return a pointer to the stored timestamp. 
@@ -195,7 +288,7 @@ void TimestampWrite (ArgStruct *p)
 
 
 void
-Echo (ArgStruct *p)
+Echo (ThreadArgs *p)
 {
     // Server-side only!
     // Loop through for expduration seconds and count each packet you send out
@@ -270,7 +363,7 @@ Echo (ArgStruct *p)
 
 
 void
-establish (ArgStruct *p)
+establish (ThreadArgs *p)
 {
     struct protoent *proto;
     int one = 1;
@@ -305,95 +398,19 @@ establish (ArgStruct *p)
 
 
 void
-ThroughputSetup (ArgStruct *p)
+ThroughputSetup (ThreadArgs *p)
 {
     Setup (p);
 }
 
 
 void 
-CleanUp (ArgStruct *p)
+CleanUp (ThreadArgs *p)
 {
+
    printf ("Quitting!\n");
 
    close (p->commfd);
 
 }
-
-
-void 
-Reset (ArgStruct *p)
-{
-  
-  /* Reset sockets */
-
-  if (p->reset_conn) {
-
-    doing_reset = 1;
-
-    /* Close the sockets */
-    CleanUp (p);
-
-    /* Now open and connect new sockets */
-    Setup (p);
-
-  }
-
-}
-
-/* Dummy functions -----------------------------------------------------------*/
-// May need filling in later
-
-void
-Sync (ArgStruct *p)
-{
-
-}
-
-
-void PrepareToReceive(ArgStruct *p)
-{
-    /*
-     * The Berkeley sockets interface doesn't have a method to pre-post
-     * a buffer for reception of data.
-    */
-}
-
-
-void
-SendTime (ArgStruct *p, double *t)
-{
-    // TODO fill in if needed
-}
-
-
-void
-RecvTime (ArgStruct *p, double *t)
-{
-    // TODO fill in if needed
-}
-
-
-void
-SendRepeat (ArgStruct *p, int rpt)
-{
-    // TODO fill in if needed
-}
-
-
-void 
-RecvRepeat (ArgStruct *p, int *rpt)
-{
-    // TODO fill in if needed
-}
-
-
-void 
-AfterAlignmentInit (ArgStruct *p)
-{
-
-}
-
-
-
 
