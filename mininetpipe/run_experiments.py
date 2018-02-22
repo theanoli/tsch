@@ -20,8 +20,9 @@ class ExperimentSet(object):
         self.server_addr = args.server_addr
         self.nodes = args.nodes.split(",")
         self.ntrials = args.ntrials
-        self.ncli_min = args.ncli_min
-        self.ncli_max = args.ncli_max
+        #self.ncli_min = args.ncli_min
+        #self.ncli_max = args.ncli_max
+        self.nclients = args.nclients
         self.nservers = args.nservers
         self.start_port = args.start_port
         self.wdir = args.wdir
@@ -38,43 +39,36 @@ class ExperimentSet(object):
         except:
             self.results_filebase = None 
 
-        # If we have more server processes than client procs, override the number of
-        # client procs to ensure each server proc gets at least one client proc
-        if self.ncli_min < self.nservers:
-            self.ncli_min = self.nservers
-
-        if self.ncli_max < self.ncli_min:
-            self.ncli_max = self.ncli_min
-
+        # If we have more server threads than clients, override the number of
+        # clients to ensure each server thread gets at least one client proc
+        if self.nclients < self.nservers:
+            self.nclients = self.nservers
+        
     def printer(self, msg): 
         print "%s %s" % (self.printlabel, msg)
     
     def run_experiments(self):
         # Launch the entire set of experiments for this experiment set
-        n = self.ncli_min
+        # TODO un-hardcode this at some point
+        n = 1 
 
-        while n <= self.ncli_max:
+        while n < 8:
             for trial in range(self.ntrials):
                 self.printer("Running trial %d for %d clients per node" % 
                         (trial + 1, n))
                 experiment = Experiment(self, n, trial)
                 self.printer("Completed trial %d!" % (trial + 1))
                 time.sleep(2)
-            if len(self.nodes) > 1:
-                n *= len(self.nodes) 
-            else:
                 n *= 2
             self.printer("Moving on to %d clients per node." % n)
 
 
 class Experiment(object):
-    def __init__(self, experiment_set, nprocs, trial_number):
+    def __init__(self, experiment_set, nthreads, trial_number):
         self.experiment_set = experiment_set
         self.trial_number = trial_number
-        self.printer("Number of client nodes: %d\n\tnprocs: %d" % (len(self.nodes), nprocs))
-        self.nprocs_per_client = int(math.ceil(float(nprocs) / len(self.nodes)))
-        self.printer("nprocs per client: %d" % self.nprocs_per_client)
-        self.total_clientprocs = self.nprocs_per_client * len(self.nodes)
+        self.clients = nthreads
+        self.printer("Number of client threads: %d" % (nthreads))
 
         if self.results_filebase:
             # Override the trial number to keep going from last trial
@@ -93,14 +87,13 @@ class Experiment(object):
                     self.trial_number = last_trial + 1
 
                 self.results_file = (self.results_filebase +
-                        "_c%d" % self.total_clientprocs + 
+                        "_c%d" % self.nthreads * len(self.nodes) + 
                         "_%d.dat" % self.trial_number)
         else: 
             self.results_file = "temp"
 
         if self.online_wait is None:
-            self.online_wait = math.ceil(self.total_clientprocs / self.nservers * 
-                    self.wait_multiplier)
+            self.online_wait = 0
 
         self.run_experiment()
 
@@ -123,49 +116,42 @@ class Experiment(object):
         
         os.chdir(self.wdir)
 
-        servers = []
-        for i in range(self.nservers): 
-            serv_cmd = (self.basecmd +
-                    " -c %d" % (self.total_clientprocs / self.nservers) + 
-                    " -P %d" % (self.start_port + i) +
-                    " -w %d" % (self.online_wait) +
-                    " -u %d" % self.expduration)
-            if self.pin_procs: 
-                serv_cmd = "taskset -c %d " % i + serv_cmd
-            if self.results_dir:
-                serv_cmd += " -d %s" % self.results_dir
-            if self.results_file:
-                serv_cmd += " -o %s" % self.results_file
-            if self.collect_stats and (i == 0):
-                serv_cmd += " -l"
-            cmd = shlex.split(serv_cmd)
-            self.printer("Launching server process %d: %s" % (i, serv_cmd))
-            servers.append(subprocess.Popen(cmd))
-            time.sleep(0.01)
+        serv_cmd = (self.basecmd +
+                " -c %d" % self.nclients * len(self.nodes) +  # Fix this for TCP
+                " -P %d" % self.start_port +
+                " -w %d" % self.online_wait +
+                " -u %d" % self.expduration + 
+                " -T %d" % self.nservers)
+        if self.pin_procs: 
+            serv_cmd = " -p"
+        if self.results_dir:
+            serv_cmd += " -d %s" % self.results_dir
+        if self.results_file:
+            serv_cmd += " -o %s" % self.results_file
+        if self.collect_stats:
+            serv_cmd += " -l"
+        cmd = shlex.split(serv_cmd)
+        self.printer("Launching server process: %s" % (i, serv_cmd))
+        server = subprocess.Popen(cmd)
 
         time.sleep(0.5)
-        return servers
+        return server
 
     def launch_clients(self):
         # Launch the client-side programs
-        self.printer("Launching clients, %s processes per client..." % 
-                self.nprocs_per_client)
+        self.printer("Launching clients...")
         i = 0
 
         for node in self.nodes:
             # Create a giant list of all the commands to be executed on a
             # single node; this avoids opening a ton of SSH sessions
-            nodecmds = ""
-            for n in range(self.nprocs_per_client):
-                if (n % 100) == 0:
-                    self.printer("Recording client process %d on %s, portno %d" % 
-                            (n, node, self.start_port + (i % self.nservers)))
-                cmd = (self.basecmd + 
-                        " -H %s" % self.server_addr +
-                        " -P %d" % (self.start_port + (i % self.nservers)))
-                nodecmds += (cmd + " &\n")
-                i += 1
+            nodecmd = ""
+            cmd = (self.basecmd + 
+                    " -H %s" % self.server_addr +
+                    " -T %d" % self.nclients + 
+                    " -P %d" % self.start_port)
 
+            # TODO this may no longer be necessary since commands are much simpler now
             # Commands can be really long; dump to file
             fname = "cmdfile_%s.sh" % node
             f = open(fname, "w")
@@ -204,18 +190,22 @@ if __name__ == "__main__":
             type=int,
             help='Number of times to repeat experiment. Default 1.',
             default=1)
-    parser.add_argument('--ncli_min',
+    # parser.add_argument('--ncli_min',
+    #         type=int,
+    #         help=('Min number of clients to run. Default 1.'),
+    #         default=1)
+    # parser.add_argument('--ncli_max',
+    #         type=int,
+    #         help=('Max number of clients to run (will start at 1, '
+    #             'go through powers of two until max). Default 1.'),
+    #         default=1)
+    parser.add_argument('--nclients',
             type=int,
-            help=('Min number of clients to run. Default 1.'),
-            default=1)
-    parser.add_argument('--ncli_max',
-            type=int,
-            help=('Max number of clients to run (will start at 1, '
-                'go through powers of two until max). Default 1.'),
+            help='Number of client threads to run. Default 1.',
             default=1)
     parser.add_argument('--nservers',
             type=int,
-            help='Number of server processes to run. Default 1.',
+            help='Number of server threads to run. Default 1.',
             default=1)
     parser.add_argument('--start_port',
             type=int,

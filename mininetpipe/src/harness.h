@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <libgen.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h> 
@@ -83,6 +84,7 @@ struct threadargs
     char    *lbuff;          /* For saving latency measurements */
 
     // for throughput measurements
+    int     online_wait;    /* How long to wait for clients to come up */
     uint64_t counter;       /* For counting packets!                        */
     double  duration;       /* Measured time over which packets are blasted */
 
@@ -96,6 +98,7 @@ typedef struct programargs ProgramArgs;
 struct programargs
 {
     ProgramState    program_state;
+    int     pinthreads;     /* Pin threads to cores                         */
     int     latency;        /* Measure latency (1) or throughput (0)        */
     int     expduration;    /* How long to count packets                    */
     int     online_wait;    /* Tput: how long to wait for clients to come up */
@@ -152,9 +155,9 @@ void LaunchThreads (ProgramArgs *p);
 
 void *ThreadEntry (void *vargp);
 
-void SimpleTx (ThreadArgs *p);
+void SimpleRx (ThreadArgs *p);
 
-void *SimpleRx (void *vargp);
+void *SimpleTx (void *vargp);
 
 void TimestampWrite (ThreadArgs *p);
 

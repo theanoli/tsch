@@ -38,6 +38,8 @@ main (int argc, char **argv)
     args.expduration = 20;  // Seconds; default for throughput, will get
                             // overridden for latency or by args
     args.online_wait = 0;
+    args.nthreads = 1;
+    args.pinthreads = 0;
 
     // This gets swapped for instances that specify a host (-H opt)
     args.tr = 0;
@@ -52,7 +54,7 @@ main (int argc, char **argv)
                           // will need to open DEFPORT + 1, ... 
 
     /* Parse the arguments. See Usage for description */
-    while ((c = getopt (argc, argv, "o:d:H:T:r:c:P:s:tu:lw:h")) != -1)
+    while ((c = getopt (argc, argv, "o:d:H:T:r:c:P:ps:tu:lw:h")) != -1)
     {
         switch (c)
         {
@@ -85,6 +87,9 @@ main (int argc, char **argv)
 		              break;
 
             case 'P': args.port = atoi (optarg);
+                      break;
+
+            case 'p': args.pinthreads = 1; 
                       break;
 
             case 's': sleep_interval = atoi (optarg);

@@ -7,31 +7,30 @@ int doing_reset = 0;
 void
 Init (ProgramArgs *p, int *pargc, char ***pargv)
 {
-    ThreadArgs *t_args = calloc (p->nthreads, sizeof (ThreadArgs));
-    if (t_args == NULL) {
+    ThreadArgs *targs = calloc (p->nthreads, sizeof (ThreadArgs));
+    if (targs == NULL) {
         printf ("Error malloc'ing space for thread args!\n");
         exit (-10);
     }
-    p->thread_data = t_args;
+    p->thread_data = targs;
 }
 
 
 void 
 LaunchThreads (ProgramArgs *p)
 {
-    int i;
+    int i, ret;
+    cpu_set_t cpuset __attribute__((__unused__));
 
-    p->tids = (pthread_t *)malloc (p->nthreads * sizeof (pthread_t))
+    p->tids = (pthread_t *)malloc (p->nthreads * sizeof (pthread_t));
     if (p->tids == NULL) {
         printf ("Failed to malloc space for tids!\n");
         exit (-82);
     }
 
-    // This is not going to work TODO
     ThreadArgs *targs = p->thread_data;
 
     for (i = 0; i < p->nthreads; i++) {
-        targs[i].program_data = &p; 
         targs[i].threadid = i;
         targs[i].port = p->port + i;
         targs[i].program_state = &p->program_state;
@@ -39,9 +38,20 @@ LaunchThreads (ProgramArgs *p)
         targs[i].outfile = p->outfile;
         targs[i].tr = p->tr;
         targs[i].rcv = p->rcv;
-        memcpy (targs[i]->sbuff, p->sbuff, PSIZE + 1);
+        targs[i].online_wait = p->online_wait;
+        memcpy (targs[i].sbuff, p->sbuff, PSIZE + 1);
 
         pthread_create (&p->tids[i], NULL, ThreadEntry, (void *)&targs[i]);
+        
+        if (p->pinthreads) {
+            CPU_ZERO (&cpuset);
+            CPU_SET (i, &cpuset);
+            ret = pthread_setaffinity_np (p->tids[i], sizeof (cpu_set_t), &cpuset);
+            if (ret != 0) {
+                printf ("Couldn't pin thread to core!\n");
+                exit (-14);
+            }
+        }
     }
 }
 
@@ -50,36 +60,39 @@ LaunchThreads (ProgramArgs *p)
 void *
 ThreadEntry (void *vargp)
 {
-    ThreadArgs *t_args = (ThreadArgs *)vargp; 
-    Setup (t_args);
+    ThreadArgs *targs = (ThreadArgs *)vargp; 
+    Setup (targs);
     
-    if (t_args->tr) {
-        thread_t tid;
-        pthread_create (&tid, NULL, SimpleRx, (void *)t_args);
+    if (targs->tr) {
+        pthread_t tid;
+        pthread_create (&tid, NULL, SimpleTx, (void *)targs);
         
-        SimpleTx (t_args);
+        SimpleRx (targs);
 
-    } else if (t_args->rcv) {
-        Echo (t_args);
+    } else if (targs->rcv) {
+        Echo (targs);
         
         printf ("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
         printf ("Thread %d: Received %" PRIu64 " packets in %f seconds\n", 
-                    t_args->threadid, t_args->counter, t_args->duration);
-        printf ("Throughput is %f pps\n", args->counter/t_args->duration);
+                    targs->threadid, targs->counter, targs->duration);
+        printf ("Throughput is %f pps\n", targs->counter/targs->duration);
         printf ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
 
-        if (args.outfile != NULL) {
-            if ((out = fopen (s, "ab")) == NULL) {
-                fprintf (stderr,"Can't open %s for output\n", s);
+        if (targs->outfile != NULL) {
+            FILE *out;
+            if ((out = fopen (targs->outfile, "ab")) == NULL) {
+                fprintf (stderr,"Can't open %s for output\n", targs->outfile);
                 exit (1);
             }
 
-            fprintf (out, "%f\n", t_args->counter/t_args->duration);
+            fprintf (out, "%f\n", targs->counter/targs->duration);
             fclose (out);
         }
 
-        CleanUp (t_args);
+        CleanUp (targs);
     }
+
+    return 0;
 }
 
 
@@ -180,12 +193,30 @@ Setup (ThreadArgs *p)
 
 
 void
-SimpleTx (ThreadArgs *p)
+SimpleRx (ThreadArgs *p)
 {
     int n; 
 
-    while (p->program_state == experiment) {
-        n = write (p->commfd, p->sbuff, PSIZE);
+    while (*p->program_state == experiment) {
+        n = read (p->commfd, p->sbuff, PSIZE);
+
+        if (n < 0) {
+            perror ("read from server");
+            exit (1);
+        }
+    }
+}
+
+
+// This will be spawned in a different thread
+void *
+SimpleTx (void *vargp)
+{
+    ThreadArgs *p = (ThreadArgs *)vargp;
+    int n;
+
+    while (*p->program_state == experiment) {
+        n = write (p->commfd, p->rbuff, PSIZE);
 
         if (n < 0) {
             perror ("write to server");
@@ -194,24 +225,8 @@ SimpleTx (ThreadArgs *p)
 
         // usleep (p->sleeptime);
     }
-}
 
-
-// This will be spawned in a different thread
-void 
-*SimpleRx (void *vargp)
-{
-    ThreadArgs *p = (ThreadArgs *)vargp;
-    int n;
-
-    while (p->program_state == experiment) {
-        n = read (p->commfd, p->rbuff, PSIZE);
-
-        if (n < 0) {
-            perror ("read from server");
-            exit (1);
-        }
-    }
+    return 0;
 }
 
 
@@ -306,7 +321,7 @@ Echo (ThreadArgs *p)
     tnull = When ();
     if (!p->latency) {
         printf ("Waiting for clients to start up...\n");
-        while ((duration = When () - tnull) < (p->online_wait + 5)) {
+        while ((duration = When () - tnull) < (p->online_wait + 3)) {
 
         }
     }
@@ -322,12 +337,12 @@ Echo (ThreadArgs *p)
     
     p->counter = 0;
 
-    p->program_state = warmup;
+    *p->program_state = warmup;
     printf ("Assuming all clients have come online! Setting alarm...\n");
     alarm (WARMUP);
 
     // struct timespec timeout = { .tv_nsec = 10 * 1000UL, };
-    while (p->program_state != end) { 
+    while (*p->program_state != end) { 
         if (DEBUG)
             printf ("waiting for messages...\n");
         // Read data from client; m is number of messages received 
@@ -355,7 +370,7 @@ Echo (ThreadArgs *p)
         }
 
         // Count successfully echoed packets
-        if (p->program_state == experiment) {
+        if (*p->program_state == experiment) {
             p->counter += m;
         }
     }
