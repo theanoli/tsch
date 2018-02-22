@@ -20,8 +20,6 @@ class ExperimentSet(object):
         self.server_addr = args.server_addr
         self.nodes = args.nodes.split(",")
         self.ntrials = args.ntrials
-        #self.ncli_min = args.ncli_min
-        #self.ncli_max = args.ncli_max
         self.nclients = args.nclients
         self.nservers = args.nservers
         self.start_port = args.start_port
@@ -131,7 +129,7 @@ class Experiment(object):
         if self.collect_stats:
             serv_cmd += " -l"
         cmd = shlex.split(serv_cmd)
-        self.printer("Launching server process: %s" % (i, serv_cmd))
+        self.printer("Launching server process: %s" % serv_cmd)
         server = subprocess.Popen(cmd)
 
         time.sleep(0.5)
@@ -155,7 +153,7 @@ class Experiment(object):
             # Commands can be really long; dump to file
             fname = "cmdfile_%s.sh" % node
             f = open(fname, "w")
-            f.write(nodecmds)
+            f.write(nodecmd)
             f.close()
 
         for node in self.nodes:
@@ -167,11 +165,10 @@ class Experiment(object):
     def run_experiment(self):
         self.kill_zombie_processes()
 
-        servers = self.launch_servers()
+        server = self.launch_servers()
         self.launch_clients()
 
-        for server in servers:
-            server.wait()
+        server.wait()
 
     
 if __name__ == "__main__":
@@ -190,15 +187,6 @@ if __name__ == "__main__":
             type=int,
             help='Number of times to repeat experiment. Default 1.',
             default=1)
-    # parser.add_argument('--ncli_min',
-    #         type=int,
-    #         help=('Min number of clients to run. Default 1.'),
-    #         default=1)
-    # parser.add_argument('--ncli_max',
-    #         type=int,
-    #         help=('Max number of clients to run (will start at 1, '
-    #             'go through powers of two until max). Default 1.'),
-    #         default=1)
     parser.add_argument('--nclients',
             type=int,
             help='Number of client threads to run. Default 1.',

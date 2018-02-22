@@ -41,6 +41,9 @@ LaunchThreads (ProgramArgs *p)
         targs[i].online_wait = p->online_wait;
         memcpy (targs[i].sbuff, p->sbuff, PSIZE + 1);
 
+        if (p->rcv) {
+            printf ("Launching server thread %d...\n", i);
+        }
         pthread_create (&p->tids[i], NULL, ThreadEntry, (void *)&targs[i]);
         
         if (p->pinthreads) {
