@@ -236,8 +236,20 @@ main (int argc, char **argv)
             args.program_state = experiment;
 
         } else if (args.rcv) {
-            printf ("Getting ready to receive packets...\n");
-            alarm (warmup);
+            // Wait a few seconds to let clients come online
+            if (!args.latency) {
+                printf ("Waiting for clients to start up...\n");
+                sleep (args.online_wait + 3);
+            }
+
+            printf ("Assuming all clients have come online!");
+            printf (" Setting warmup alarm...\n");
+            args.program_state = warmup;
+            alarm (WARMUP);
+        }
+
+        for (i = 0; i < args.nthreads; i++) {
+            pthread_join (args.tids[i], NULL);
         }
     }
 

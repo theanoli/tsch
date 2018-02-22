@@ -50,7 +50,7 @@ class ExperimentSet(object):
         # TODO un-hardcode this at some point
         n = 1 
 
-        while n < 8:
+        while n <= 8:
             for trial in range(self.ntrials):
                 self.printer("Running trial %d for %d clients per node" % 
                         (trial + 1, n))
@@ -143,7 +143,6 @@ class Experiment(object):
         for node in self.nodes:
             # Create a giant list of all the commands to be executed on a
             # single node; this avoids opening a ton of SSH sessions
-            nodecmd = ""
             cmd = (self.basecmd + 
                     " -H %s" % self.server_addr +
                     " -T %d" % self.nclients + 
@@ -151,16 +150,9 @@ class Experiment(object):
 
             # TODO this may no longer be necessary since commands are much simpler now
             # Commands can be really long; dump to file
-            fname = "cmdfile_%s.sh" % node
-            f = open(fname, "w")
-            f.write(nodecmd)
-            f.close()
-
-        for node in self.nodes:
-            self.printer("Contacting client %s to launch client processes..." % node) 
-            fname = "cmdfile_%s.sh" % node
-            subprocess.Popen(shlex.split("ssh %s 'cd %s; bash -s' < %s" % 
-                (node, self.wdir, fname)))
+            self.printer("Sending command to client: %s" % cmd)
+            subprocess.Popen(shlex.split("ssh %s 'cd %s; %s'" % 
+                (node, self.wdir, cmd)))
         
     def run_experiment(self):
         self.kill_zombie_processes()

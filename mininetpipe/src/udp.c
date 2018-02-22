@@ -7,7 +7,7 @@ int doing_reset = 0;
 void
 Init (ProgramArgs *p, int *pargc, char ***pargv)
 {
-    ThreadArgs *targs = calloc (p->nthreads, sizeof (ThreadArgs));
+    ThreadArgs *targs = (ThreadArgs *)calloc (p->nthreads, sizeof (ThreadArgs));
     if (targs == NULL) {
         printf ("Error malloc'ing space for thread args!\n");
         exit (-10);
@@ -22,7 +22,7 @@ LaunchThreads (ProgramArgs *p)
     int i, ret;
     cpu_set_t cpuset __attribute__((__unused__));
 
-    p->tids = (pthread_t *)malloc (p->nthreads * sizeof (pthread_t));
+    p->tids = (pthread_t *)calloc (p->nthreads, sizeof (pthread_t));
     if (p->tids == NULL) {
         printf ("Failed to malloc space for tids!\n");
         exit (-82);
@@ -318,17 +318,6 @@ Echo (ThreadArgs *p)
     char bufs[MAXEVENTS][PSIZE + 1];            // packet buffers
     struct sockaddr_in addrs[MAXEVENTS];    // return addresses
 
-    double tnull, duration;
-
-    // Wait a few seconds to let clients come online
-    tnull = When ();
-    if (!p->latency) {
-        printf ("Waiting for clients to start up...\n");
-        while ((duration = When () - tnull) < (p->online_wait + 3)) {
-
-        }
-    }
-
     for (i = 0; i < MAXEVENTS; i++) {
         iovecs[i].iov_base          = bufs[i];
         iovecs[i].iov_len           = PSIZE;
@@ -339,10 +328,6 @@ Echo (ThreadArgs *p)
     }
     
     p->counter = 0;
-
-    *p->program_state = warmup;
-    printf ("Assuming all clients have come online! Setting alarm...\n");
-    alarm (WARMUP);
 
     // struct timespec timeout = { .tv_nsec = 10 * 1000UL, };
     while (*p->program_state != end) { 
@@ -387,6 +372,8 @@ establish (ThreadArgs *p)
     int one = 1;
 
     if (p->rcv) {
+        printf ("Client thread %d attempting to connect on port %d...\n",
+                p->threadid, p->commfd);
         p->commfd = p->servicefd;
         
         if (p->commfd < 0) {
@@ -409,9 +396,9 @@ establish (ThreadArgs *p)
             perror ("tester: server: unable to setsockopt!");
             exit (557);
         }
-    }
 
-    printf ("Established the connection...\n");
+        printf ("Client thread %d established the connection...\n", p->threadid);
+    }
 }
 
 
