@@ -18,6 +18,7 @@
 
 #define PSIZE   32
 #define NTHREADS 32
+#define NSERVERCORES 32
 #define DEFPORT 8000
 #define EXPDURATION 10
 #define MAXEVENTS 8192

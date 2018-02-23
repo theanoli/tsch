@@ -47,26 +47,26 @@ class ExperimentSet(object):
     
     def run_experiments(self):
         # Launch the entire set of experiments for this experiment set
-        # TODO un-hardcode this at some point
         n = 1 
 
         while n <= 8:
             for trial in range(self.ntrials):
-                self.printer("Running trial %d for %d clients per node" % 
-                        (trial + 1, n))
+                self.printer("Running trial %d for %d client threads per node" % 
+                        (trial + 1, n * self.nclients))
                 experiment = Experiment(self, n, trial)
                 self.printer("Completed trial %d!" % (trial + 1))
                 time.sleep(2)
                 n *= 2
-            self.printer("Moving on to %d clients per node." % n)
+            self.printer("Moving on to %d clients per node." % (n * self.nclients))
 
 
 class Experiment(object):
-    def __init__(self, experiment_set, nthreads, trial_number):
+    def __init__(self, experiment_set, n, trial_number):
         self.experiment_set = experiment_set
         self.trial_number = trial_number
-        self.clients = nthreads
-        self.printer("Number of client threads: %d" % (nthreads))
+        self.n = n
+        self.printer("Number of client threads: %d" % 
+                (self.nclients * n * len(self.nodes)))
 
         if self.results_filebase:
             # Override the trial number to keep going from last trial
@@ -76,16 +76,19 @@ class Experiment(object):
                     if self.results_filebase in x]
                 print previous_trials
 
-                if len(previous_trials) > 0:
-                    last_trials = [int(re.search(
-                        r"^[0-9a-z_]+_(\d+)\.dat$", x).group(1))
-                        for x in previous_trials if ".tab" not in x]
-                    last_trial = max(last_trials)
+                try:
+                    if len(previous_trials) > 0:
+                        last_trials = [int(re.search(
+                            r"^[0-9a-z_]+_(\d+)\.dat$", x).group(1))
+                            for x in previous_trials if ".tab" not in x]
+                        last_trial = max(last_trials)
 
-                    self.trial_number = last_trial + 1
+                        self.trial_number = last_trial + 1
+                except:
+                    self.trial_number = 0
 
                 self.results_file = (self.results_filebase +
-                        "_c%d" % self.nthreads * len(self.nodes) + 
+                        "_c%d" % (self.nclients * len(self.nodes) * n) + 
                         "_%d.dat" % self.trial_number)
         else: 
             self.results_file = "temp"
@@ -115,7 +118,7 @@ class Experiment(object):
         os.chdir(self.wdir)
 
         serv_cmd = (self.basecmd +
-                " -c %d" % self.nclients * len(self.nodes) +  # Fix this for TCP
+                " -c %d" % (self.nclients * len(self.nodes) * self.n) +  # Fix this for TCP
                 " -P %d" % self.start_port +
                 " -w %d" % self.online_wait +
                 " -u %d" % self.expduration + 
@@ -144,8 +147,9 @@ class Experiment(object):
             # Create a giant list of all the commands to be executed on a
             # single node; this avoids opening a ton of SSH sessions
             cmd = (self.basecmd + 
+                    " -c %d" % self.nservers + 
                     " -H %s" % self.server_addr +
-                    " -T %d" % self.nclients + 
+                    " -T %d" % (self.nclients * self.n) +
                     " -P %d" % self.start_port)
 
             # TODO this may no longer be necessary since commands are much simpler now

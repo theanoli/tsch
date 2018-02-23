@@ -88,6 +88,7 @@ main (int argc, char **argv)
             case 'r': nrtts = atoi (optarg);
                       break;
 
+            // Overloading to be ncli (for server) and nserver for (clients)
     	    case 'c': args.ncli = atoi (optarg);
 		              break;
 
@@ -250,13 +251,17 @@ main (int argc, char **argv)
 
             printf ("Assuming all clients have come online!");
             printf (" Entering warmup period...\n");
-            
             UpdateProgramState (warmup);
             sleep (WARMUP);
+            
+            printf ("Starting counting packets for throughput...\n");
             UpdateProgramState (experiment);
             sleep (args.expduration);
+
+            printf ("Experiment over, stopping counting packets...\n");
             UpdateProgramState (cooldown);
             sleep (COOLDOWN);
+
             UpdateProgramState (end);
         }
 
@@ -273,18 +278,17 @@ void
 UpdateProgramState (ProgramState state)
 {
     int i;
+    if ((args.collect_stats) && (args.rcv) && (state == experiment)) {
+        CollectStats (&args);
+    }
+
     for (i = 0; i < args.nthreads; i++) {
         args.thread_data[i].program_state = state;
         if ((state == experiment) && (args.rcv)) {
-            printf ("Starting counting packets for throughput...\n");
             args.thread_data[i].t0 = When ();
-            if (args.collect_stats) {
-                CollectStats (&args);
-            }
         }
 
         if ((state == cooldown) && (args.rcv)) {
-            printf ("Experiment over, stopping counting packets...\n");
             args.thread_data[i].duration = When () - args.thread_data[i].t0;
         }
     }

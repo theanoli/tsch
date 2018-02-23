@@ -37,7 +37,7 @@ LaunchThreads (ProgramArgs *p)
         targs[i].threadid = i;
         snprintf (targs[i].threadname, 128, "[%s.%d]", p->machineid, i);
 
-        targs[i].port = p->port + i;
+        targs[i].port = p->port + i % p->ncli;
         targs[i].host = p->host;
         targs[i].outfile = p->outfile;
         targs[i].tr = p->tr;
@@ -52,10 +52,10 @@ LaunchThreads (ProgramArgs *p)
         
         if (p->pinthreads) {
             CPU_ZERO (&cpuset);
-            CPU_SET (i, &cpuset);
+            CPU_SET (i % NSERVERCORES, &cpuset);
             ret = pthread_setaffinity_np (p->tids[i], sizeof (cpu_set_t), &cpuset);
             if (ret != 0) {
-                printf ("[%s] Couldn't pin thread to core!\n", p->machineid);
+                printf ("[%s] Couldn't pin thread %d to core!\n", p->machineid, i);
                 exit (-14);
             }
         }
@@ -168,7 +168,7 @@ Setup (ThreadArgs *p)
             exit (-10);
         }
 
-        printf ("%s successfully made contact!\n", p->threadname);
+        printf ("%s successfully made contact on port %d!\n", p->threadname, p->port);
         lsin1->sin_port = htons (p->port);
         p->commfd = sockfd;
         freeaddrinfo (result);
@@ -192,8 +192,6 @@ Setup (ThreadArgs *p)
         }
 
         p->servicefd = sockfd;
-        printf ("Bound to socket %d...\n", sockfd);
-
     }
 
     establish (p);
@@ -203,7 +201,6 @@ Setup (ThreadArgs *p)
 void
 SimpleRx (ThreadArgs *p)
 {
-    printf ("%s entering SimpleRx\n", p->threadname);
     int n; 
 
     while (p->program_state != experiment) {
@@ -213,12 +210,11 @@ SimpleRx (ThreadArgs *p)
         n = read (p->commfd, p->rbuff, PSIZE);
 
         if (n < 0) {
-            printf ("Client %d error: ", p->threadid);
+            printf ("%s error: ", p->threadname);
             perror ("read from server");
             exit (1);
         }
     }
-    printf ("%s exiting SimpleRx\n", p->threadname);
 }
 
 
@@ -227,7 +223,6 @@ void *
 SimpleTx (void *vargp)
 {
     ThreadArgs *p = (ThreadArgs *)vargp;
-    printf ("%s entering SimpleTx\n", p->threadname);
     int n;
     
     while (p->program_state != experiment) {
@@ -246,7 +241,6 @@ SimpleTx (void *vargp)
         // usleep (p->sleeptime);
     }
 
-    printf ("%s exiting SimpleTx\n", p->threadname);
     return 0;
 }
 
@@ -393,8 +387,6 @@ establish (ThreadArgs *p)
 
     if (p->rcv) {
         p->commfd = p->servicefd;
-        printf ("%s attempting to connect on fd %d...\n",
-                p->threadname, p->commfd);
         
         if (p->commfd < 0) {
             printf ("%s accept failed! errno=%d\n", p->threadname, errno);
@@ -417,7 +409,7 @@ establish (ThreadArgs *p)
             exit (557);
         }
 
-        printf ("%s established a connection...\n", p->threadname);
+        printf ("%s Established a connection...\n", p->threadname);
     }
 }
 
