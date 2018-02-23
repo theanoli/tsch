@@ -121,7 +121,7 @@ class Experiment(object):
                 " -u %d" % self.expduration + 
                 " -T %d" % self.nservers)
         if self.pin_procs: 
-            serv_cmd = " -p"
+            serv_cmd += " -p"
         if self.results_dir:
             serv_cmd += " -d %s" % self.results_dir
         if self.results_file:
@@ -132,7 +132,7 @@ class Experiment(object):
         self.printer("Launching server process: %s" % serv_cmd)
         server = subprocess.Popen(cmd)
 
-        time.sleep(0.5)
+        time.sleep(3)
         return server
 
     def launch_clients(self):
@@ -181,7 +181,8 @@ if __name__ == "__main__":
             default=1)
     parser.add_argument('--nclients',
             type=int,
-            help='Number of client threads to run. Default 1.',
+            help=('Number of client threads to run per server machine. '
+                'Default 1.'),
             default=1)
     parser.add_argument('--nservers',
             type=int,

@@ -13,6 +13,14 @@ Init (ProgramArgs *p, int *pargc, char ***pargv)
         exit (-10);
     }
     p->thread_data = targs;
+
+    p->tids = (pthread_t *)calloc (p->nthreads, sizeof (pthread_t));
+    if (p->tids == NULL) {
+        printf ("Failed to malloc space for tids!\n");
+        exit (-82);
+    }
+
+    UpdateProgramState (startup);
 }
 
 
@@ -22,18 +30,14 @@ LaunchThreads (ProgramArgs *p)
     int i, ret;
     cpu_set_t cpuset __attribute__((__unused__));
 
-    p->tids = (pthread_t *)calloc (p->nthreads, sizeof (pthread_t));
-    if (p->tids == NULL) {
-        printf ("Failed to malloc space for tids!\n");
-        exit (-82);
-    }
-
     ThreadArgs *targs = p->thread_data;
 
     for (i = 0; i < p->nthreads; i++) {
+        targs[i].machineid = p->machineid;
         targs[i].threadid = i;
+        snprintf (targs[i].threadname, 128, "[%s.%d]", p->machineid, i);
+
         targs[i].port = p->port + i;
-        targs[i].program_state = &p->program_state;
         targs[i].host = p->host;
         targs[i].outfile = p->outfile;
         targs[i].tr = p->tr;
@@ -42,7 +46,7 @@ LaunchThreads (ProgramArgs *p)
         memcpy (targs[i].sbuff, p->sbuff, PSIZE + 1);
 
         if (p->rcv) {
-            printf ("Launching server thread %d...\n", i);
+            printf ("[%s] Launching thread %d...\n", p->machineid, i);
         }
         pthread_create (&p->tids[i], NULL, ThreadEntry, (void *)&targs[i]);
         
@@ -51,7 +55,7 @@ LaunchThreads (ProgramArgs *p)
             CPU_SET (i, &cpuset);
             ret = pthread_setaffinity_np (p->tids[i], sizeof (cpu_set_t), &cpuset);
             if (ret != 0) {
-                printf ("Couldn't pin thread to core!\n");
+                printf ("[%s] Couldn't pin thread to core!\n", p->machineid);
                 exit (-14);
             }
         }
@@ -76,8 +80,8 @@ ThreadEntry (void *vargp)
         Echo (targs);
         
         printf ("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
-        printf ("Thread %d: Received %" PRIu64 " packets in %f seconds\n", 
-                    targs->threadid, targs->counter, targs->duration);
+        printf ("%s Received %" PRIu64 " packets in %f seconds\n", 
+                    targs->threadname, targs->counter, targs->duration);
         printf ("Throughput is %f pps\n", targs->counter/targs->duration);
         printf ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
 
@@ -164,6 +168,7 @@ Setup (ThreadArgs *p)
             exit (-10);
         }
 
+        printf ("%s successfully made contact!\n", p->threadname);
         lsin1->sin_port = htons (p->port);
         p->commfd = sockfd;
         freeaddrinfo (result);
@@ -198,16 +203,22 @@ Setup (ThreadArgs *p)
 void
 SimpleRx (ThreadArgs *p)
 {
+    printf ("%s entering SimpleRx\n", p->threadname);
     int n; 
 
-    while (*p->program_state == experiment) {
-        n = read (p->commfd, p->sbuff, PSIZE);
+    while (p->program_state != experiment) {
+    }
+
+    while (1) {
+        n = read (p->commfd, p->rbuff, PSIZE);
 
         if (n < 0) {
+            printf ("Client %d error: ", p->threadid);
             perror ("read from server");
             exit (1);
         }
     }
+    printf ("%s exiting SimpleRx\n", p->threadname);
 }
 
 
@@ -216,12 +227,18 @@ void *
 SimpleTx (void *vargp)
 {
     ThreadArgs *p = (ThreadArgs *)vargp;
+    printf ("%s entering SimpleTx\n", p->threadname);
     int n;
+    
+    while (p->program_state != experiment) {
 
-    while (*p->program_state == experiment) {
-        n = write (p->commfd, p->rbuff, PSIZE);
+    }
+
+    while (1) {
+        n = write (p->commfd, p->sbuff, PSIZE);
 
         if (n < 0) {
+            printf ("Client %d error: ", p->threadid);
             perror ("write to server");
             exit (1);
         }
@@ -229,6 +246,7 @@ SimpleTx (void *vargp)
         // usleep (p->sleeptime);
     }
 
+    printf ("%s exiting SimpleTx\n", p->threadname);
     return 0;
 }
 
@@ -329,12 +347,14 @@ Echo (ThreadArgs *p)
     
     p->counter = 0;
 
-    // struct timespec timeout = { .tv_nsec = 10 * 1000UL, };
-    while (*p->program_state != end) { 
-        if (DEBUG)
-            printf ("waiting for messages...\n");
+    // Wait for state to get updated to warmup
+    while (p->program_state == startup) {
+    }
+
+    struct timespec timeout = { .tv_nsec = 10 * 1000UL, };
+    while (p->program_state != end) { 
         // Read data from client; m is number of messages received 
-        m = recvmmsg (p->commfd, msgs, 2048, MSG_WAITFORONE, NULL); // &timeout);
+        m = recvmmsg (p->commfd, msgs, 2048, MSG_WAITFORONE, &timeout);
         if (DEBUG)
             printf ("Got %d messages.\n", m);
 
@@ -358,7 +378,7 @@ Echo (ThreadArgs *p)
         }
 
         // Count successfully echoed packets
-        if (*p->program_state == experiment) {
+        if (p->program_state == experiment) {
             p->counter += m;
         }
     }
@@ -372,12 +392,12 @@ establish (ThreadArgs *p)
     int one = 1;
 
     if (p->rcv) {
-        printf ("Client thread %d attempting to connect on port %d...\n",
-                p->threadid, p->commfd);
         p->commfd = p->servicefd;
+        printf ("%s attempting to connect on fd %d...\n",
+                p->threadname, p->commfd);
         
         if (p->commfd < 0) {
-            printf ("Server: accept failed! errno=%d\n", errno);
+            printf ("%s accept failed! errno=%d\n", p->threadname, errno);
             exit (-12);
         }
 
@@ -397,7 +417,7 @@ establish (ThreadArgs *p)
             exit (557);
         }
 
-        printf ("Client thread %d established the connection...\n", p->threadid);
+        printf ("%s established a connection...\n", p->threadname);
     }
 }
 
@@ -413,7 +433,7 @@ void
 CleanUp (ThreadArgs *p)
 {
 
-   printf ("Quitting!\n");
+   printf ("%s Quitting!\n", p->threadname);
 
    close (p->commfd);
 

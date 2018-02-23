@@ -48,6 +48,11 @@ main (int argc, char **argv)
     signal (SIGINT, SignalHandler);
     signal (SIGALRM, SignalHandler);
 
+    // Machine ID
+    args.machineid = (char *)malloc (128);
+    gethostname (args.machineid, 128);
+    args.machineid = strsep (&args.machineid, ".");
+
     // Thread-specific arguments
     args.host = NULL;
     args.port = DEFPORT;  // The first port; if more than one server thread, 
@@ -233,19 +238,26 @@ main (int argc, char **argv)
         // Get throughput measurements
         if (args.tr) {
             // Set program state to "experiment" so threads can start sending
-            args.program_state = experiment;
+            sleep (1);
+            UpdateProgramState (experiment);
 
         } else if (args.rcv) {
             // Wait a few seconds to let clients come online
             if (!args.latency) {
                 printf ("Waiting for clients to start up...\n");
-                sleep (args.online_wait + 3);
+                sleep (args.online_wait + 6);
             }
 
             printf ("Assuming all clients have come online!");
-            printf (" Setting warmup alarm...\n");
-            args.program_state = warmup;
-            alarm (WARMUP);
+            printf (" Entering warmup period...\n");
+            
+            UpdateProgramState (warmup);
+            sleep (WARMUP);
+            UpdateProgramState (experiment);
+            sleep (args.expduration);
+            UpdateProgramState (cooldown);
+            sleep (COOLDOWN);
+            UpdateProgramState (end);
         }
 
         for (i = 0; i < args.nthreads; i++) {
@@ -254,6 +266,28 @@ main (int argc, char **argv)
     }
 
     return 0;
+}
+
+
+void
+UpdateProgramState (ProgramState state)
+{
+    int i;
+    for (i = 0; i < args.nthreads; i++) {
+        args.thread_data[i].program_state = state;
+        if ((state == experiment) && (args.rcv)) {
+            printf ("Starting counting packets for throughput...\n");
+            args.thread_data[i].t0 = When ();
+            if (args.collect_stats) {
+                CollectStats (&args);
+            }
+        }
+
+        if ((state == cooldown) && (args.rcv)) {
+            printf ("Experiment over, stopping counting packets...\n");
+            args.thread_data[i].duration = When () - args.thread_data[i].t0;
+        }
+    }
 }
 
 

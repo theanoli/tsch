@@ -52,6 +52,7 @@
 
 // Global data structures
 typedef enum program_state {
+    startup,
     warmup,
     experiment,
     cooldown,
@@ -63,7 +64,10 @@ typedef struct threadargs ThreadArgs;
 struct threadargs 
 {
     /* This is the common information that is needed for all tests           */
+    char *  machineid; /* Machine ID   */ 
     int     threadid;       /* The thread number                            */
+    char    threadname[128];    /* MachineID.threadID for printing          */
+
     int     servicefd,     /* File descriptor of the network socket         */
             commfd;        /* Communication file descriptor                 */
     short   port;          /* Port used for connection                      */
@@ -89,7 +93,7 @@ struct threadargs
     double  duration;       /* Measured time over which packets are blasted */
 
     // timer data 
-    ProgramState *program_state;
+    volatile ProgramState program_state;
     double t0;
     int tput_done;
 };
@@ -97,7 +101,8 @@ struct threadargs
 typedef struct programargs ProgramArgs;
 struct programargs
 {
-    ProgramState    program_state;
+    volatile ProgramState    program_state;
+    char *  machineid;      /* Machine id */
     int     pinthreads;     /* Pin threads to cores                         */
     int     latency;        /* Measure latency (1) or throughput (0)        */
     int     expduration;    /* How long to count packets                    */
@@ -128,6 +133,8 @@ struct data
     int    repeat;
 };
 
+
+void UpdateProgramState (ProgramState state);
 
 double When ();
 
