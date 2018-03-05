@@ -39,8 +39,8 @@ class ExperimentSet(object):
 
         # If we have more server threads than clients, override the number of
         # clients to ensure each server thread gets at least one client proc
-        if self.nclients < self.nservers:
-            self.nclients = self.nservers
+        #if self.nclients * len(self.nodes) < self.nservers:
+        #    self.nclients = self.nservers/len(self.nodes)
         
     def printer(self, msg): 
         print "%s %s" % (self.printlabel, msg)
@@ -144,16 +144,12 @@ class Experiment(object):
         i = 0
 
         for node in self.nodes:
-            # Create a giant list of all the commands to be executed on a
-            # single node; this avoids opening a ton of SSH sessions
             cmd = (self.basecmd + 
                     " -c %d" % self.nservers + 
                     " -H %s" % self.server_addr +
                     " -T %d" % (self.nclients * self.n) +
                     " -P %d" % self.start_port)
 
-            # TODO this may no longer be necessary since commands are much simpler now
-            # Commands can be really long; dump to file
             self.printer("Sending command to client: %s" % cmd)
             subprocess.Popen(shlex.split("ssh %s 'cd %s; %s'" % 
                 (node, self.wdir, cmd)))
@@ -185,7 +181,7 @@ if __name__ == "__main__":
             default=1)
     parser.add_argument('--nclients',
             type=int,
-            help=('Number of client threads to run per server machine. '
+            help=('Number of client threads to run per client machine. '
                 'Default 1.'),
             default=1)
     parser.add_argument('--nservers',

@@ -12,3 +12,4 @@ ifconfig | awk '{ print $1 }' | grep eth | grep -v eth0 | while read var; do
     sudo bash initialize_rss_and_rfs.sh $var
     sudo ethtool -N $var rx-flow-hash udp4 sdfn
 done
+

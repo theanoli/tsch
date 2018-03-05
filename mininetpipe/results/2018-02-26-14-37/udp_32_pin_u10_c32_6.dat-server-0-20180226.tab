@@ -1,0 +1,26 @@
+################################################################################
+# Collectl:   V3.6.9-1  HiRes: 1  Options: -P -f results/2018-02-26-14-37/udp_32_pin_u10_c32_6.dat -sc -c10 -oaz 
+# Host:       server-0  DaemonOpts: 
+# Booted:     1519674311.66 [20180226-12:45:11]
+# Distro:     debian jessie/sid, Ubuntu 14.04.1 LTS  Platform: 
+# Date:       20180226-150226  Secs: 1519682546 TZ: -0700
+# SubSys:     c Options: az Interval: 1 NumCPUs: 64  CPUsDis: 1 NumBud: 0 Flags: iD
+# Filters:    NfsFilt:  EnvFilt:  TcpFilt: ituc
+# HZ:         100  Arch: x86_64-linux-gnu-thread-multi PageSize: 4096
+# Cpu:        GenuineIntel Speed(MHz): 2200.112 Cores: 8  Siblings: 8 Nodes: 4
+# Kernel:     3.13.0-100-generic  Memory: 131822812 kB  Swap: 3145724 kB
+# NumDisks:   7 DiskNames: sdb sde sdc sdd sdg sdf sda
+# NumNets:    9 NetNames: eth0:1000 eth1:?? eth2:?? eth3:?? eth4:10000 eth5:10000 eth6:10000 eth7:?? lo:??
+# SCSI:       DA:0:00:00:00 DA:0:00:01:00 DA:0:00:02:00 DA:0:00:03:00 DA:0:00:04:00 DA:0:00:05:00 DA:0:00:06:00 ??:0:00:32:00
+################################################################################
+#Date Time [CPU]User% [CPU]Nice% [CPU]Sys% [CPU]Wait% [CPU]Irq% [CPU]Soft% [CPU]Steal% [CPU]Idle% [CPU]Totl% [CPU]Intrpt/sec [CPU]Ctx/sec [CPU]Proc/sec [CPU]ProcQue [CPU]ProcRun [CPU]L-Avg1 [CPU]L-Avg5 [CPU]L-Avg15 [CPU]RunTot [CPU]BlkTot
+20180226 15:02:28 9 0 66 0 0 25 0 0 100 1060670 3723 0 691 34 17.35 8.12 4.86 33 0
+20180226 15:02:29 9 0 67 0 0 23 0 1 99 1051863 4698 0 678 4 17.35 8.12 4.86 4 1
+20180226 15:02:30 0 0 0 0 0 4 0 96 4 230564 1270 0 660 3 16.12 8.02 4.84 2 0
+20180226 15:02:31 0 0 0 0 0 4 0 96 4 236941 564 0 660 3 16.12 8.02 4.84 2 0
+20180226 15:02:32 0 0 0 0 0 4 0 96 4 241468 569 0 660 2 16.12 8.02 4.84 2 0
+20180226 15:02:33 0 0 0 0 0 4 0 96 4 241685 579 0 660 3 16.12 8.02 4.84 2 0
+20180226 15:02:34 0 0 0 0 0 4 0 96 4 240785 613 0 660 2 16.12 8.02 4.84 2 0
+20180226 15:02:35 0 0 0 0 0 4 0 96 4 237427 633 0 660 3 14.99 7.92 4.83 3 0
+20180226 15:02:36 0 0 0 0 0 4 0 96 4 239927 617 0 660 3 14.99 7.92 4.83 2 0
+20180226 15:02:37 0 0 0 0 0 4 0 96 4 236845 604 0 660 2 14.99 7.92 4.83 2 0

@@ -135,6 +135,8 @@ struct data
 };
 
 
+void InterruptThreads ();
+
 void UpdateProgramState (ProgramState state);
 
 double When ();

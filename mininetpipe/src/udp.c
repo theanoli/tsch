@@ -37,7 +37,11 @@ LaunchThreads (ProgramArgs *p)
         targs[i].threadid = i;
         snprintf (targs[i].threadname, 128, "[%s.%d]", p->machineid, i);
 
-        targs[i].port = p->port + i % p->ncli;
+        if (p->rcv) {
+            targs[i].port = p->port + i % NSERVERCORES;
+        } else if (p->tr) {
+            targs[i].port = p->port + i % p->ncli;
+        }
         targs[i].host = p->host;
         targs[i].outfile = p->outfile;
         targs[i].tr = p->tr;
@@ -186,6 +190,7 @@ Setup (ThreadArgs *p)
         lsin1->sin_port         = htons (p->port);
 
         if (bind (sockfd, (struct sockaddr *) lsin1, sizeof (*lsin1)) < 0) {
+            printf ("%s ", p->threadname);
             perror ("tester: server: bind on local address failed!"
                     "errno");
             exit (-6);
@@ -345,7 +350,9 @@ Echo (ThreadArgs *p)
     while (p->program_state == startup) {
     }
 
-    struct timespec timeout = { .tv_nsec = 10 * 1000UL, };
+    struct timespec timeout = { .tv_nsec = 15 * 1000UL, };
+    printf ("%s Entering packet receive mode...\n", p->threadname);
+
     while (p->program_state != end) { 
         // Read data from client; m is number of messages received 
         m = recvmmsg (p->commfd, msgs, 2048, MSG_WAITFORONE, &timeout);
@@ -353,6 +360,11 @@ Echo (ThreadArgs *p)
             printf ("Got %d messages.\n", m);
 
         if (m < 0) {
+            // if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+            if (errno == EINTR) {
+                printf ("%s Caught an interrupt...\n", p->threadname);
+                 continue;
+            }
             perror ("read");
             exit (1);
         }
@@ -376,6 +388,8 @@ Echo (ThreadArgs *p)
             p->counter += m;
         }
     }
+
+    p->tput_done = 1;
 }
 
 

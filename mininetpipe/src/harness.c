@@ -47,6 +47,7 @@ main (int argc, char **argv)
 
     signal (SIGINT, SignalHandler);
     signal (SIGALRM, SignalHandler);
+    signal (SIGTERM, SignalHandler);
 
     // Machine ID
     args.machineid = (char *)malloc (128);
@@ -88,7 +89,7 @@ main (int argc, char **argv)
             case 'r': nrtts = atoi (optarg);
                       break;
 
-            // Overloading to be ncli (for server) and nserver for (clients)
+            // Overloading to be #clients (for server) and #servers for (clients)
     	    case 'c': args.ncli = atoi (optarg);
 		              break;
 
@@ -263,6 +264,9 @@ main (int argc, char **argv)
             sleep (COOLDOWN);
 
             UpdateProgramState (end);
+            
+            // TODO this needs to be fixed, it's awful 
+            InterruptThreads ();
         }
 
         for (i = 0; i < args.nthreads; i++) {
@@ -271,6 +275,18 @@ main (int argc, char **argv)
     }
 
     return 0;
+}
+
+
+void
+InterruptThreads (void)
+{
+    int i;
+    for (i = 0; i < args.nthreads; i++) {
+        if (!args.thread_data[i].tput_done) {
+            pthread_kill (args.tids[i], SIGTERM);
+        }
+    }
 }
 
 
@@ -395,6 +411,9 @@ SignalHandler (int signum) {
                 args.program_state = end;
             }
         }
+    } else if (signum == SIGTERM) {
+        printf ("Oooops got interrupted...\n");
+        exit (0);
     }
 }
 

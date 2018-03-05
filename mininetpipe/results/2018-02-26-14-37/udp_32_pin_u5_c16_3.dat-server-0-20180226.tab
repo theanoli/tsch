@@ -1,0 +1,21 @@
+################################################################################
+# Collectl:   V3.6.9-1  HiRes: 1  Options: -P -f results/2018-02-26-14-37/udp_32_pin_u5_c16_3.dat -sc -c5 -oaz 
+# Host:       server-0  DaemonOpts: 
+# Booted:     1519674312.15 [20180226-12:45:12]
+# Distro:     debian jessie/sid, Ubuntu 14.04.1 LTS  Platform: 
+# Date:       20180226-154946  Secs: 1519685386 TZ: -0700
+# SubSys:     c Options: az Interval: 1 NumCPUs: 64  CPUsDis: 1 NumBud: 0 Flags: iD
+# Filters:    NfsFilt:  EnvFilt:  TcpFilt: ituc
+# HZ:         100  Arch: x86_64-linux-gnu-thread-multi PageSize: 4096
+# Cpu:        GenuineIntel Speed(MHz): 2200.112 Cores: 8  Siblings: 8 Nodes: 4
+# Kernel:     3.13.0-100-generic  Memory: 131822812 kB  Swap: 3145724 kB
+# NumDisks:   7 DiskNames: sdb sde sdc sdd sdg sdf sda
+# NumNets:    9 NetNames: eth0:1000 eth1:?? eth2:?? eth3:?? eth4:10000 eth5:10000 eth6:10000 eth7:?? lo:??
+# SCSI:       DA:0:00:00:00 DA:0:00:01:00 DA:0:00:02:00 DA:0:00:03:00 DA:0:00:04:00 DA:0:00:05:00 DA:0:00:06:00 ??:0:00:32:00
+################################################################################
+#Date Time [CPU]User% [CPU]Nice% [CPU]Sys% [CPU]Wait% [CPU]Irq% [CPU]Soft% [CPU]Steal% [CPU]Idle% [CPU]Totl% [CPU]Intrpt/sec [CPU]Ctx/sec [CPU]Proc/sec [CPU]ProcQue [CPU]ProcRun [CPU]L-Avg1 [CPU]L-Avg5 [CPU]L-Avg15 [CPU]RunTot [CPU]BlkTot
+20180226 15:49:48 1 0 24 0 0 19 0 56 44 400816 241027 0 686 15 4.66 2.55 1.90 14 0
+20180226 15:49:49 0 0 24 0 0 17 0 59 41 445917 243647 0 686 15 4.66 2.55 1.90 15 0
+20180226 15:49:50 1 0 23 0 0 16 0 60 40 450470 228267 0 686 15 4.66 2.55 1.90 15 0
+20180226 15:49:51 0 0 23 0 0 16 0 60 40 455927 230640 0 686 13 4.66 2.55 1.90 15 0
+20180226 15:49:52 1 0 23 0 0 14 0 62 38 497090 268267 0 686 14 5.41 2.74 1.97 9 0
