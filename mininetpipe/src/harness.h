@@ -78,6 +78,8 @@ struct threadargs
     char    *outfile;       /* Where results go to die                      */
     int     tr, rcv;
     int     latency;        /* 1 if this is a latency experiment            */
+    int     ncli;           /* #server threads if tr; #client threads per 
+                               server thread if rcv                         */
 
     char    *r_ptr;        /* Pointer to current location in receive buffer */
     char    *s_ptr;        /* Pointer to current location in send buffer    */

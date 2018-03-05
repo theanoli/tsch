@@ -118,7 +118,8 @@ class Experiment(object):
         os.chdir(self.wdir)
 
         serv_cmd = (self.basecmd +
-                " -c %d" % (self.nclients * len(self.nodes) * self.n) +  # Fix this for TCP
+                # -c should be the per-server thread #clients
+                " -c %d" % (self.nclients * len(self.nodes) * self.n)/self.nservers +  
                 " -P %d" % self.start_port +
                 " -w %d" % self.online_wait +
                 " -u %d" % self.expduration + 

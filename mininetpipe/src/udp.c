@@ -40,13 +40,14 @@ LaunchThreads (ProgramArgs *p)
         if (p->rcv) {
             targs[i].port = p->port + i % NSERVERCORES;
         } else if (p->tr) {
-            targs[i].port = p->port + i % p->ncli;
+            targs[i].port = p->port + i % p->ncli % NSERVERCORES;
         }
         targs[i].host = p->host;
         targs[i].outfile = p->outfile;
         targs[i].tr = p->tr;
         targs[i].rcv = p->rcv;
         targs[i].online_wait = p->online_wait;
+        targs[i].latency = p->latency;
         memcpy (targs[i].sbuff, p->sbuff, PSIZE + 1);
 
         if (p->rcv) {
@@ -75,29 +76,40 @@ ThreadEntry (void *vargp)
     Setup (targs);
     
     if (targs->tr) {
-        pthread_t tid;
-        pthread_create (&tid, NULL, SimpleTx, (void *)targs);
-        
-        SimpleRx (targs);
+        if (targs->latency) {
+            printf ("Not implemented!\n");
+            exit (-102);
+        } else {
+            pthread_t tid;
+            pthread_create (&tid, NULL, SimpleTx, (void *)targs);
+            
+            SimpleRx (targs);
+        }
 
     } else if (targs->rcv) {
-        Echo (targs);
+        if (targs->latency) {
+            printf ("Not implemented!\n");
+            exit (-102);
+        } else {
+            Echo (targs);
         
-        printf ("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
-        printf ("%s Received %" PRIu64 " packets in %f seconds\n", 
-                    targs->threadname, targs->counter, targs->duration);
-        printf ("Throughput is %f pps\n", targs->counter/targs->duration);
-        printf ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+            printf ("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+            printf ("%s Received %" PRIu64 " packets in %f seconds\n", 
+                        targs->threadname, targs->counter, targs->duration);
+            printf ("Throughput is %f pps\n", targs->counter/targs->duration);
+            printf ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
 
-        if (targs->outfile != NULL) {
-            FILE *out;
-            if ((out = fopen (targs->outfile, "ab")) == NULL) {
-                fprintf (stderr,"Can't open %s for output\n", targs->outfile);
-                exit (1);
+            if (targs->outfile != NULL) {
+                FILE *out;
+                if ((out = fopen (targs->outfile, "ab")) == NULL) {
+                    fprintf (stderr,"Can't open %s for output\n", targs->outfile);
+                    exit (1);
+                }
+
+                fprintf (out, "%f\n", targs->counter/targs->duration);
+                fclose (out);
             }
 
-            fprintf (out, "%f\n", targs->counter/targs->duration);
-            fclose (out);
         }
 
         CleanUp (targs);
@@ -250,35 +262,8 @@ SimpleTx (void *vargp)
 }
 
 
-void
-SimpleWrite (ThreadArgs *p)
-{
-    // This will run only on the client side. Send some data, 
-    // receive some data and get rid of it at function exit.
-    // OK to reallocate a buffer every time we call this because
-    // we don't really need to worry too much about client performance.
-    // TODO any reason to use a random string? Any reason to force
-    // a string of length PSIZE?
-    int n;
-
-    n = write (p->commfd, p->sbuff, PSIZE);
-    if (DEBUG)
-        printf ("Sent msg %s in %d bytes to server\n", p->sbuff, n);
-
-    if (n < 0) {
-        perror ("write to server");
-        exit (1);
-    }
-
-    n = read (p->commfd, p->rbuff, PSIZE);
-    if (n < 0) {
-       perror ("read from server");
-       exit (1);
-    }
-}
-
-
-void TimestampWrite (ThreadArgs *p)
+void 
+TimestampWrite (ThreadArgs *p)
 {
     // Send and then receive an echoed timestamp.
     // Return a pointer to the stored timestamp. 

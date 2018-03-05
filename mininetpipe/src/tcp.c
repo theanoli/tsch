@@ -50,27 +50,128 @@ tcp_accept_helper (int sockid, struct sockaddr *addr, socklen_t *addrlen)
 
 
 void
-Init (ArgStruct *p, int *pargc, char ***pargv)
+Init (ProgramArgs *p, int *pargc, char ***pargv)
 {
-    // Initialize buffers to put incoming/outgoing data
-    p->s_ptr = (char *) malloc (PSIZE);
-    p->r_ptr = (char *) malloc (PSIZE);
-    p->lbuff = (char *) malloc (PSIZE * 2);
+    ThreadArgs *targs = (ThreadArgs *)calloc (p->nthreads, 
+            sizeof (ThreadArgs));
 
-    if ((p->s_ptr == NULL) || (p->r_ptr == NULL) 
-            || (p->lbuff == NULL)) {
-        printf ("Malloc error!\n");
-        exit (1);
+    if (targs == NULL) {
+        printf ("Error malloc'ing space for thread args!\n");
+        exit (-10);
     }
+    p->thread_data = targs;
 
-    memset (p->s_ptr, 0, PSIZE);
-    memset (p->r_ptr, 0, PSIZE);
-    memset (p->lbuff, 0, PSIZE * 2);
+    p->tids = (pthread_t *)calloc (p->nthreads, sizeof (pthread_t));
+    if (p->tids == NULL) {
+        printf ("Failed to malloc space for tids!\n");
+        exit (-82);
+    }
 }
 
 
 void
-Setup (ArgStruct *p)
+LaunchThreads (ProgramArgs *p)
+{
+    int i, ret;
+    cpu_set_t cpuset __attribute__((__unused__));
+
+    ThreadArgs *targs = p->thread_data;
+
+    for (i = 0; i < p->nthreads; i++) {
+        targs[i].machineid = p->machineid;
+        targs[i].threadid = i;
+        snprintf (targs[i].threadname, 128, "[%s.%d]", p->machineid, i);
+
+        if (p->rcv) {
+            targs[i].port = p->port + i % NSERVERCORES;
+        } else if (p->tr) {
+            // E.g., if there are 8 server threads but only 4 cores, and 16
+            // client threads, then want to cycle through portnos 8000-8003 only.
+            // If there are 2 server threads with 4 cores, and 16 client threads, 
+            // cycle through portnos 8000-8001 only.
+            targs[i].port = p->port + i % p->ncli % NSERVERCORES; 
+        }
+        targs[i].host = p->host;
+        targs[i].outfile = p->outfile;
+        targs[i].tr = p->tr;
+        targs[i].rcv = p->rcv;
+        targs[i].online_wait = p->online_wait;
+        targs[i].latency = p->latency;
+        targs[i].ncli = p->ncli;
+        memcpy (targs[i].sbuff, p->sbuff, PSIZE + 1);
+
+        if (p->rcv) {
+            printf ("[%s] Launching thread %d...\n", p->machineid, i);
+        }
+        pthread_create (&p->tids[i], NULL, ThreadEntry, (void *)&targs[i]);
+        
+        if (p->pinthreads) {
+            // This is fragile; better to get available cores programmatically
+            // instead of using hardcoded macro value NSERVERCORES
+            CPU_ZERO (&cpuset);
+            CPU_SET (i % NSERVERCORES, &cpuset);
+            ret = pthread_setaffinity_np (p->tids[i], sizeof (cpu_set_t), &cpuset);
+            if (ret != 0) {
+                printf ("[%s] Couldn't pin thread %d to core!\n", p->machineid, i);
+                exit (-14);
+            }
+        }
+    }
+}
+
+
+// Entry point for new threads
+void *
+ThreadEntry (void *vargp)
+{
+    ThreadArgs *targs = (ThreadArgs *)vargp;
+    Setup (targs);
+
+    if (targs->tr) {
+        if (targs->latency) {
+            printf ("Not implemented!\n");
+            exit (-102);
+        } else {
+            pthread_t tid;
+            pthread_create (&tid, NULL, SimpleTx, (void *)targs);
+
+            SimpleRx (targs);
+        }
+    } else if (targs->rcv) {
+        if (targs->latency) {
+            printf ("Not implemented!\n");
+            exit (-102);
+        } else {
+            Echo (targs);
+
+            printf ("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+            printf ("%s Received %" PRIu64 " packets in %f seconds\n", 
+                        targs->threadname, targs->counter, targs->duration);
+            printf ("Throughput is %f pps\n", targs->counter/targs->duration);
+            printf ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+
+            if (targs->outfile != NULL) {
+                FILE *out;
+                if ((out = fopen (targs->outfile, "ab")) == NULL) {
+                    fprintf (stderr,"Can't open %s for output\n", targs->outfile);
+                    exit (1);
+                }
+
+                fprintf (out, "%f\n", targs->counter/targs->duration);
+                fclose (out);
+            }
+
+        }
+
+        CleanUp (targs);
+    }
+
+    return 0;
+}
+
+
+void
+Setup (ThreadArgs *p)
 {
     // Initialize connections: create socket, bind, listen (in establish)
     // Also creates epoll instance
@@ -184,34 +285,58 @@ Setup (ArgStruct *p)
 
 
 void
-SimpleWrite (ArgStruct *p)
+SimpleRx (ThreadArgs *p)
 {
-    // Client-side; send some amount of data to the server,
-    // then receive data (and throw it away on function exit).
-    // We shouldn't do epoll on the client side, since we only
-    // want one connection to the server per client program
-    int n;
+    int n; 
 
-    n = write (p->commfd, p->sbuff, PSIZE);
-    if (n < 0) {
-        perror ("write to server");
-        exit (1);
+    while (p->program_state != experiment) {
     }
 
-    n = read (p->commfd, p->rbuff, PSIZE);
-    if (n < 0) {
-        perror ("read from server");
-        exit (1);
+    while (1) {
+        n = read (p->commfd, p->rbuff, PSIZE);
+
+        if (n < 0) {
+            printf ("%s error: ", p->threadname);
+            perror ("read from server");
+            exit (1);
+        }
     }
 }
 
 
+// This will be spawned in a different thread
+void *
+SimpleTx (void *vargp)
+{
+    ThreadArgs *p = (ThreadArgs *)vargp;
+    int n;
+    
+    while (p->program_state != experiment) {
+
+    }
+
+    while (1) {
+        n = write (p->commfd, p->sbuff, PSIZE);
+
+        if (n < 0) {
+            printf ("Client %d error: ", p->threadid);
+            perror ("write to server");
+            exit (1);
+        }
+
+        // usleep (p->sleeptime);
+    }
+
+    return 0;
+}
+
+
 void 
-TimestampWrite (ArgStruct *p)
+TimestampWrite (ThreadArgs *p)
 {
     // Send and then receive an echoed timestamp.
     // Return a pointer to the stored timestamp. 
-
+    // TODO this is super old and might not work anymore
     char pbuffer[PSIZE];  // for packets
     int n;
     struct timespec sendtime, recvtime;
@@ -247,7 +372,7 @@ TimestampWrite (ArgStruct *p)
 
 
 void
-Echo (ArgStruct *p)
+Echo (ThreadArgs *p)
 {
     // Server-side only!
     // Loop through for expduration seconds and count each packet you send out
@@ -276,9 +401,12 @@ Echo (ArgStruct *p)
     p->counter = 0;
 
     // Add a few-second delay to let the clients stabilize
-    p->program_state = warmup;
-    printf ("Setting the alarm...\n");
-    alarm (WARMUP);
+    while (p->program_state == startup) {
+        // sppppiiiinnnnnn
+    }
+
+    printf ("%s Entering packet receive mode...\n", p->threadname);
+
     while (p->program_state != end) {
         n = epoll_wait (ep, events, MAXEVENTS, -1);
 
@@ -358,11 +486,13 @@ Echo (ArgStruct *p)
             }
         }
     }
+
+    p->tput_done = 1;
 }
 
 
 void
-ThroughputSetup (ArgStruct *p)
+ThroughputSetup (ThreadArgs *p)
 {
     int sockfd; 
     struct sockaddr_in *lsin1, *lsin2;
@@ -473,7 +603,7 @@ ThroughputSetup (ArgStruct *p)
 
 
 void
-throughput_establish (ArgStruct *p)
+throughput_establish (ThreadArgs *p)
 {
     // TODO this FD needs to get added to an epoll instance
     socklen_t clen;
@@ -575,7 +705,7 @@ throughput_establish (ArgStruct *p)
 
 
 void
-establish (ArgStruct *p)
+establish (ThreadArgs *p)
 {
     socklen_t clen;
     struct protoent *proto;
@@ -606,34 +736,16 @@ establish (ArgStruct *p)
 
 
 void
-CleanUp (ArgStruct *p)
+CleanUp (ThreadArgs *p)
 {
-   if (p->tr) {
-      close (p->commfd);
+    printf ("%s Quitting!\n", p->threadname);
+   
+    close (p->commfd);
 
-   } else if (p->rcv) {
-      close (p->commfd);
-      close (p->servicefd);
-      close (ep);
-   }
-}
-
-
-void
-Reset(ArgStruct *p)
-{
-    /* Reset sockets */
-    if (p->reset_conn) {
-
-        doing_reset = 1;
-    
-        /* Close the sockets */
-        CleanUp (p);
-    
-        /* Now open and connect new sockets */
-        Setup (p);
+    if (p->rcv) {
+        close (p->servicefd);
+        close (ep);
     }
-
 }
 
 
@@ -728,58 +840,5 @@ tcp_write_helper (int sockid, char *buf, int len)
             }
         }
     }
-}
-
-
-
-/* Dummy functions -----------------------------------------------------------*/
-// May need filling in later
-
-void
-Sync (ArgStruct *p)
-{
-    // TODO fill in if needed
-}
-
-
-void 
-PrepareToReceive (ArgStruct *p)
-{
-    // Not needed
-}
-
-
-void
-SendTime (ArgStruct *p, double *t)
-{
-    // TODO fill in if needed
-}
-
-
-void
-RecvTime (ArgStruct *p, double *t)
-{
-    // TODO fill in if needed
-}
-
-
-void
-SendRepeat (ArgStruct *p, int rpt)
-{
-    // TODO fill in if needed
-}
-
-
-void 
-RecvRepeat (ArgStruct *p, int *rpt)
-{
-    // TODO fill in if needed
-}
-
-
-void
-AfterAlignmentInit (ArgStruct *p)
-{
-
 }
 

@@ -133,6 +133,7 @@ main (int argc, char **argv)
         exit (1);
         
         /* 
+        // TODO: lbuff initialization
         // Some huge number, don't actually care
         args.expduration = 1000000;
 
@@ -266,7 +267,7 @@ main (int argc, char **argv)
             UpdateProgramState (end);
             
             // TODO this needs to be fixed, it's awful 
-            InterruptThreads ();
+            // InterruptThreads ();
         }
 
         for (i = 0; i < args.nthreads; i++) {
