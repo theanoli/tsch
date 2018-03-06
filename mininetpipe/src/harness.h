@@ -94,6 +94,7 @@ struct threadargs
     int     online_wait;    /* How long to wait for clients to come up */
     uint64_t counter;       /* For counting packets!                        */
     double  duration;       /* Measured time over which packets are blasted */
+    int ep;                 /* For epoll file descriptor                */
 
     // timer data 
     volatile ProgramState program_state;
@@ -166,6 +167,8 @@ void SimpleWrite (ThreadArgs *p);
 void LaunchThreads (ProgramArgs *p);
 
 void *ThreadEntry (void *vargp);
+
+void SimpleRxTx (ThreadArgs *p);
 
 void SimpleRx (ThreadArgs *p);
 

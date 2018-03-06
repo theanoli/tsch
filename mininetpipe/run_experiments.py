@@ -49,7 +49,7 @@ class ExperimentSet(object):
         # Launch the entire set of experiments for this experiment set
         n = 1 
 
-        while n <= 8:
+        while n <= 1:
             for trial in range(self.ntrials):
                 self.printer("Running trial %d for %d client threads per node" % 
                         (trial + 1, n * self.nclients))
@@ -119,7 +119,7 @@ class Experiment(object):
 
         serv_cmd = (self.basecmd +
                 # -c should be the per-server thread #clients
-                " -c %d" % (self.nclients * len(self.nodes) * self.n)/self.nservers +  
+                " -c %d" % ((self.nclients * len(self.nodes) * self.n)/self.nservers) +  
                 " -P %d" % self.start_port +
                 " -w %d" % self.online_wait +
                 " -u %d" % self.expduration + 

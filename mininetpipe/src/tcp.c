@@ -7,11 +7,10 @@
 #define COOLDOWN 5
 
 int doing_reset = 0;
-int ep = -1;
 
 
 int
-tcp_accept_helper (int sockid, struct sockaddr *addr, socklen_t *addrlen)
+tcp_accept_helper (int ep, int sockid, struct sockaddr *addr, socklen_t *addrlen)
 {
     // Accept incoming connections on the listening socket
     int nevents, i;
@@ -23,16 +22,16 @@ tcp_accept_helper (int sockid, struct sockaddr *addr, socklen_t *addrlen)
 
     if (epoll_ctl (ep, EPOLL_CTL_ADD, sockid, &event) == -1) {
         perror ("epoll_ctl 1");
-        exit (1);
+        return -1;
     }
 
     while (1) {
         nevents = epoll_wait (ep, events, MAXEVENTS, -1);
         if (nevents < 0) {
             if (errno != EINTR) {
-                perror ("epoll_wait");
+                perror ("accept: epoll_wait");
             }
-            exit (1);
+            return -1;
         }
 
         for (i = 0; i < nevents; i++) {
@@ -41,8 +40,7 @@ tcp_accept_helper (int sockid, struct sockaddr *addr, socklen_t *addrlen)
                 epoll_ctl (ep, EPOLL_CTL_DEL, sockid, NULL);  // event is ignored
                 return accept (sockid, addr, addrlen);
             } else {
-                printf ("Socket error!\n");
-                exit (1);
+                return -1;
             }
         }
     }
@@ -98,10 +96,15 @@ LaunchThreads (ProgramArgs *p)
         targs[i].online_wait = p->online_wait;
         targs[i].latency = p->latency;
         targs[i].ncli = p->ncli;
+        targs[i].ep = -1;
         memcpy (targs[i].sbuff, p->sbuff, PSIZE + 1);
 
         if (p->rcv) {
-            printf ("[%s] Launching thread %d...\n", p->machineid, i);
+            printf ("[%s] Launching thread %d, ", p->machineid, i);
+            printf ("connecting to portno %d\n", targs[i].port);
+        } else if (p->tr) {
+            printf ("[%s] Launching thread %d, ", p->machineid, i);
+            printf ("connecting to portno %d\n", targs[i].port);
         }
         pthread_create (&p->tids[i], NULL, ThreadEntry, (void *)&targs[i]);
         
@@ -125,23 +128,31 @@ void *
 ThreadEntry (void *vargp)
 {
     ThreadArgs *targs = (ThreadArgs *)vargp;
-    Setup (targs);
 
     if (targs->tr) {
         if (targs->latency) {
             printf ("Not implemented!\n");
             exit (-102);
+            // Setup (targs);
         } else {
+            ThroughputSetup (targs);
+            SimpleRxTx (targs);
+
+            /* For open-loop clients
             pthread_t tid;
             pthread_create (&tid, NULL, SimpleTx, (void *)targs);
 
             SimpleRx (targs);
+            */
         }
+        
     } else if (targs->rcv) {
         if (targs->latency) {
             printf ("Not implemented!\n");
             exit (-102);
         } else {
+            ThroughputSetup (targs);
+
             Echo (targs);
 
             printf ("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
@@ -188,10 +199,6 @@ Setup (ThreadArgs *p)
     struct protoent *proto;
     int flags;
 
-    if (p->rcv) {
-        printf ("*** Setting up connection(s)... ***\n");
-    }
-
     host = p->host;
     sprintf (portno, "%d", p->port);
     flags = SOCK_STREAM;
@@ -207,7 +214,7 @@ Setup (ThreadArgs *p)
     memset ((char *) lsin1, 0, sizeof (*lsin1));
     memset ((char *) lsin2, 0, sizeof (*lsin2));
     
-    ep = epoll_create (MAXEVENTS);
+    p->ep = epoll_create (MAXEVENTS);
 
     if (p->rcv) {
         flags |= SOCK_NONBLOCK;
@@ -285,6 +292,35 @@ Setup (ThreadArgs *p)
 
 
 void
+SimpleRxTx (ThreadArgs *p)
+{
+    int n; 
+
+    while (p->program_state != experiment) {
+        // spin
+    }
+
+    while (1) {
+        n = write (p->commfd, p->sbuff, PSIZE);
+
+        if (n < 0) {
+            printf ("Client %d error: ", p->threadid);
+            perror ("write to server");
+            exit (1);
+        }
+
+        n = read (p->commfd, p->rbuff, PSIZE);
+
+        if (n < 0) {
+            printf ("%s error: ", p->threadname);
+            perror ("read from server");
+            exit (1);
+        }
+    }
+}
+
+
+void
 SimpleRx (ThreadArgs *p)
 {
     int n; 
@@ -324,7 +360,7 @@ SimpleTx (void *vargp)
             exit (1);
         }
 
-        // usleep (p->sleeptime);
+        usleep (100000);
     }
 
     return 0;
@@ -392,7 +428,7 @@ Echo (ThreadArgs *p)
         event.events = EPOLLIN;
         event.data.fd = p->commfd;
 
-        if (epoll_ctl (ep, EPOLL_CTL_ADD, p->commfd, &event) == -1) {
+        if (epoll_ctl (p->ep, EPOLL_CTL_ADD, p->commfd, &event) == -1) {
             perror ("epoll_ctl");
             exit (1);
         }
@@ -408,7 +444,7 @@ Echo (ThreadArgs *p)
     printf ("%s Entering packet receive mode...\n", p->threadname);
 
     while (p->program_state != end) {
-        n = epoll_wait (ep, events, MAXEVENTS, -1);
+        n = epoll_wait (p->ep, events, MAXEVENTS, 1);
 
         if (n < 0) {
             if (n == EINTR) {
@@ -443,11 +479,11 @@ Echo (ThreadArgs *p)
                 int written;
                 char *q;
 
-                // This is dangerous because p->r_ptr is only PSIZE bytes long
+                // This is dangerous because p->rbuff is only PSIZE bytes long
                 // TODO figure this out
-                q = p->r_ptr;
+                q = p->rbuff;
 
-                while ((j = read (events[i].data.fd, q, PSIZE - 1)) > 0) {
+                while ((j = read (events[i].data.fd, q, PSIZE)) > 0) {
                     q += j;
                 }
                 
@@ -458,11 +494,11 @@ Echo (ThreadArgs *p)
                     done = 1;  // Close this socket
                 } else {
                     // We've read all the data; echo it back to the client
-                    to_write = q - p->r_ptr;
+                    to_write = q - p->rbuff;
                     written = 0;
                     
                     while ((j = write (events[i].data.fd, 
-                                    p->r_ptr + written, to_write) + written) < to_write) {
+                                    p->rbuff + written, to_write) + written) < to_write) {
                         if (j < 0) {
                             if (errno != EAGAIN) {
                                 perror ("server write");
@@ -507,10 +543,6 @@ ThroughputSetup (ThreadArgs *p)
     int socket_family = AF_INET;
     int flags;
 
-    if (p->rcv) {
-        printf ("*** Setting up connection(s)... ***\n");
-    }
-
     host = p->host;
 
     // To resolve a hostname
@@ -525,7 +557,7 @@ ThroughputSetup (ThreadArgs *p)
     memset ((char *) lsin2, 0, sizeof (*lsin2));
     sprintf (portno, "%d", p->port);
     
-    ep = epoll_create (MAXEVENTS);
+    p->ep = epoll_create (MAXEVENTS);
 
     flags = SOCK_STREAM;
     if (p->rcv) {
@@ -551,13 +583,11 @@ ThroughputSetup (ThreadArgs *p)
                 continue;
             }
 
-            if (connect (sockfd, rp->ai_addr, rp->ai_addrlen) == -1) {
-                perror ("connect");
-                close (sockfd);
-                continue;
+            if (connect (sockfd, rp->ai_addr, rp->ai_addrlen) != -1) {
+                break;
             }
-            
-            break;
+
+            close (sockfd);
         }
 
         if (rp == NULL) {
@@ -621,7 +651,7 @@ throughput_establish (ThreadArgs *p)
         event.events = EPOLLIN;
         event.data.fd = p->servicefd;
 
-        if (epoll_ctl (ep, EPOLL_CTL_ADD, p->servicefd, &event) == -1) {
+        if (epoll_ctl (p->ep, EPOLL_CTL_ADD, p->servicefd, &event) == -1) {
             perror ("epoll_ctl");
             exit (1);
         }
@@ -631,16 +661,16 @@ throughput_establish (ThreadArgs *p)
         t0 = When ();
         printf ("\tStarting loop to wait for connections...\n");
 
-        while ((duration = (t0 + (p->online_wait + 10)) - When ()) > 0) {
+        while ((duration = (t0 + (p->online_wait + 5)) - When ()) > 0) {
             if ((connections == p->ncli) && report_connections)  {
                 printf ("OMGLSDJF:LDSKJF:LDSKJF:DLSFJ Got all the connections...\n");
                 report_connections = 0;
             }
 
-            nevents = epoll_wait (ep, events, MAXEVENTS, duration); 
+            nevents = epoll_wait (p->ep, events, MAXEVENTS, duration); 
             if (nevents < 0) {
                 if (errno != EINTR) {
-                    perror ("epoll_wait");
+                    perror ("establish: epoll_wait");
                 }
                 exit (1);
             }
@@ -682,7 +712,7 @@ throughput_establish (ThreadArgs *p)
                         event.data.fd = p->commfd;
                         event.events = EPOLLIN;  // TODO check this
 
-                        if (epoll_ctl (ep, EPOLL_CTL_ADD, p->commfd, &event) < 0) {
+                        if (epoll_ctl (p->ep, EPOLL_CTL_ADD, p->commfd, &event) < 0) {
                             perror ("epoll_ctl");
                             exit (1);
                         }
@@ -714,10 +744,14 @@ establish (ThreadArgs *p)
 
     if (p->rcv) {
         listen (p->servicefd, 1024);
-        p->commfd = tcp_accept_helper (p->servicefd,     
+        p->commfd = tcp_accept_helper (p->ep, p->servicefd,     
                                 (struct sockaddr *) &(p->prot.sin2), &clen);
+        if (p->commfd < 0) {
+            printf ("%s Socket error!\n", p->threadname);
+            exit (1);
+        }
         while (p->commfd < 0 && errno == EAGAIN) {
-            p->commfd = tcp_accept_helper (p->servicefd,     
+            p->commfd = tcp_accept_helper (p->ep, p->servicefd,     
                                 (struct sockaddr *) &(p->prot.sin2), &clen);
         }
 
@@ -744,7 +778,7 @@ CleanUp (ThreadArgs *p)
 
     if (p->rcv) {
         close (p->servicefd);
-        close (ep);
+        close (p->ep);
     }
 }
 
@@ -771,6 +805,7 @@ setsock_nonblock (int fd)
 
 
 /* Obsolete functions? */
+/*
 int
 tcp_read_helper (int sockid, char *buf, int len)
 {
@@ -780,13 +815,13 @@ tcp_read_helper (int sockid, char *buf, int len)
 
     event.events = EPOLLIN;
     event.data.fd = sockid;
-    if (epoll_ctl (ep, EPOLL_CTL_ADD, sockid, &event) == -1) {
+    if (epoll_ctl (p->ep, EPOLL_CTL_ADD, sockid, &event) == -1) {
         perror ("epoll_ctl 2");
         exit (1);
     }
 
     while (1) {
-        nevents = epoll_wait (ep, events, MAXEVENTS, -1);
+        nevents = epoll_wait (p->ep, events, MAXEVENTS, -1);
         if (nevents < 0) {
             if (errno != EINTR) {
                 perror ("epoll_wait");
@@ -796,7 +831,7 @@ tcp_read_helper (int sockid, char *buf, int len)
 
         for (i = 0; i < nevents; i++) {
             if (events[i].data.fd == sockid) {
-                epoll_ctl (ep, EPOLL_CTL_DEL, sockid, NULL);
+                epoll_ctl (p->ep, EPOLL_CTL_DEL, sockid, NULL);
                 return read (sockid, buf, len);
             } else {
                 printf ("Socket error!\n");
@@ -816,13 +851,13 @@ tcp_write_helper (int sockid, char *buf, int len)
 
     event.events = EPOLLOUT;
     event.data.fd = sockid;
-    if (epoll_ctl (ep, EPOLL_CTL_ADD, sockid, &event) == -1) {
+    if (epoll_ctl (p->ep, EPOLL_CTL_ADD, sockid, &event) == -1) {
         perror ("epoll_ctl 3");
         exit (1);
     }
 
     while (1) {
-        nevents = epoll_wait (ep, events, MAXEVENTS, -1);
+        nevents = epoll_wait (p->ep, events, MAXEVENTS, -1);
         if (nevents < 0) {
             if (errno != EINTR) {
                 perror ("epoll_wait");
@@ -832,7 +867,7 @@ tcp_write_helper (int sockid, char *buf, int len)
 
         for (i = 0; i < nevents; i++) {
             if (events[i].data.fd == sockid) {
-                epoll_ctl (ep, EPOLL_CTL_DEL, sockid, NULL);
+                epoll_ctl (p->ep, EPOLL_CTL_DEL, sockid, NULL);
                 return write (sockid, buf, len);
             } else {
                 printf ("Socket error!\n");
@@ -841,4 +876,4 @@ tcp_write_helper (int sockid, char *buf, int len)
         }
     }
 }
-
+*/
