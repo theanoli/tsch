@@ -90,7 +90,6 @@ LaunchThreads (ProgramArgs *p)
             targs[i].port = p->port + i % p->ncli % NSERVERCORES; 
         }
         targs[i].host = p->host;
-        targs[i].outfile = p->outfile;
         targs[i].tr = p->tr;
         targs[i].rcv = p->rcv;
         targs[i].online_wait = p->online_wait;
@@ -98,6 +97,8 @@ LaunchThreads (ProgramArgs *p)
         targs[i].ncli = p->ncli;
         targs[i].ep = -1;
         memcpy (targs[i].sbuff, p->sbuff, PSIZE + 1);
+
+        setup_filenames (&targs[i]);
 
         if (p->rcv) {
             printf ("[%s] Launching thread %d, ", p->machineid, i);
@@ -128,12 +129,12 @@ void *
 ThreadEntry (void *vargp)
 {
     ThreadArgs *targs = (ThreadArgs *)vargp;
+    int ret;
 
     if (targs->tr) {
         if (targs->latency) {
-            printf ("Not implemented!\n");
-            exit (-102);
-            // Setup (targs);
+            Setup (targs);
+            TimestampWrite (targs);
         } else {
             ThroughputSetup (targs);
             SimpleRxTx (targs);
@@ -148,11 +149,10 @@ ThreadEntry (void *vargp)
         
     } else if (targs->rcv) {
         if (targs->latency) {
-            printf ("Not implemented!\n");
-            exit (-102);
+            Setup (targs);
+            Echo (targs);
         } else {
             ThroughputSetup (targs);
-
             Echo (targs);
 
             printf ("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
@@ -162,14 +162,7 @@ ThreadEntry (void *vargp)
             printf ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
 
             if (targs->outfile != NULL) {
-                FILE *out;
-                if ((out = fopen (targs->outfile, "ab")) == NULL) {
-                    fprintf (stderr,"Can't open %s for output\n", targs->outfile);
-                    exit (1);
-                }
-
-                fprintf (out, "%f\n", targs->counter/targs->duration);
-                fclose (out);
+                record_throughput (targs);
             }
 
         }
@@ -374,36 +367,58 @@ TimestampWrite (ThreadArgs *p)
     // Return a pointer to the stored timestamp. 
     // TODO this is super old and might not work anymore
     char pbuffer[PSIZE];  // for packets
-    int n;
+    int n, m;
+    int i;
     struct timespec sendtime, recvtime;
+    int out;
 
-    sendtime = When2 ();
-    snprintf (pbuffer, PSIZE, "%lld,%.9ld%-31s",
-            (long long) sendtime.tv_sec, sendtime.tv_nsec, ",");
-
-    n = write (p->commfd, pbuffer, PSIZE - 1);
-    if (n < 0) {
-        perror ("write");
+    p->lbuff = malloc (PSIZE * 2);
+    if (p->lbuff == NULL) {
+        fprintf (stderr, "Malloc for lbuff failed!\n");
         exit (1);
     }
 
-    if (DEBUG)
-        printf ("pbuffer: %s, %d bytes written\n", pbuffer, n);
-
-    memset (pbuffer, 0, PSIZE);
-    
-    n = read (p->commfd, pbuffer, PSIZE);
-    if (n < 0) {
-        perror ("read");
-        exit (1);
+    if (args.tr && !p->no_record) {
+        if ((out = fopen (p->outfile, "wb")) == NULL) {
+            fprintf (stderr, "Can't open %s for output!\n", p->outfile);
+            exit (1);
+        }
+    } else {
+        out = stdout;
     }
-    recvtime = When2 ();        
 
-    snprintf (p->lbuff, PSIZE, "%s", pbuffer);
-    snprintf (p->lbuff + PSIZE - 1, PSIZE, "%lld,%.9ld\n", 
-            (long long) recvtime.tv_sec, recvtime.tv_nsec);
-    if (DEBUG)
-        printf ("Got timestamp: %s, %d bytes read\n", pbuffer, n);
+    for (i = 0; i < p->nrtts; i++) {
+        sendtime = When2 ();
+        snprintf (pbuffer, PSIZE, "%lld,%.9ld%-31s",
+                (long long) sendtime.tv_sec, sendtime.tv_nsec, ",");
+
+        n = write (p->commfd, pbuffer, PSIZE - 1);
+        if (n < 0) {
+            perror ("write");
+            exit (1);
+        }
+
+        debug_print (DEBUG, "pbuffer: %s, %d bytes written\n", pbuffer, n);
+
+        memset (pbuffer, 0, PSIZE);
+        
+        n = read (p->commfd, pbuffer, PSIZE);
+        if (n < 0) {
+            perror ("read");
+            exit (1);
+        }
+        recvtime = When2 ();        
+
+        memset (p->lbuff, 0, PSIZE * 2);
+        m = snprintf (p->lbuff, PSIZE, "%s", pbuffer);
+        snprintf (p->lbuff + m, PSIZE, "%lld,%.9ld\n", 
+                (long long) recvtime.tv_sec, recvtime.tv_nsec);
+
+        if (!p->no_record) {
+            fwrite (p->lbuff, strlen (p->lbuff), 1, out);
+        }
+        debug_print (DEBUG, "Got timestamp: %s, %d bytes read\n", pbuffer, n);
+    }
 }
 
 
@@ -453,8 +468,7 @@ Echo (ThreadArgs *p)
             // exit (1);
         }
         
-        if (DEBUG)
-            printf ("Got %d events\n", n);
+        debug_print (DEBUG, "Got %d events\n", n);
 
         for (i = 0; i < n; i++) {
             // Check for errors

@@ -48,7 +48,10 @@ LaunchThreads (ProgramArgs *p)
         targs[i].rcv = p->rcv;
         targs[i].online_wait = p->online_wait;
         targs[i].latency = p->latency;
+        targs[i].no_record = p->no_record;
         memcpy (targs[i].sbuff, p->sbuff, PSIZE + 1);
+
+        setup_filenames (&targs[i]);
 
         if (p->rcv) {
             printf ("[%s] Launching thread %d...\n", p->machineid, i);
@@ -80,34 +83,29 @@ ThreadEntry (void *vargp)
             printf ("Not implemented!\n");
             exit (-102);
         } else {
+            // FOR OPEN-LOOP CLIENTS; see TCP for closed-loop format
+            // Create an additional sending thread
             pthread_t tid;
             pthread_create (&tid, NULL, SimpleTx, (void *)targs);
             
+            // This thread does the receiving
             SimpleRx (targs);
         }
-
     } else if (targs->rcv) {
         if (targs->latency) {
-            printf ("Not implemented!\n");
-            exit (-102);
+            Echo (targs);
         } else {
             Echo (targs);
         
-            printf ("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+            printf ("\n");
+            printf ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
             printf ("%s Received %" PRIu64 " packets in %f seconds\n", 
                         targs->threadname, targs->counter, targs->duration);
             printf ("Throughput is %f pps\n", targs->counter/targs->duration);
             printf ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
 
-            if (targs->outfile != NULL) {
-                FILE *out;
-                if ((out = fopen (targs->outfile, "ab")) == NULL) {
-                    fprintf (stderr,"Can't open %s for output\n", targs->outfile);
-                    exit (1);
-                }
-
-                fprintf (out, "%f\n", targs->counter/targs->duration);
-                fclose (out);
+            if (!targs->no_record) {
+                record_throughput (targs);
             }
 
         }

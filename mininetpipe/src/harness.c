@@ -30,8 +30,6 @@ main (int argc, char **argv)
     int c, i;
 
     /* Initialize vars that may change from default due to arguments */
-    default_outdir = 1;
-    default_outfile = 1;
     sleep_interval = 0;
     nrtts = NRTTS;
     args.latency = 1;  // Default to do latency; this is arbitrary
@@ -40,6 +38,7 @@ main (int argc, char **argv)
     args.online_wait = 0;
     args.nthreads = 1;
     args.pinthreads = 0;
+    args.no_record = 0;
 
     // This gets swapped for instances that specify a host (-H opt)
     args.tr = 0;
@@ -64,15 +63,16 @@ main (int argc, char **argv)
     {
         switch (c)
         {
-            case 'o': default_outfile = 0;
-		      outfile = optarg;
-                      printf ("Sending output to file %s\n", outfile); 
-                      fflush(stdout);
+            case 'n': args.no_record = 1;
+                      break; 
+
+            case 'o': args.outfile = optarg;
+                      printf ("Sending output to file %s\n", optarg);
+                      fflush (stdout);
                       break;
 
-            case 'd': default_outdir = 0;
-                      outdir = optarg;
-                      printf ("Sending output to directory %s\n", outdir); 
+            case 'd': args.outdir = optarg;
+                      printf ("Sending output to directory %s\n", optarg); 
                       fflush(stdout);
                       break;
 
@@ -131,101 +131,18 @@ main (int argc, char **argv)
     if (args.latency) {
         printf ("Sorry, not implemented yet");
         exit (1);
-        
-        /* 
-        // TODO: lbuff initialization
+
         // Some huge number, don't actually care
         args.expduration = 1000000;
-
-        // Use default filename construction for results
-        if (default_outfile) {
-            int exp_timestamp;
-                exp_timestamp = (int) time (0);
-            outfile = (char *) malloc (256);
-            snprintf (outfile, 256, "%s-%d-r%d-s%d.out", whichproto, 
-                exp_timestamp, nrtts, sleep_interval);
-            }
-
-        if (default_outdir) {
-            outdir = (char *) malloc (256);
-            snprintf (outdir, 256, "default");
-        }
-
-        snprintf (s, 512, "results/%s/%s", outdir, outfile);
-        memcpy (cpy_s, s, 512);
-        printf ("Results going into %s\n", s); 
-        mkdir (dirname (cpy_s), 0777);
-
-        Setup (&args);
+        LaunchThreads (&args);
 
         if (args.tr) {
-            if ((out = fopen (s, "wb")) == NULL) {
-                fprintf (stderr,"Can't open %s for output\n", s);
-                exit (1);
-            }
-        } else {
-            out = stdout;
-        }
-     
-        // Get some number of latency measurements
-        printf ("Collecting latency measurements to file %s.\n", s);
-
-        int n;
-        double rtt;
-        double t0;
-        
-        if (args.tr) {
-            // Warm up
-            for (n = 0; n < (nrtts / 4); n++) {
-                //SimpleWrite (&args);
-                //usleep (sleep_interval);
-            }
-
-            // Take measurements
-            t0 = When ();
-            for (n = 0; n < nrtts; n++) {
-                TimestampWrite (&args); 
-                fwrite (args.lbuff, strlen (args.lbuff), 1, out);
-                usleep (sleep_interval);
-            }
-
-            args.duration = When () - t0;
-            rtt = args.duration/nrtts;
-
-            // Note these are inflated by the I/O done to record individual
-            // packet RTTs as well as sleep time (if any)
-            printf ("\n");
-            printf ("Average RTT: %f\n", rtt);
-            printf ("Experiment duration: %f for %d packets\n", 
-                    args.duration, nrtts);
-            printf ("Printed results to file %s\n", s);
-
+            
         } else if (args.rcv) {
             Echo (&args);
         }
-        */
     } else {
         /* FOR THROUGHPUT */
-
-        // If there's no file specified, do not record results 
-        if (args.rcv) {
-            if (default_outfile) {
-                printf ("No file specified; not recording results!\n");	
-                args.outfile = NULL;
-            } else {
-                if (default_outdir) {
-                    outdir = (char *) malloc (256);
-                    snprintf (outdir, 256, "default");
-                }
-                
-                snprintf (s, 512, "results/%s/%s", outdir, outfile);
-                memcpy (cpy_s, s, 512);
-                printf ("Results going into %s\n", s); 
-                mkdir (dirname (cpy_s), 0777);
-
-                args.outfile = s;
-            }
-        }
 
         // Create the string that will be echoed
         char *abcs = "abcdefghijklmnopqrstuvwxyz";
@@ -308,6 +225,64 @@ UpdateProgramState (ProgramState state)
         if ((state == cooldown) && (args.rcv)) {
             args.thread_data[i].duration = When () - args.thread_data[i].t0;
         }
+    }
+}
+
+
+void
+setup_filenames (ThreadArgs *targs)
+{
+    char s[512];
+    char s2[512];
+
+    memset (&s, 0, 512);
+    memset (&s2, 0, 512);
+    memset (&targs->outfile, 0, 512);
+    memset (&targs->outdir, 0, 512);
+
+    snprintf (s, 512, "%s/%s.%d-%s.dat", args.outdir, args.machineid, 
+            args.threadid, args.outfile);
+    snprintf (s2, 512, "%s/%s-throughput.dat", args.outdir, args.machineid);
+
+    memcpy (targs->outfile, s, 512);
+    memcpy (targs->outdir, s2, 512);
+
+    printf ("Results going into file %s\n", targs->outfile);
+}
+
+
+void
+record_throughput (ThreadArgs *targs)
+{
+    // Currently this doesn't do anything if there is an error opening
+    // the fd or writing to the file. TODO do we care?
+    int tputfd = open (targs->tput_outfile, O_CREAT | O_RDWR,
+            S_IRWXU | S_IRWXG | S_IRWXO);
+    if (tputfd < 0) {
+        fprintf (stderr, "Can't open throughput file for output!\n");
+        return;
+    }
+
+    char buf[20];
+    memset (buf, '\n', 20);
+    snprintf (buf, 20, "%f\n", targs->pps);
+    int ret = pwrite (tputfd, buf, 20, 20 * targs->threadid);
+    if (ret < 0) {
+        perror ("throughput write: ");
+    }
+
+    close (tputfd);
+}
+
+
+void
+debug_print (int debug_id, const char *format, ...)
+{
+    if (flag) {
+        va_list valist; 
+        va_start (valist, format);
+        int ret = vfprintf (stdout, format, valist);
+        va_end (args);
     }
 }
 

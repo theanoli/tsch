@@ -75,14 +75,17 @@ struct threadargs
     ProtocolStruct prot;   /* Protocol-depended stuff                       */
 
     char    *host;          /* Name of receiving host                       */
-    char    *outfile;       /* Where results go to die                      */
+    char    outdir[512];
+    char    outfile[512];       /* Where results go to die                      */
+    char    *tput_outfile;
     int     tr, rcv;
     int     latency;        /* 1 if this is a latency experiment            */
     int     ncli;           /* #server threads if tr; #client threads per 
                                server thread if rcv                         */
+    int     no_record;
 
-    char    *r_ptr;        /* Pointer to current location in receive buffer */
-    char    *s_ptr;        /* Pointer to current location in send buffer    */
+    // char    *r_ptr;        /* Pointer to current location in receive buffer */
+    // char    *s_ptr;        /* Pointer to current location in send buffer    */
     char    rbuff[PSIZE + 1];  /* Receive buffer                                */
     char    sbuff[PSIZE + 1];  /* Send buffer                                   */
 
@@ -100,6 +103,7 @@ struct threadargs
     volatile ProgramState program_state;
     double t0;
     int tput_done;
+
 };
 
 typedef struct programargs ProgramArgs;
@@ -116,7 +120,7 @@ struct programargs
     int     collect_stats;  /* Collect stats on resource usage              */
     int     tr,rcv;         /* Transmit and Recv flags, or maybe neither    */
     int     nthreads;       /* How many threads to launch                   */
-    char    *outfile;       /* Where results go to die                      */
+    int     no_record;      /* Flag: record results or not                  */
 
     char    sbuff[PSIZE + 1];   /* Tput: the string that will be sent       */
 
@@ -139,51 +143,30 @@ struct data
 
 
 void InterruptThreads ();
-
 void UpdateProgramState (ProgramState state);
-
 double When ();
-
 struct timespec When2 ();
-
 void Init (ProgramArgs *p, int* argc, char*** argv);
-
 void Setup (ThreadArgs *p);
-
 void ThroughputSetup (ThreadArgs *p);
-
 void establish (ThreadArgs *p);
-
 void throughput_establish (ThreadArgs *p);
-
 int setsock_nonblock (int fd);
-
 void SendData (ThreadArgs *p);
-
 char *RecvData (ThreadArgs *p);
-
 void SimpleWrite (ThreadArgs *p);
-
 void LaunchThreads (ProgramArgs *p);
-
 void *ThreadEntry (void *vargp);
-
 void SimpleRxTx (ThreadArgs *p);
-
 void SimpleRx (ThreadArgs *p);
-
 void *SimpleTx (void *vargp);
-
 void TimestampWrite (ThreadArgs *p);
-
 void Echo (ThreadArgs *p);
-
 void CleanUp(ThreadArgs *p);
-
 void PrintUsage();
-
 void SignalHandler (int signum);
-
 void CollectStats (ProgramArgs *p);
-
 int getopt( int argc, char * const argv[], const char *optstring);
+void setup_filenames (ThreadArgs *targs);
+void record_throughput (ThreadArgs *targs);
+void debug_print (int debug_id, const char *format, ...);
