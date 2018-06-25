@@ -1,3 +1,5 @@
 drat/results
 *.swp
 out*
+machine_info.txt
+machine_list.txt
