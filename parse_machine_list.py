@@ -135,7 +135,7 @@ def setup_dpdk(whoami, machine_dict, do_mtcp):
                     (home, machines[machine]['iface'], i))
         else:
             # Takes as arg: iface
-            setup_cmd = ("cd %s; source 'dpdk-setup.sh %s'" % 
+            setup_cmd = ("cd %s; source 'dpdk_setup.sh %s'" % 
                     (home, machines[machine]['iface']))
         ssh = "ssh %s@%s.emulab.net" % (whoami, machineid)
         setup_cmd = "%s '%s'" % (ssh, setup_cmd)
@@ -158,7 +158,7 @@ def setup_rss_rfs(whoami, machine_dict):
         script_path = os.path.join(os.getcwd())
         ssh = ("ssh %s@%s.emulab.net" % (
             args.whoami, machines[machine]['machineid']))
-        setup_cmd = ("cd %s; sudo bash client_startup_script.sh %s" %
+        setup_cmd = ("cd %s; sudo bash machine_startup_script.sh %s" %
                 (script_path, machines[machine]['iface']))
         setup_cmd = "%s '%s'" % (ssh, setup_cmd)
         p = subprocess.Popen(shlex.split(setup_cmd))

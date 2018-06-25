@@ -1,1 +1,1 @@
-export RTE_SDK=/proj/sequencer/tsch/mininetpipe/DPDK
+export RTE_SDK=/proj/sequencer/mtcp/dpdk
