@@ -6,6 +6,7 @@
 #include <libgen.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h> 
 #include <string.h>
@@ -75,13 +76,13 @@ struct threadargs
     ProtocolStruct prot;   /* Protocol-depended stuff                       */
 
     char    *host;          /* Name of receiving host                       */
-    char    outdir[512];
     char    outfile[512];       /* Where results go to die                      */
     char    *tput_outfile;
     int     tr, rcv;
     int     latency;        /* 1 if this is a latency experiment            */
     int     ncli;           /* #server threads if tr; #client threads per 
                                server thread if rcv                         */
+    int     nrtts; 
     int     no_record;
 
     // char    *r_ptr;        /* Pointer to current location in receive buffer */
@@ -102,6 +103,7 @@ struct threadargs
     // timer data 
     volatile ProgramState program_state;
     double t0;
+    double pps;
     int tput_done;
 
 };
@@ -121,8 +123,12 @@ struct programargs
     int     tr,rcv;         /* Transmit and Recv flags, or maybe neither    */
     int     nthreads;       /* How many threads to launch                   */
     int     no_record;      /* Flag: record results or not                  */
+    int     nrtts; 
 
     char    sbuff[PSIZE + 1];   /* Tput: the string that will be sent       */
+
+    char    *outdir;
+    char    *outfile;       /* Where results go to die                      */
 
     pthread_t *tids;        /* Thread handles                               */
     ThreadArgs *thread_data;    /* Array of per-thread data structures      */

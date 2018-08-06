@@ -2,14 +2,19 @@
 
 Stuff for transport protocol development and experiments.
 
-## Installation
+## Setup
+
+### Before setting everything up... 
+Copy and paste the list of machines from the "List View" tab in your experiment's Emulab portal. 
 
 ### mTCP
-To install mTCP on a machine, run `sudo bash mtcp_setup.sh iface N`, where `iface` is the interface you want to bring down for DPDK and `N` is an integer that will become the last octet of that machine's IP address. Do not use the same number for two different machines at the same time!
+To install mTCP on all machines, run `python parse_machine_list.py [your emulab ID] --setup_mtcp`. 
 
-This will configure/build/install both DPDK and mTCP.
+### DPDK
+To set up DPDK on all machines (without mTCP), run `python parse_machine_list.py [your Emulab ID] --setup_DPDK`.
 
-For DPDK only, run `sudo bash dpdk-setup.sh iface`.
+### Linux TCP/UDP
+To disable irqbalance and collectl, and to enable RSS/RFS, run `python parse_machine_list.py [your Emulab ID] --setup_rss`. This will steer flows bound for particular ports to particular CPUs (e.g., packets destined for port 8000 will go to receive queue 0, which will be pinned to core 0), as well as killing collectl and irqbalance and turning off hyperthreading on 32-core machines. You will need to modify this script if you are on a machine with a different core count. 
 
 ### Building the binaries
 From the mininetpipe/ directory, type `make xyz`, where `xyz` is the protocol name you want to build. 
@@ -18,9 +23,6 @@ Available options as of now:
 * mtcp (mTCP)
 * udp (UDP)
 * tcp (TCP)
-
-### Setting up the machines
-To disable irqbalance and collectl, and to enable RSS/RFS, run `sudo bash machine_setup_script.sh iface1 iface2 ...` for all interfaces you plan to use. This will steer flows bound for particular ports to particular CPUs (e.g., packets destined for port 8000 will go to receive queue 0, which will be pinned to core 0), as well as killing collectl and irqbalance and turning off hyperthreading on 32-core machines. You will need to modify this script if you are on a machine with a different core count. For best results, run for every interface and on all machines involved in your experiment. 
 
 ## Running experiments
 The script `run_experiments.py` will launch the specified number of server and client processes when launched from the server machine. A basic call for throughput would be: 

@@ -92,6 +92,7 @@ LaunchThreads (ProgramArgs *p)
         targs[i].host = p->host;
         targs[i].tr = p->tr;
         targs[i].rcv = p->rcv;
+        targs[i].nrtts = p->nrtts;
         targs[i].online_wait = p->online_wait;
         targs[i].latency = p->latency;
         targs[i].ncli = p->ncli;
@@ -129,8 +130,7 @@ void *
 ThreadEntry (void *vargp)
 {
     ThreadArgs *targs = (ThreadArgs *)vargp;
-    int ret;
-
+    // This is a client
     if (targs->tr) {
         if (targs->latency) {
             Setup (targs);
@@ -147,6 +147,7 @@ ThreadEntry (void *vargp)
             */
         }
         
+    // This is a server
     } else if (targs->rcv) {
         if (targs->latency) {
             Setup (targs);
@@ -161,6 +162,7 @@ ThreadEntry (void *vargp)
             printf ("Throughput is %f pps\n", targs->counter/targs->duration);
             printf ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
 
+            targs->pps = targs->counter/targs->duration;
             if (targs->outfile != NULL) {
                 record_throughput (targs);
             }
@@ -370,7 +372,7 @@ TimestampWrite (ThreadArgs *p)
     int n, m;
     int i;
     struct timespec sendtime, recvtime;
-    int out;
+    FILE *out;
 
     p->lbuff = malloc (PSIZE * 2);
     if (p->lbuff == NULL) {
@@ -378,7 +380,7 @@ TimestampWrite (ThreadArgs *p)
         exit (1);
     }
 
-    if (args.tr && !p->no_record) {
+    if (p->tr && !p->no_record) {
         if ((out = fopen (p->outfile, "wb")) == NULL) {
             fprintf (stderr, "Can't open %s for output!\n", p->outfile);
             exit (1);

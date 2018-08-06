@@ -16,22 +16,13 @@ FILE *out;          /* Output data file                          */
 int 
 main (int argc, char **argv)
 {
-    char s[512];        /* Empty string for filepath */
-    char cpy_s[512];	/* For basename */
-    int default_outdir;     /* bool; use default outdir? */
-    char *outdir;
-
-    int default_outfile;    /* bool; use default outfile? */
-    char *outfile;
-
-    int nrtts __attribute__((__unused__));
     int sleep_interval __attribute__((__unused__)); /* How long to sleep b/t latency pings (usec) */
 
     int c, i;
 
     /* Initialize vars that may change from default due to arguments */
     sleep_interval = 0;
-    nrtts = NRTTS;
+    args.nrtts = NRTTS;
     args.latency = 1;  // Default to do latency; this is arbitrary
     args.expduration = 20;  // Seconds; default for throughput, will get
                             // overridden for latency or by args
@@ -86,7 +77,7 @@ main (int argc, char **argv)
             case 'T': args.nthreads = atoi (optarg);
                       break;
 
-            case 'r': nrtts = atoi (optarg);
+            case 'r': args.nrtts = atoi (optarg);
                       break;
 
             // Overloading to be #clients (for server) and #servers for (clients)
@@ -136,11 +127,6 @@ main (int argc, char **argv)
         args.expduration = 1000000;
         LaunchThreads (&args);
 
-        if (args.tr) {
-            
-        } else if (args.rcv) {
-            Echo (&args);
-        }
     } else {
         /* FOR THROUGHPUT */
 
@@ -182,9 +168,6 @@ main (int argc, char **argv)
             sleep (COOLDOWN);
 
             UpdateProgramState (end);
-            
-            // TODO this needs to be fixed, it's awful 
-            // InterruptThreads ();
         }
 
         for (i = 0; i < args.nthreads; i++) {
@@ -238,14 +221,14 @@ setup_filenames (ThreadArgs *targs)
     memset (&s, 0, 512);
     memset (&s2, 0, 512);
     memset (&targs->outfile, 0, 512);
-    memset (&targs->outdir, 0, 512);
+    memset (&targs->tput_outfile, 0, 512);
 
     snprintf (s, 512, "%s/%s.%d-%s.dat", args.outdir, args.machineid, 
-            args.threadid, args.outfile);
+            targs->threadid, args.outfile);
     snprintf (s2, 512, "%s/%s-throughput.dat", args.outdir, args.machineid);
 
     memcpy (targs->outfile, s, 512);
-    memcpy (targs->outdir, s2, 512);
+    memcpy (targs->tput_outfile, s2, 512);
 
     printf ("Results going into file %s\n", targs->outfile);
 }
@@ -278,11 +261,11 @@ record_throughput (ThreadArgs *targs)
 void
 debug_print (int debug_id, const char *format, ...)
 {
-    if (flag) {
+    if (debug_id) {
         va_list valist; 
         va_start (valist, format);
-        int ret = vfprintf (stdout, format, valist);
-        va_end (args);
+        vfprintf (stdout, format, valist);
+        va_end (valist);
     }
 }
 

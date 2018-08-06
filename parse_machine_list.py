@@ -152,7 +152,7 @@ def setup_rss_rfs(whoami, machine_dict):
     print "\nSetting up RSS/RFS on all machines..."
     subprocesses = []
     for machine in machine_dict.keys():
-        print ("\nSetting up RSS/RFS on machine %s (%s)..." % (
+        print ("\nSetting up RSS/RFS on machine %s..." % (
                 machines[machine]['machineid']))
 
         script_path = os.path.join(os.getcwd())
