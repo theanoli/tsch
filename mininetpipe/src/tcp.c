@@ -367,7 +367,6 @@ TimestampWrite (ThreadArgs *p)
 {
     // Send and then receive an echoed timestamp.
     // Return a pointer to the stored timestamp. 
-    // TODO this is super old and might not work anymore
     char pbuffer[PSIZE];  // for packets
     int n, m;
     int i;

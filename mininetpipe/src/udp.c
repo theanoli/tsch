@@ -43,12 +43,12 @@ LaunchThreads (ProgramArgs *p)
             targs[i].port = p->port + i % p->ncli % NSERVERCORES;
         }
         targs[i].host = p->host;
-        targs[i].outfile = p->outfile;
         targs[i].tr = p->tr;
         targs[i].rcv = p->rcv;
         targs[i].online_wait = p->online_wait;
         targs[i].latency = p->latency;
         targs[i].no_record = p->no_record;
+        targs[i].nrtts = p->nrtts;
         memcpy (targs[i].sbuff, p->sbuff, PSIZE + 1);
 
         setup_filenames (&targs[i]);
@@ -80,8 +80,7 @@ ThreadEntry (void *vargp)
     
     if (targs->tr) {
         if (targs->latency) {
-            printf ("Not implemented!\n");
-            exit (-102);
+            TimestampWrite (targs);
         } else {
             // FOR OPEN-LOOP CLIENTS; see TCP for closed-loop format
             // Create an additional sending thread
@@ -104,6 +103,7 @@ ThreadEntry (void *vargp)
             printf ("Throughput is %f pps\n", targs->counter/targs->duration);
             printf ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
 
+            targs->pps = targs->counter/targs->duration;
             if (!targs->no_record) {
                 record_throughput (targs);
             }
@@ -266,42 +266,83 @@ TimestampWrite (ThreadArgs *p)
     // Send and then receive an echoed timestamp.
     // Return a pointer to the stored timestamp. 
     // TODO this might be broken b/c of addressing
-    int n;
+    char pbuffer[PSIZE];  // for packets
+    int n, m;
+    int i;
     struct timespec sendtime, recvtime;
+    FILE *out;
     struct sockaddr_in *remote = NULL;
     socklen_t len;
 
     remote = &(p->prot.sin1);
     len = sizeof (*remote); 
-    sendtime = When2 ();
-    snprintf (p->s_ptr, PSIZE, "%lld,%.9ld%-31s",
-            (long long) sendtime.tv_sec, sendtime.tv_nsec, ",");
 
-    n = sendto (p->commfd, p->s_ptr, PSIZE - 1, 0,
+    p->lbuff = malloc (PSIZE * 2);
+    if (p->lbuff == NULL) {
+        fprintf (stderr, "Malloc for lbuff failed!\n");
+        exit (1);
+    }
+
+    if (p->tr && !p->no_record) {
+        if ((out = fopen (p->outfile, "wb")) == NULL) {
+            fprintf (stderr, "Can't open %s for output!\n", p->outfile);
+            exit (1);
+        }
+    } else {
+        out = stdout;
+    }
+
+    for (i = 0; i < p->nrtts; i++) {
+        sendtime = When2 ();
+        snprintf (pbuffer, PSIZE, "%lld,%.9ld%-31s",
+                (long long) sendtime.tv_sec, sendtime.tv_nsec, ",");
+
+        n = sendto (p->commfd, pbuffer, PSIZE - 1, 0,
             (struct sockaddr *) remote, len); 
-    if (n < 0) {
-        perror ("write");
-        exit (1);
+        if (n < 0) {
+            perror ("write");
+            exit (1);
+        }
+
+        debug_print (DEBUG, "pbuffer: %s, %d bytes written\n", pbuffer, n);
+
+        memset (pbuffer, 0, PSIZE);
+        
+        // If the recvfrom times out (ret. -1), resend the packet and go 
+        // through the loop again 
+        while ((n = recvfrom (p->commfd, pbuffer, PSIZE, 0, 
+                (struct sockaddr *) remote, &len)) == -1) {
+            p->retransmits++;
+
+            n = sendto (p->commfd, pbuffer, PSIZE - 1, 0, 
+                    (struct sockaddr *) remote, len);
+            if (n < 0) {
+                perror ("write");
+                exit (1);
+            }
+        }
+        recvtime = When2 ();        
+
+        if (n == 0) {
+            printf ("Skipping...\n");
+            return;
+        }
+
+        memset (p->lbuff, 0, PSIZE * 2);
+        m = snprintf (p->lbuff, PSIZE, "%s", pbuffer);
+        snprintf (p->lbuff + m, PSIZE, "%lld,%.9ld\n", 
+                (long long) recvtime.tv_sec, recvtime.tv_nsec);
+
+        if (!p->no_record) {
+            fwrite (p->lbuff, strlen (p->lbuff), 1, out);
+        }
+        debug_print (DEBUG, "Got timestamp: %s, %d bytes read\n", pbuffer, n);
+        
+        if (n < 0) {
+            perror ("read");
+            exit (1);
+        }
     }
-
-    if (DEBUG)
-        printf ("send buffer: %s, %d bytes written\n", p->s_ptr, n);
-
-    memset (p->s_ptr, 0, PSIZE);
-    
-    n = recvfrom (p->commfd, p->s_ptr, PSIZE, 0, 
-            (struct sockaddr *) remote, &len);
-    if (n < 0) {
-        perror ("read");
-        exit (1);
-    }
-    recvtime = When2 ();        
-
-    if (DEBUG)
-        printf ("Got timestamp: %s, %d bytes read\n", p->s_ptr, n);
-    snprintf (p->lbuff, PSIZE, "%s", p->s_ptr);
-    snprintf (p->lbuff + PSIZE - 1, PSIZE, "%lld,%.9ld\n", 
-            (long long) recvtime.tv_sec, recvtime.tv_nsec);
 }
 
 

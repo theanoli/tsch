@@ -95,10 +95,11 @@ struct threadargs
     char    *lbuff;          /* For saving latency measurements */
 
     // for throughput measurements
-    int     online_wait;    /* How long to wait for clients to come up */
+    int     online_wait;    /* How long to wait for clients to come up      */
     uint64_t counter;       /* For counting packets!                        */
     double  duration;       /* Measured time over which packets are blasted */
-    int ep;                 /* For epoll file descriptor                */
+    int ep;                 /* For epoll file descriptor                    */
+    uint64_t retransmits;   /* Only useful for unreliable transports        */
 
     // timer data 
     volatile ProgramState program_state;
