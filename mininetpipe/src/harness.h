@@ -76,8 +76,8 @@ struct threadargs
     ProtocolStruct prot;   /* Protocol-depended stuff                       */
 
     char    *host;          /* Name of receiving host                       */
-    char    outfile[512];       /* Where results go to die                      */
-    char    *tput_outfile;
+    char    latency_outfile[512];       /* Where results go to die                      */
+    char    tput_outfile[512];
     int     tr, rcv;
     int     latency;        /* 1 if this is a latency experiment            */
     int     ncli;           /* #server threads if tr; #client threads per 
@@ -126,10 +126,10 @@ struct programargs
     int     no_record;      /* Flag: record results or not                  */
     int     nrtts; 
 
+    char    *outfile_base;
     char    sbuff[PSIZE + 1];   /* Tput: the string that will be sent       */
 
     char    *outdir;
-    char    *outfile;       /* Where results go to die                      */
 
     pthread_t *tids;        /* Thread handles                               */
     ThreadArgs *thread_data;    /* Array of per-thread data structures      */

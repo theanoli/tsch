@@ -65,7 +65,8 @@ def get_machine_info():
                 'machineid': machineid
         }
 
-        ssh = " ".join(fields[4:])
+        ssh = " ".join(fields[5:])
+        print(ssh)
 
         ip, iface = get_iface(ssh)
         mac = get_mac(ssh, iface)
@@ -123,8 +124,6 @@ def read_machine_info():
 
 
 def setup_dpdk(whoami, machine_dict, do_mtcp):
-    print "\nSetting up DPDK on sequencer, proxies, and dep trackers..."
-
     home = os.getcwd()
     codes = []
     for i, machine in enumerate(machine_dict.keys()):
@@ -176,7 +175,7 @@ if __name__ == "__main__":
             help=('If set, set up mTCP on all machines.'),
             action='store_true')
     parser.add_argument('--do_rss',
-            help=('If set, set up RSS/RFS on the clients.'),
+            help=('If set, set up RSS/RFS on all machines.'),
             action='store_true')
     parser.add_argument('--read_info',
             help=('If set, read machine info from machine_info.txt rather than' +

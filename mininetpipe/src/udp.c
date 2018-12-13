@@ -1,8 +1,7 @@
 #include "harness.h"
 
 #define DEBUG 0
-
-int doing_reset = 0;
+#define TIMEOUT 100  // in usec
 
 void
 Init (ProgramArgs *p, int *pargc, char ***pargv)
@@ -51,7 +50,10 @@ LaunchThreads (ProgramArgs *p)
         targs[i].nrtts = p->nrtts;
         memcpy (targs[i].sbuff, p->sbuff, PSIZE + 1);
 
-        setup_filenames (&targs[i]);
+        printf ("Setting up filenames...\n");
+        if (p->tr) {
+            setup_filenames (&targs[i]);
+        }
 
         if (p->rcv) {
             printf ("[%s] Launching thread %d...\n", p->machineid, i);
@@ -132,6 +134,7 @@ Setup (ThreadArgs *p)
 
     struct protoent *proto;
     int flags; 
+    struct timeval read_timeout;
 
     host = p->host;
     sprintf (portno, "%d", p->port);
@@ -183,6 +186,11 @@ Setup (ThreadArgs *p)
         }
 
         printf ("%s successfully made contact on port %d!\n", p->threadname, p->port);
+        read_timeout.tv_sec = 0;
+        read_timeout.tv_usec = TIMEOUT;
+        setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, &read_timeout,
+                sizeof (read_timeout));
+
         lsin1->sin_port = htons (p->port);
         p->commfd = sockfd;
         freeaddrinfo (result);
@@ -284,14 +292,19 @@ TimestampWrite (ThreadArgs *p)
     }
 
     if (p->tr && !p->no_record) {
-        if ((out = fopen (p->outfile, "wb")) == NULL) {
-            fprintf (stderr, "Can't open %s for output!\n", p->outfile);
+        if ((out = fopen (p->latency_outfile, "wb")) == NULL) {
+            fprintf (stderr, "Can't open %s for output!\n", p->latency_outfile);
             exit (1);
         }
     } else {
         out = stdout;
     }
 
+    while (p->program_state != experiment) {
+    }
+
+    printf ("Getting ready to send timestamp packets...\n");
+    fflush (stdout);
     for (i = 0; i < p->nrtts; i++) {
         sendtime = When2 ();
         snprintf (pbuffer, PSIZE, "%lld,%.9ld%-31s",
@@ -313,6 +326,8 @@ TimestampWrite (ThreadArgs *p)
         while ((n = recvfrom (p->commfd, pbuffer, PSIZE, 0, 
                 (struct sockaddr *) remote, &len)) == -1) {
             p->retransmits++;
+            printf ("%d retransmits\n", (int)p->retransmits);
+            fflush (stdout);
 
             n = sendto (p->commfd, pbuffer, PSIZE - 1, 0, 
                     (struct sockaddr *) remote, len);
@@ -361,7 +376,7 @@ Echo (ThreadArgs *p)
 
     for (i = 0; i < MAXEVENTS; i++) {
         iovecs[i].iov_base          = bufs[i];
-        iovecs[i].iov_len           = PSIZE;
+        iovecs[i].iov_len           = PSIZE + 1;
         msgs[i].msg_hdr.msg_iov     = &iovecs[i];
         msgs[i].msg_hdr.msg_iovlen  = 1;
         msgs[i].msg_hdr.msg_name    = &addrs[i];
@@ -374,7 +389,7 @@ Echo (ThreadArgs *p)
     while (p->program_state == startup) {
     }
 
-    struct timespec timeout = { .tv_nsec = 15 * 1000UL, };
+    struct timespec timeout = { .tv_nsec = 1000 * 1000UL, };
     printf ("%s Entering packet receive mode...\n", p->threadname);
 
     while (p->program_state != end) { 
@@ -385,8 +400,7 @@ Echo (ThreadArgs *p)
 
         if (m < 0) {
             // if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-            if (errno == EINTR) {
-                printf ("%s Caught an interrupt...\n", p->threadname);
+            if ((errno == EINTR) || (errno == EAGAIN)) {
                  continue;
             }
             perror ("read");
@@ -439,10 +453,6 @@ establish (ThreadArgs *p)
         // For UDP, this will let multiple processes to bind to the same port;
         // here we want it so we can immediately reuse the same socket
         if (setsockopt (p->commfd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof (int))) {
-            perror ("tester: server: unable to setsockopt!");
-            exit (557);
-        }
-        if (setsockopt (p->commfd, SOL_SOCKET, SO_REUSEPORT, &one, sizeof (int))) {
             perror ("tester: server: unable to setsockopt!");
             exit (557);
         }

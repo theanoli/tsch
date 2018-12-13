@@ -5,13 +5,13 @@ Stuff for transport protocol development and experiments.
 ## Setup
 
 ### Before setting everything up... 
-Copy and paste the list of machines from the "List View" tab in your experiment's Emulab portal. 
+Copy and paste, into the file `./machine_list.txt`, the list of machines from the "List View" tab in your experiment's Emulab portal. 
 
 ### mTCP
-To install mTCP on all machines, run `python parse_machine_list.py [your emulab ID] --setup_mtcp`. 
+To install mTCP on all machines, run `python parse_machine_list.py [your emulab ID] --do_mtcp`. 
 
 ### DPDK
-To set up DPDK on all machines (without mTCP), run `python parse_machine_list.py [your Emulab ID] --setup_DPDK`.
+To set up DPDK on all machines (without mTCP), run `python parse_machine_list.py [your Emulab ID] --do_DPDK`.
 
 ### Linux TCP/UDP
 To disable irqbalance and collectl, and to enable RSS/RFS, run `python parse_machine_list.py [your Emulab ID] --setup_rss`. This will steer flows bound for particular ports to particular CPUs (e.g., packets destined for port 8000 will go to receive queue 0, which will be pinned to core 0), as well as killing collectl and irqbalance and turning off hyperthreading on 32-core machines. You will need to modify this script if you are on a machine with a different core count. 

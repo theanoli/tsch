@@ -24,10 +24,6 @@ main (int argc, char **argv)
     sleep_interval = 0;
     args.nrtts = NRTTS;
     args.latency = 1;  // Default to do latency; this is arbitrary
-    args.expduration = 20;  // Seconds; default for throughput, will get
-                            // overridden for latency or by args
-    args.online_wait = 0;
-    args.nthreads = 1;
     args.pinthreads = 0;
     args.no_record = 0;
 
@@ -49,6 +45,7 @@ main (int argc, char **argv)
     args.port = DEFPORT;  // The first port; if more than one server thread, 
                           // will need to open DEFPORT + 1, ... 
 
+    printf ("In the client program!\n");
     /* Parse the arguments. See Usage for description */
     while ((c = getopt (argc, argv, "o:d:H:T:r:c:P:ps:tu:lw:h")) != -1)
     {
@@ -57,14 +54,10 @@ main (int argc, char **argv)
             case 'n': args.no_record = 1;
                       break; 
 
-            case 'o': args.outfile = optarg;
-                      printf ("Sending output to file %s\n", optarg);
-                      fflush (stdout);
+            case 'o': args.outfile_base = optarg;
                       break;
 
             case 'd': args.outdir = optarg;
-                      printf ("Sending output to directory %s\n", optarg); 
-                      fflush(stdout);
                       break;
 
             case 'H': args.tr = 1;       /* -H implies transmit node */
@@ -116,16 +109,13 @@ main (int argc, char **argv)
     
     /* Let modules initialize related vars, and possibly call a library init
        function that requires argc and argv */
+    printf ("[%s] Initializing...\n", args.machineid);
     Init (&args, &argc, &argv);   /* This will set args.tr and args.rcv */
 
     /* FOR LATENCY */
     if (args.latency) {
-        printf ("Sorry, not implemented yet");
-        exit (1);
-
-        // Some huge number, don't actually care
-        args.expduration = 1000000;
         LaunchThreads (&args);
+        UpdateProgramState (experiment);
 
     } else {
         /* FOR THROUGHPUT */
@@ -169,10 +159,10 @@ main (int argc, char **argv)
 
             UpdateProgramState (end);
         }
+    }
 
-        for (i = 0; i < args.nthreads; i++) {
-            pthread_join (args.tids[i], NULL);
-        }
+    for (i = 0; i < args.nthreads; i++) {
+        pthread_join (args.tids[i], NULL);
     }
 
     return 0;
@@ -220,17 +210,17 @@ setup_filenames (ThreadArgs *targs)
 
     memset (&s, 0, 512);
     memset (&s2, 0, 512);
-    memset (&targs->outfile, 0, 512);
+    memset (&targs->latency_outfile, 0, 512);
     memset (&targs->tput_outfile, 0, 512);
 
-    snprintf (s, 512, "%s/%s.%d-%s.dat", args.outdir, args.machineid, 
-            targs->threadid, args.outfile);
-    snprintf (s2, 512, "%s/%s-throughput.dat", args.outdir, args.machineid);
+    snprintf (s, 512, "%s/%s_%s.%d-latency.dat", args.outdir, args.outfile_base, args.machineid, 
+            targs->threadid);
+    snprintf (s2, 512, "%s/%s_%s-throughput.dat", args.outdir, args.outfile_base, args.machineid);
 
-    memcpy (targs->outfile, s, 512);
+    memcpy (targs->latency_outfile, s, 512);
     memcpy (targs->tput_outfile, s2, 512);
 
-    printf ("Results going into file %s\n", targs->outfile);
+    printf ("Results going into file %s\n", targs->latency_outfile);
 }
 
 
@@ -302,33 +292,23 @@ CollectStats (ProgramArgs *p)
         printf ("[server] Launching collectl...\n");
         fflush (stdout);
         char nsamples[128];
+        char outfile[128];
         
         snprintf (nsamples, 128, "-c%d", p->expduration);
+        snprintf (outfile, 128, "%s/%s-collectl", p->outdir, p->outfile_base);
 
-        if (p->outfile == NULL) {
-            // Nowhere to save results; dump to terminal
-            char *argv[4];
+        // else save results to file
+        char *argv[8];
 
-            argv[0] = "collectl";
-            argv[1] = "-sc";
-            argv[2] = nsamples;
-            argv[3] = NULL;
-            execvp ("collectl", argv);
-
-        } else {
-            // else save results to file
-            char *argv[8];
-
-            argv[0] = "collectl";
-            argv[1] = "-P";
-            argv[2] = "-f";
-            argv[3] = p->outfile;
-            argv[4] = "-sc";
-            argv[5] = nsamples;
-            argv[6] = "-oaz";
-            argv[7] = NULL;
-            execvp ("collectl", argv);
-        }
+        argv[0] = "collectl";
+        argv[1] = "-P";
+        argv[2] = "-f";
+        argv[3] = outfile;
+        argv[4] = "-sc";
+        argv[5] = nsamples;
+        argv[6] = "-oaz";
+        argv[7] = NULL;
+        execvp ("collectl", argv);
     }
 }
 

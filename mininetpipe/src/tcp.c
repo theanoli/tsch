@@ -6,9 +6,6 @@
 #define WARMUP 3
 #define COOLDOWN 5
 
-int doing_reset = 0;
-
-
 int
 tcp_accept_helper (int ep, int sockid, struct sockaddr *addr, socklen_t *addrlen)
 {
@@ -99,7 +96,9 @@ LaunchThreads (ProgramArgs *p)
         targs[i].ep = -1;
         memcpy (targs[i].sbuff, p->sbuff, PSIZE + 1);
 
-        setup_filenames (&targs[i]);
+        if (p->tr) {
+            setup_filenames (&targs[i]);
+        }
 
         if (p->rcv) {
             printf ("[%s] Launching thread %d, ", p->machineid, i);
@@ -163,7 +162,7 @@ ThreadEntry (void *vargp)
             printf ("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
 
             targs->pps = targs->counter/targs->duration;
-            if (targs->outfile != NULL) {
+            if (targs->tput_outfile != NULL) {
                 record_throughput (targs);
             }
 
@@ -354,8 +353,6 @@ SimpleTx (void *vargp)
             perror ("write to server");
             exit (1);
         }
-
-        usleep (100000);
     }
 
     return 0;
@@ -380,14 +377,15 @@ TimestampWrite (ThreadArgs *p)
     }
 
     if (p->tr && !p->no_record) {
-        if ((out = fopen (p->outfile, "wb")) == NULL) {
-            fprintf (stderr, "Can't open %s for output!\n", p->outfile);
+        if ((out = fopen (p->latency_outfile, "wb")) == NULL) {
+            fprintf (stderr, "Can't open %s for output!\n", p->latency_outfile);
             exit (1);
         }
     } else {
         out = stdout;
     }
 
+    printf ("[%s] Getting ready to send from thread %d, ", p->machineid, i);
     for (i = 0; i < p->nrtts; i++) {
         sendtime = When2 ();
         snprintf (pbuffer, PSIZE, "%lld,%.9ld%-31s",

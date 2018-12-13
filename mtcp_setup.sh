@@ -13,7 +13,7 @@ fi
 rm -f $dpdk/lib
 rm -f $dpdk/include
 
-bash /proj/sequencer/tsch/dpdk-setup.sh $1
+bash /proj/sequencer/tsch/dpdk_setup.sh $1
 
 if [ $? -gt 0 ]; then
 	echo "DPDK setup failed"

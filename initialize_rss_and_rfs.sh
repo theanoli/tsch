@@ -1,13 +1,14 @@
 # Set up RSS -- note there are only 63 queues!
 
 iface=$1
+ncores=$2
 
 # Enable ntuple hashing
 sudo ethtool -K $iface ntuple on
 
 # Specify actions for matches
 # To check: sudo ethtool -u <interface>
-for x in `seq 0 62`; do
+for x in `seq 0 $(($ncores - 1))`; do
     if [ $x -gt 9 ]; then
         port=80$x
     else
@@ -21,7 +22,7 @@ done
 echo 32768 | sudo tee /proc/sys/net/core/rps_sock_flow_entries
 
 # Set this value to be the max number of entries/total # queues
-for x in `seq 0 62`; do
+for x in `seq 0 $(($ncores - 1))`; do
     echo 512 | sudo tee /sys/class/net/$iface/queues/rx-$x/rps_flow_cnt
 done
 
