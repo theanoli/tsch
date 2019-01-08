@@ -151,14 +151,23 @@ def setup_rss_rfs(whoami, machine_dict):
     print "\nSetting up RSS/RFS on all machines..."
     subprocesses = []
     for machine in machine_dict.keys():
-        print ("\nSetting up RSS/RFS on machine %s..." % (
+        if "server" in machine: 
+            am_server = 1
+        else:
+            am_server = 0
+
+        print ("\nSetting up RSS/RFS on machine %s (%s)..." % (
+                machine,
                 machines[machine]['machineid']))
 
         script_path = os.path.join(os.getcwd())
         ssh = ("ssh %s@%s.emulab.net" % (
             args.whoami, machines[machine]['machineid']))
-        setup_cmd = ("cd %s; sudo bash machine_startup_script.sh %s" %
-                (script_path, machines[machine]['iface']))
+        setup_cmd = ("cd %s; sudo bash machine_startup_script.sh %s %s" %
+                (script_path, 
+                    machines[machine]['iface'],
+                    am_server))
+        print(setup_cmd)
         setup_cmd = "%s '%s'" % (ssh, setup_cmd)
         p = subprocess.Popen(shlex.split(setup_cmd))
         p.wait()
