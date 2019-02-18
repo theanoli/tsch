@@ -16,17 +16,9 @@ sudo bash turn_off_some_cores.sh $ncores_noht $(($ncores-1))   # turn off HT
 echo "Setting nqueues == ncores..."
 sudo ethtool -L $iface combined $ncores_noht
 
-# RSS: Which queue should handle interrupts from packets matching
-# a particular hash
-# Have only half the queues handle interrupts
-if [[ $am_server -eq 1 ]]; then
-    echo "Setting queues-to-cores interrupt handling mapping..."
-    sudo ethtool -X $iface weight 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1
-fi
-
 # Which CPUs should handle interrupts from which queues
-echo "Setting SMP affinity..."
-sudo bash set_smp_affinity.sh $iface $ncores_noht
+#echo "Setting SMP affinity..."
+#sudo bash set_smp_affinity.sh $iface $ncores_noht
 
 # Which CPUs should handle packets from which queues; only
 # do this when threads/processes are pinned to cores and each thread
@@ -36,8 +28,8 @@ if [[ $am_server -eq 1 ]]; then
     do_flowdir=0
     do_rfs=0
 else
-    do_flowdir=1
-    do_rfs=1
+    do_flowdir=0
+    do_rfs=0
 fi
 echo "Initializing RSS and RFS, FDir=$do_flowdir and RFS=$do_rfs..."
 sudo bash initialize_rss_and_rfs.sh $iface $ncores_noht \

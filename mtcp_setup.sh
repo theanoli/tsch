@@ -9,6 +9,15 @@ if [ $# -lt 2 ]; then
 	exit
 fi
 
+ncores=`lscpu | awk '$1 == "CPU(s):" {print $2}'`
+ncores_noht=$(($ncores/2))
+
+sudo pkill collectl
+sudo service irqbalance stop
+
+#echo "Turning off cores $ncores_noht through $(($ncores-1))..."
+#sudo bash turn_off_some_cores.sh $ncores_noht $(($ncores-1))   # turn off HT
+
 # Clean up old builds
 rm -f $dpdk/lib
 rm -f $dpdk/include

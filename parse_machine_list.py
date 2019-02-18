@@ -13,20 +13,22 @@ def get_iface(ssh):
     cmd = ssh + """ \"ifconfig | grep 10\\.1\\.1 -B1 | awk 'NR==1{ print $1 }'\""""
     try:
         iface = subprocess.check_output(shlex.split(cmd))
-        if not iface.strip():
+        iface = iface.decode().strip()
+        if not iface:
             return None, None
     except:
         return None, None
 
-    cmd = ssh + """ \"ifconfig %s | awk -F ' *|:' '/inet addr/{ print $4 }'\"""" % iface.strip()
+    cmd = ssh + """ \"ifconfig %s | awk -F ' *|:' '/inet addr/{ print $4 }'\"""" % iface
     try:
         ip = subprocess.check_output(shlex.split(cmd))
-        if not ip.strip():
+        ip = ip.decode().strip()
+        if not ip:
             return None, None
     except:
         return None, None
     
-    return ip.strip(), iface.strip()
+    return ip, iface
     
 
 def get_mac(ssh, iface):
@@ -35,7 +37,7 @@ def get_mac(ssh, iface):
         return None
     try: 
         mac = subprocess.check_output(shlex.split(cmd))
-        return mac.strip()
+        return mac.decode().strip()
     except: 
         return None
 
@@ -53,8 +55,8 @@ def get_machine_info():
         if line == '\n':
             continue
         fields = line.split()
-        machinename = fields[0]
-        machineid = fields[1]
+        machinename = fields[0]  # e.g., "client-0"
+        machineid = fields[1]  # e.g., "pc722"
 
         if "server" in machinename:
             servers.append(machinename)
@@ -73,7 +75,7 @@ def get_machine_info():
 
         if iface is None or mac is None:
             manual_input_flag = 1
-            print ("Couldn't get iface and/or mac--will pause before setting" +
+            print("Couldn't get iface and/or mac--will pause before setting" +
                 " up DPDK so you can input them manually")
 
         machines[machinename]['iface'] = iface
@@ -81,13 +83,13 @@ def get_machine_info():
         machines[machinename]['ip'] = ip
         
         dump.write("%s,%s,%s,%s,%s\n" % (machinename, machineid, iface, mac, ip))
-        print machinename, machineid, iface, mac, ip
+        print(machinename, machineid, iface, mac, ip)
 
     f.close()
     dump.close()
 
     if manual_input_flag:
-        raw_input ("Pausing for manual input; save machine_list.txt with" + 
+        input ("Pausing for manual input; save machine_list.txt with" + 
                 " missing values filled in, then hit any key to keep going... ")
         machines, clients, servers = read_machine_info()
 
@@ -123,54 +125,69 @@ def read_machine_info():
     return machines, clients, servers
 
 
-def setup_dpdk(whoami, machine_dict, do_mtcp):
+def setup_machines(whoami, args):
     home = os.getcwd()
     codes = []
-    for i, machine in enumerate(machine_dict.keys()):
+    for i, machine in enumerate(machines.keys()):
         machineid = machines[machine]['machineid']
-        if do_mtcp:
-            # Takes as args: iface, integer (for IP address)
-            setup_cmd = ("cd %s; sudo bash mtcp_setup.sh %s %d" % 
-                    (home, machines[machine]['iface'], i))
-        else:
-            # Takes as arg: iface
-            setup_cmd = ("cd %s; source 'dpdk_setup.sh %s'" % 
-                    (home, machines[machine]['iface']))
-        ssh = "ssh %s@%s.emulab.net" % (whoami, machineid)
-        setup_cmd = "%s '%s'" % (ssh, setup_cmd)
-        p = subprocess.Popen(shlex.split(setup_cmd))
-        p.wait()
-        codes.append((machine, p.returncode))
-
-    for machine, rc in codes: 
-        print ("%s completed with exit status %d" % 
-            (machine, rc))
-        
-
-def setup_rss_rfs(whoami, machine_dict):
-    print "\nSetting up RSS/RFS on all machines..."
-    subprocesses = []
-    for machine in machine_dict.keys():
-        if "server" in machine: 
+        if "server" in machine:
             am_server = 1
         else:
             am_server = 0
 
-        print ("\nSetting up RSS/RFS on machine %s (%s)..." % (
-                machine,
-                machines[machine]['machineid']))
+        if args.do_mtcp:
+            print("\nSetting up mTCP on all machines...")
+            ip_last_octet = i+1
+            # Takes as args: iface, integer (for IP address)
+            setup_cmd = ("cd %s; sudo bash mtcp_setup.sh %s %d" % 
+                    (home, machines[machine]['iface'], ip_last_octet))
+            machines[machine]['ip'] = '10.0.0.%d' % ip_last_octet
 
-        script_path = os.path.join(os.getcwd())
-        ssh = ("ssh %s@%s.emulab.net" % (
-            args.whoami, machines[machine]['machineid']))
-        setup_cmd = ("cd %s; sudo bash machine_startup_script.sh %s %s" %
-                (script_path, 
-                    machines[machine]['iface'],
-                    am_server))
-        print(setup_cmd)
+        elif args.do_dpdk:
+            print("\nSetting up DPDK on all machines...")
+            # Takes as arg: iface
+            setup_cmd = ("cd %s; source 'dpdk_setup.sh %s'" % 
+                    (home, machines[machine]['iface']))
+
+        elif args.do_udp:
+            print("\nSetting up all machines for UDP...")
+            setup_cmd = ("cd %s; sudo bash udp_setup.sh %s %s" %
+                    (home, machines[machine]['iface'],
+                        am_server))
+
+        elif args.do_tcp:
+            print("\nSetting up all machines for TCP...")
+            setup_cmd = ("cd %s; sudo bash tcp_setup.sh %s %s" %
+                    (home, machines[machine]['iface'],
+                        am_server))
+
+        else: 
+            print("\nNo additional setup! Exiting...")
+            return
+
+        ssh = "ssh %s@%s.emulab.net" % (whoami, machineid)
         setup_cmd = "%s '%s'" % (ssh, setup_cmd)
         p = subprocess.Popen(shlex.split(setup_cmd))
+        
+        # This needs to happen serially so compilation doesn't collide
         p.wait()
+        codes.append((machine, p.returncode))
+
+    # Need to update the IP addresses of all machines
+    if args.do_mtcp:
+        with open('machine_info.txt', 'wb') as dump:
+            for machine, values in machines.items():
+                info = "%s,%s,%s,%s,%s\n" % (
+                    machine, 
+                    values['machineid'], 
+                    values['iface'], 
+                    values['mac'], 
+                    values['ip'])
+                dump.write(info.encode('utf-8'))
+
+    for machine, rc in codes: 
+        print("%s completed with exit status %d" % 
+            (machine, rc))
 
 
 if __name__ == "__main__":
@@ -183,8 +200,11 @@ if __name__ == "__main__":
     parser.add_argument('--do_mtcp',
             help=('If set, set up mTCP on all machines.'),
             action='store_true')
-    parser.add_argument('--do_rss',
+    parser.add_argument('--do_udp',
             help=('If set, set up RSS/RFS on all machines.'),
+            action='store_true')
+    parser.add_argument('--do_tcp',
+            help=('If set, disable hyperthreading on all machines.'),
             action='store_true')
     parser.add_argument('--read_info',
             help=('If set, read machine info from machine_info.txt rather than' +
@@ -198,7 +218,4 @@ if __name__ == "__main__":
     else:
         machines, clients, servers = get_machine_info()
 
-    if args.do_dpdk or args.do_mtcp:
-        setup_dpdk(args.whoami, machines, args.do_mtcp)
-    if args.do_rss:
-        setup_rss_rfs(args.whoami, machines)
+    setup_machines(args.whoami, args)

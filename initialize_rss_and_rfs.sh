@@ -1,5 +1,3 @@
-# Set up RSS -- note there are only 63 queues!
-
 iface=$1
 ncores=$2
 do_flowdir=$3
@@ -32,6 +30,6 @@ if [[ $do_rfs -eq 1 ]]; then
     # Set this value to be the max number of entries/total # queues
     cd /sys/class/net/$iface/queues
     for queue in rx-*; do
-        echo 2048 | sudo tee $queue/rps_flow_cnt
+        echo 1024 | sudo tee $queue/rps_flow_cnt
     done
 fi
