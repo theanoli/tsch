@@ -13,13 +13,13 @@ def get_iface(ssh):
     cmd = ssh + """ \"ifconfig | grep 10\\.1\\.1 -B1 | awk 'NR==1{ print $1 }'\""""
     try:
         iface = subprocess.check_output(shlex.split(cmd))
-        iface = iface.decode().strip()
+        iface = iface.decode().split(":")[0]
         if not iface:
             return None, None
     except:
         return None, None
 
-    cmd = ssh + """ \"ifconfig %s | awk -F ' *|:' '/inet addr/{ print $4 }'\"""" % iface
+    cmd = ssh + """ \"ifconfig %s | awk -F ' *|:' '/inet /{ print $3 }'\"""" % iface
     try:
         ip = subprocess.check_output(shlex.split(cmd))
         ip = ip.decode().strip()
@@ -32,9 +32,9 @@ def get_iface(ssh):
     
 
 def get_mac(ssh, iface):
-    cmd = ssh + """ \"ifconfig -a %s | awk 'NR==1{ print $5 }'\"""" % iface
     if iface is None:
         return None
+    cmd = ssh + " \"cat /sys/class/net/%s/address\"" % iface
     try: 
         mac = subprocess.check_output(shlex.split(cmd))
         return mac.decode().strip()
@@ -146,7 +146,7 @@ def setup_machines(whoami, args):
         elif args.do_dpdk:
             print("\nSetting up DPDK on all machines...")
             # Takes as arg: iface
-            setup_cmd = ("cd %s; source 'dpdk_setup.sh %s'" % 
+            setup_cmd = ("cd %s; sudo bash dpdk_apt_setup.sh %s" % 
                     (home, machines[machine]['iface']))
 
         elif args.do_udp:
